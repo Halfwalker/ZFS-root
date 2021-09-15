@@ -1508,6 +1508,7 @@ fi
 cat > /etc/apt/apt.conf.d/30pre-snap << EOF
 # Snapshot root dataset before installing or removing packages
 Dpkg::Pre-Invoke { "/sbin/zfs snap ${POOLNAME}/ROOT/${SUITE}@apt_\$(date +%F-%H%M%S)"; };
+Dpkg::Pre-Invoke { "/sbin/zfs snap bpool/BOOT/${SUITE}@apt_\$(date +%F-%H%M%S)"; };
 EOF
 
 # zfs set mountpoint=legacy rpool/var/log
