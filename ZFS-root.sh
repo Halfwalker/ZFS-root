@@ -697,7 +697,7 @@ zfs mount ${POOLNAME}/ROOT/${SUITE}
     zfs mount bpool/BOOT/${SUITE}
     # zedenv wants /boot/grub to be a separate dataset
     zfs create -o org.zedenv.grub:bootonzfs=yes -o mountpoint=/boot/grub bpool/BOOT/grub
-    zfs mount ${POOLNAME}/BOOT/grub
+    zfs mount bpool/BOOT/grub
 
     # Per zedenv - use legacy
     # zfs create -o org.zedenv.grub:bootonzfs=yes -o mountpoint=legacy bpool/BOOT/grub
