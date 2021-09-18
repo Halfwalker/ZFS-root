@@ -94,11 +94,6 @@ PARTITION_DATA=5
 #       root dataset properties to point to /boot/pool.key
 ZFSENC_OPTIONS="-o encryption=aes-256-gcm -o keylocation=file://${ZFSBUILD}/boot/pool.key -o keyformat=raw"
 
-# If using grub, then dnodesize must be set to "legacy", not "auto"
-# Only needed for bootfs setting, which is needed for zedenv
-# https://github.com/johnramsden/zedenv
-DNODESIZE=legacy
-
 # Check for a local apt-cacher-ng system - looking for these hosts
 # aptcacher.local
 # bondi.local
@@ -352,7 +347,7 @@ case ${SUITE} in
         case ${SCRIPT_SUITE} in
             bionic | focal)
                 SUITE_BOOT_POOL="-o feature@userobj_accounting=enabled"
-                SUITE_ROOT_POOL="-O dnodesize=${DNODESIZE}"
+                SUITE_ROOT_POOL="-O dnodesize=auto"
                 ;;
             xenial)
                 SUITE_BOOT_POOL=""
