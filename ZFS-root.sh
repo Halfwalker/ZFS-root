@@ -225,7 +225,7 @@ fi
 if [ "${RAIDLEVEL}" = "single" ] ; then RAIDLEVEL= ; fi
 
 # Set basic options for install
-whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: Enabling HWE kernel requires pool attribute dnodesize=legacy" 18 83 7 \
+whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 18 83 7 \
     GOOGLE "Add google authenticator via pam for ssh logins" OFF \
     UEFI "Enable UEFI grub install" $( [ -d /sys/firmware/efi ] && echo ON || echo OFF ) \
     HWE "Install Hardware Enablement kernel" OFF \
@@ -367,7 +367,7 @@ case ${SUITE} in
         case ${SCRIPT_SUITE} in
             bionic | focal)
                 SUITE_BOOT_POOL="-o feature@userobj_accounting=enabled"
-                SUITE_ROOT_POOL="-O dnodesize=${DNODESIZE}"
+                SUITE_ROOT_POOL="-O dnodesize=legacy"
                 ;;
             xenial)
                 SUITE_BOOT_POOL=""
