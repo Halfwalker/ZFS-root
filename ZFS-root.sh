@@ -583,7 +583,7 @@ mkdir -p ${ZFSBUILD}
 case ${DISCENC} in
 	LUKS)
         echo "Creating root pool ${POOLNAME}"
-        zpool create -f -o ashift=12 ${SUITE_ROOT_POOL} \
+        zpool create -f -o ashift=12 -o autotrim=on ${SUITE_ROOT_POOL} \
              -O acltype=posixacl -O canmount=off -O compression=lz4 \
              -O atime=off \
              -O normalization=formD -O relatime=on -O xattr=sa \
@@ -602,7 +602,7 @@ case ${DISCENC} in
         #  -o feature@project_quota=disabled \
         #  -o feature@spacemap_v2=disabled \
         echo "Creating root pool ${POOLNAME}"
-        zpool create -f -o ashift=12 ${SUITE_ROOT_POOL} \
+        zpool create -f -o ashift=12 -o autotrim=on ${SUITE_ROOT_POOL} \
           -O acltype=posixacl -O canmount=off -O compression=lz4 \
           -O atime=off \
           -O normalization=formD -O relatime=on -O xattr=sa \
