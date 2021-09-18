@@ -677,8 +677,6 @@ fi #HIBERNATE
 echo "Creating main zfs datasets"
 # Container for root filesystems
 zfs create -o canmount=off -o mountpoint=none ${POOLNAME}/ROOT
-# In case we use zedenv, set default bootloader option for all root filesystems
-zfs set org.zedenv:bootloader=grub ${POOLNAME}/ROOT
 # Actual dataset for suite we are installing now
 zfs create -o canmount=noauto -o mountpoint=/ ${POOLNAME}/ROOT/${SUITE}
 zpool set bootfs=${POOLNAME}/ROOT/${SUITE} ${POOLNAME}
@@ -691,13 +689,9 @@ zfs mount ${POOLNAME}/ROOT/${SUITE}
     # Actual /boot for kernels etc
     zfs create -o mountpoint=/boot bpool/BOOT/${SUITE}
     zfs mount bpool/BOOT/${SUITE}
-    # zedenv wants /boot/grub to be a separate dataset
-    zfs create -o org.zedenv.grub:bootonzfs=yes -o mountpoint=/boot/grub bpool/BOOT/grub
+    zfs create -o mountpoint=/boot/grub bpool/BOOT/grub
     zfs mount bpool/BOOT/grub
 
-    # Per zedenv - use legacy
-    # zfs create -o org.zedenv.grub:bootonzfs=yes -o mountpoint=legacy bpool/BOOT/grub
-    # mount -t zfs bpool/BOOT/grub ${ZFSBUILD}/boot/grub
 #DC# else
 #DC#     # Not LUKS encrypted, so no bpool, everything is on main pool
 #DC#     mkdir -p ${ZFSBUILD}/boot
@@ -705,12 +699,9 @@ zfs mount ${POOLNAME}/ROOT/${SUITE}
 #DC#     # Actual /boot for kernels etc
 #DC#     zfs create -o mountpoint=/boot ${POOLNAME}/boot/${SUITE}
 #DC#     zfs mount ${POOLNAME}/boot/${SUITE}
-#DC#     zfs create -o org.zedenv.grub:bootonzfs=yes -o mountpoint=/boot/grub ${POOLNAME}/boot/grub
+#DC#     zfs create -o mountpoint=/boot/grub ${POOLNAME}/boot/grub
 #DC#     zfs mount ${POOLNAME}/boot/grub
 #DC# 
-#DC#     # Per zedenv - use legacy
-#DC#     # zfs create -o org.zedenv.grub:bootonzfs=yes -o mountpoint=legacy ${POOLNAME}/boot/grub
-#DC#     # mount -t zfs ${POOLNAME}/boot/grub ${ZFSBUILD}/boot/grub
 #DC# fi # DISCENC for LUKS
 
 # Making sure we have the root pool key, to be copied into the initramfs
@@ -1480,25 +1471,6 @@ update-initramfs -c -k all
 
 # Add IP address to main tty issue
 echo "IP = \4{eth0}" >> /etc/issue
-
-# Install zedenv installation script - needs python3.6+, xenial is 3.5.1
-if [ "${SUITE}" != "xenial" ] ; then
-    cat > /home/${USERNAME}/install_zedenv.sh << EOF
-#!/bin/bash
-
-sudo apt-get -qq install -y git
-git clone https://github.com/johnramsden/zedenv.git
-git clone https://github.com/johnramsden/zedenv-grub.git
-git clone https://github.com/johnramsden/pyzfscmds.git
-cd ~/pyzfscmds
-sudo python3 setup.py install
-cd ~/zedenv
-sudo python3 setup.py install
-cd ~/zedenv-grub
-sudo python3 setup.py install
-EOF
-    chmod +x /home/${USERNAME}/install_zedenv.sh
-fi
 
 # Set apt/dpkg to automagically snap the root dataset on install/remove
 cat > /etc/apt/apt.conf.d/30pre-snap << EOF
