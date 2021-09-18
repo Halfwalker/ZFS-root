@@ -562,9 +562,10 @@ mkdir -p ${ZFSBUILD}
 
 # Create boot pool - only uses features supported by grub and zfs version
 # Only needed if encrypting disk
+# https://openzfs.github.io/openzfs-docs/Getting%20Started/Ubuntu/Ubuntu%2020.04%20Root%20on%20ZFS.html
 #DC# if [ ${DISCENC} = "LUKS" ] ; then
     echo "Creating boot pool bpool"
-    zpool create -f -o ashift=12 -d \
+    zpool create -f -o ashift=12 -d -o autotrim=on \
       -o feature@async_destroy=enabled ${SUITE_BOOT_POOL} \
       -o feature@bookmarks=enabled \
       -o feature@embedded_data=enabled \
