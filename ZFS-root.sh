@@ -89,10 +89,10 @@ PARTITION_SWAP=4
 PARTITION_DATA=5
 
 # ZFS encryption options
-# ZFSENC_OPTIONS="-O encryption=aes-256-gcm -O keylocation=prompt -O keyformat=passphrase"
+ZFSENC_OPTIONS="-O encryption=aes-256-gcm -O keylocation=prompt -O keyformat=passphrase"
 # NOTE: for keyfile, put key in /root, then later copy to target /boot and change
 #       root dataset properties to point to /boot/pool.key
-ZFSENC_OPTIONS="-o encryption=aes-256-gcm -o keylocation=file://${ZFSBUILD}/boot/pool.key -o keyformat=raw"
+# ZFSENC_OPTIONS="-o encryption=aes-256-gcm -o keylocation=file://${ZFSBUILD}/boot/pool.key -o keyformat=raw"
 
 # Check for a local apt-cacher-ng system - looking for these hosts
 # aptcacher.local
