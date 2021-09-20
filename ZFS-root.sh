@@ -561,6 +561,7 @@ mkdir -p ${ZFSBUILD}
 #DC# if [ ${DISCENC} = "LUKS" ] ; then
     echo "Creating boot pool bpool"
     zpool create -f -o ashift=12 -d -o autotrim=on \
+      -o cachefile=/etc/zfs/zpool.cache \
       -o feature@async_destroy=enabled ${SUITE_BOOT_POOL} \
       -o feature@bookmarks=enabled \
       -o feature@embedded_data=enabled \
@@ -595,8 +596,13 @@ case ${DISCENC} in
         ;;
 
     ZFSENC)
-        echo "ZFSENC not supported yet"
-        exit 1
+        echo "Creating root pool ${POOLNAME}"
+        zpool create -f -o ashift=12 -o autotrim=on ${SUITE_ROOT_POOL} \
+          -O acltype=posixacl -O canmount=off -O compression=lz4 \
+          -O atime=off ${ZFSENC_OPTIONS} \
+          -O normalization=formD -O relatime=on -O xattr=sa \
+          -O mountpoint=/ -R ${ZFSBUILD} \
+          ${POOLNAME} ${RAIDLEVEL} ${ZPOOLDISK}
         ;;
 
     NOENC)
@@ -677,35 +683,28 @@ else
 fi #HIBERNATE
 
 # Main filesystem datasets
+UUID=$(dd if=/dev/urandom bs=1 count=100 2>/dev/null |
+    tr -dc 'a-z0-9' | cut -c-6)
+
 echo "Creating main zfs datasets"
 # Container for root filesystems
 zfs create -o canmount=off -o mountpoint=none ${POOLNAME}/ROOT
 # Actual dataset for suite we are installing now
-zfs create -o canmount=noauto -o mountpoint=/ ${POOLNAME}/ROOT/${SUITE}
-zpool set bootfs=${POOLNAME}/ROOT/${SUITE} ${POOLNAME}
-zfs mount ${POOLNAME}/ROOT/${SUITE}
+zfs create -o canmount=noauto -o mountpoint=/ \
+    -o com.ubuntu.zsys:bootfs=yes \
+    -o com.ubuntu.zsys:last-used=$(date +%s) \
+    ${POOLNAME}/ROOT/${SUITE}_${UUID}
 
-# Only if encrypted disk
-#DC# if [ ${DISCENC} = "LUKS" ] ; then
-    # container for boot stuff
-    zfs create -o canmount=off -o mountpoint=none bpool/BOOT
-    # Actual /boot for kernels etc
-    zfs create -o mountpoint=/boot bpool/BOOT/${SUITE}
-    zfs mount bpool/BOOT/${SUITE}
-    zfs create -o mountpoint=/boot/grub bpool/BOOT/grub
-    zfs mount bpool/BOOT/grub
+zpool set bootfs=${POOLNAME}/ROOT/${SUITE}_${UUID} ${POOLNAME}
+zfs mount ${POOLNAME}/ROOT/${SUITE}_${UUID}
 
-#DC# else
-#DC#     # Not LUKS encrypted, so no bpool, everything is on main pool
-#DC#     mkdir -p ${ZFSBUILD}/boot
-#DC#     zfs create -o canmount=off -o mountpoint=none ${POOLNAME}/boot
-#DC#     # Actual /boot for kernels etc
-#DC#     zfs create -o mountpoint=/boot ${POOLNAME}/boot/${SUITE}
-#DC#     zfs mount ${POOLNAME}/boot/${SUITE}
-#DC#     zfs create -o mountpoint=/boot/grub ${POOLNAME}/boot/grub
-#DC#     zfs mount ${POOLNAME}/boot/grub
-#DC# 
-#DC# fi # DISCENC for LUKS
+# container for boot stuff
+zfs create -o canmount=off -o mountpoint=none bpool/BOOT
+# Actual /boot for kernels etc
+zfs create -o mountpoint=/boot bpool/BOOT/${SUITE}_${UUID}
+zfs mount bpool/BOOT/${SUITE}_${UUID}
+zfs create -o com.ubuntu.zsys:bootfs=no -o mountpoint=/boot/grub bpool/BOOT/grub
+zfs mount bpool/BOOT/grub
 
 # Making sure we have the root pool key, to be copied into the initramfs
 if [ ${DISCENC} = "ZFSENC" ] ; then
