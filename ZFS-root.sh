@@ -578,6 +578,9 @@ mkdir -p ${ZFSBUILD}
       bpool ${BPOOLRAID} ${PARTSBOOT}
 #DC# fi # DISCENC for LUKS
 
+# Grab the GUID of the new boot pool - will use below for zfs-import-bpool.service
+# to ensure we import the right bpool (in case there are others in the system)
+BPOOL_GUID=$(zpool get guid bpool -o value -H)
 
 # Create root pool
 case ${DISCENC} in
@@ -800,6 +803,7 @@ export UPASSWORD="${UPASSWORD}"
 export UCOMMENT="${UCOMMENT}"
 export DISCENC=${DISCENC}
 export ZFS08=${ZFS08}
+export BPOOL_GUID=${BPOOL_GUID}
 export GOOGLE=${GOOGLE}
 export UEFI=${UEFI}
 export PROXY=${PROXY}
@@ -1327,7 +1331,10 @@ fi
 
 # ===========================================================================
 # Enable importing bpool
-cat >> /etc/systemd/system/zfs-import-bpool.service << 'EOF'
+cat >> /etc/systemd/system/zfs-import-bpool.service << EOF
+# We use the specific GUID of the bpool (${BPOOL_GUID}) to ensure
+# we import the correct bpool (in case there are others on this system)
+
 [Unit]
 DefaultDependencies=no
 Before=zfs-import-scan.service
@@ -1341,9 +1348,12 @@ RemainAfterExit=yes
 # being overwritten with ZERO imports. So NO pools in cachefile to import.
 # This just moves zpool.cache aside, imports bpool, puts cache back in place
 # See last comment in https://github.com/openzfs/zfs/issues/8549
+
 ExecStartPre=/bin/sh -c '[ -f /etc/zfs/zpool.cache ] && mv /etc/zfs/zpool.cache /etc/zfs/preboot_zpool.cache || true'
-ExecStart=/sbin/zpool import -N -o cachefile=none bpool
+# Import bpool with guid ${BPOOL_GUID}
+ExecStart=/sbin/zpool import -N -o cachefile=none ${BPOOL_GUID} bpool
 ExecStartPost=/bin/sh -c '[ -f /etc/zfs/preboot_zpool.cache ] && mv /etc/zfs/preboot_zpool.cache /etc/zfs/zpool.cache || true'
+
 # Need a delay to allow disks to settle to import other pools via zfs-import-cache
 ExecStartPost=/bin/sleep 15
 
