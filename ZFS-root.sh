@@ -1481,11 +1481,11 @@ update-initramfs -c -k all
 # Add IP address to main tty issue
 echo "IP = \4{eth0}" >> /etc/issue
 
-# Set apt/dpkg to automagically snap the root dataset on install/remove
+# Set apt/dpkg to automagically snap the system datasets on install/remove
 cat > /etc/apt/apt.conf.d/30pre-snap << EOF
-# Snapshot root dataset before installing or removing packages
-Dpkg::Pre-Invoke { "/sbin/zfs snap ${POOLNAME}/ROOT/${SUITE}@apt_\$(date +%F-%H%M%S)"; };
-Dpkg::Pre-Invoke { "/sbin/zfs snap bpool/BOOT/${SUITE}@apt_\$(date +%F-%H%M%S)"; };
+# Snapshot main datasets before installing or removing packages
+# We use a DATE variable to ensure all snaps have SAME date
+Dpkg::Pre-Invoke { "export DATE=$(/usr/bin/date +%F-%H%M%S) ; /sbin/zfs snap ${POOLNAME}/ROOT/${SUITE}@apt_\${DATE}; /sbin/zfs snap bpool/BOOT/${SUITE}@apt_\${DATE}; /sbin/zfs snap bpool/BOOT/grub@apt_\${DATE}"; };
 EOF
 
 # zfs set mountpoint=legacy rpool/var/log
