@@ -1154,191 +1154,191 @@ apt-get -qq --no-install-recommends --yes install expect most vim-nox rsync whoi
 #_#
 cp /usr/share/doc/avahi-daemon/examples/ssh.service /etc/avahi/services
 
-#------------------- Dropbear stuff between dashed lines ----------------------------------------------------------------------
-# Only if encrypted disk, LUKS or ZFSENC
-if [ ${DISCENC} != "NOENC" ] ; then
-
-	if [ "`cat /proc/cpuinfo | fgrep aes`" != "" ] ; then
-		echo "aesni-intel" >> /etc/modules
-		echo "aesni-intel" >> /etc/initramfs-tools/modules
-	fi
-	echo "aes-x86_64" >> /etc/modules
-	echo "aes-x86_64" >> /etc/initramfs-tools/modules
-
-#   ===========================================================================
-	# Reduce cryptroot timeout from 180s to 30s and remove dropping to shell if missing device
-	# Include system IP address on boot unlock screen
-	sed -i "
-        s/slumber=180/slumber=30/g
-        s/panic/break # panic/
-		s/Please unlock disk/For \$eth0IP Please unlock disk/
-		/PREREQ=/ {
-		a \
-# Need to pause here to let network come up\n\
-sleep 7\n\
-eth0IP=\$(/sbin/ip -4 addr show eth0 | /bin/sed -n '/inet /s/.*inet \([0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\).*/\1/p')
-		
-		}
-	" /usr/share/initramfs-tools/scripts/local-top/cryptroot
-	
-#   ===========================================================================
-    # Install dropbear for ssh access into initramfs to unlock disk(s)
-    # NOTE: openssh-server must be installed first (done above)
-	apt-get -qq -y install dropbear
-	cat > /etc/initramfs-tools/conf.d/dropbear_network << '__EOFF__'
-DROPBEAR=y
-CRYPTSETUP=y
-__EOFF__
-
-#   ===========================================================================
-    ##### Need the full version of busybox if we use it
-	cat > /etc/initramfs-tools/hooks/busybox2 << '__EOFF__'
-#!/bin/sh
-##### Need the full version of busybox if we use it
-
-PREREQ=""
-
-prereqs() {
-        echo "$PREREQ"
-}
-
-case $1 in
-# get pre-requisites
-prereqs)
-        prereqs
-        exit 0
-        ;;
-esac
-
-# busybox
-if [ "${BUSYBOX}" != "n" ] && [ -e /bin/busybox ]; then
-	. /usr/share/initramfs-tools/hook-functions
-	rm -f ${DESTDIR}/bin/busybox
-	copy_exec /bin/busybox /bin
-	copy_exec /usr/bin/xargs /bin
-fi
-__EOFF__
-	chmod +x /etc/initramfs-tools/hooks/busybox2
-
-#   ===========================================================================
-    ##### Unlock script for dropbear in initramfs
-	cat > /etc/initramfs-tools/hooks/mount_cryptroot << '__EOFF__'
-#!/bin/sh
-
-# This script generates two scripts in the initramfs output,
-# /root/mount_cryptroot.sh and /root/.profile
-# https://projectgus.com/2013/05/encrypted-rootfs-over-ssh-with-debian-wheezy/
-
-ALLOW_SHELL=1
-# Set this to 1 before running update-initramfs if you want
-# to allow authorized users to type Ctrl-C to drop to a
-# root shell (useful for debugging, potential for abuse.)
-#
-# (Note that even with ALLOW_SHELL=0 it may still be possible
-# to achieve a root shell.)
-
-PREREQ="dropbear"
-prereqs() {
-    echo "$PREREQ"
-}
-case "$1" in
-    prereqs)
-        prereqs
-        exit 0
-    ;;
-esac
-
-. "${CONFDIR}/initramfs.conf"
-. /usr/share/initramfs-tools/hook-functions
-
-if [ -z ${DESTDIR} ]; then
-    exit
-fi
-
-# 16.04/xenial uses a tempdir for /root homedir, so need to find which one it is
-# something like /root-2EpTFt/
-ROOTDIR=`ls -1d ${DESTDIR}/root* | tail -1`
-SCRIPT="${ROOTDIR}/mount_cryptroot.sh"
-cat > "${SCRIPT}" << 'EOF'
-#!/bin/sh
-CMD=
-while [ -z "$CMD" -o -z "`pidof askpass plymouth`" ]; do
-  # force use of busybox for ps
-  CMD=`busybox ps -o args | grep cryptsetup | grep -i open | grep -v grep`
-  # Not using busybox, using klibc
-  # CMD=`ps -o args | grep cryptsetup | grep -i open | grep -v grep`
-
-  sleep 0.1
-done
-while [ -n "`pidof askpass plymouth`" ]; do
-  $CMD && kill -9 `pidof askpass plymouth` && echo "Success"
-done
-EOF
-
-chmod +x "${SCRIPT}"
-
-# Run mount_cryptroot by default and close the login session afterwards
-# If ALLOW_SHELL is set to 1, you can press Ctrl-C to get to an interactive prompt
-cat > "${ROOTDIR}/.profile" << EOF
-ctrl_c_exit() {
-  exit 1
-}
-ctrl_c_shell() {
-  # Ctrl-C during .profile appears to mangle terminal settings
-  reset
-}
-if [ "$ALLOW_SHELL" == "1" ]; then
-  echo "Unlocking rootfs... Type Ctrl-C for a shell."
-  trap ctrl_c_shell INT
-else
-  echo "Unlocking rootfs..."
-  trap ctrl_c_exit INT
-fi
-${ROOTDIR#$DESTDIR}/mount_cryptroot.sh && exit 1 || echo "Run ./mount_cryptroot.sh to try unlocking again"
-trap INT
-EOF
-__EOFF__
-	chmod +x /etc/initramfs-tools/hooks/mount_cryptroot
-  
-#   ===========================================================================
-	##### Second script to handle converting host SSH keys.
-	# You might NOT want to use this as now your SSH keys are stored inside
-	# plaintext initramfs instead of only encypted volume.
-    # NOTE: Need to escape $ because we need ${USERNAME}
-	cat > /etc/initramfs-tools/hooks/dropbear.fixup2 << __EOFF__
-#!/bin/sh
-PREREQ="dropbear"
-prereqs() {
-    echo "\$PREREQ"
-}
-case "\$1" in
-    prereqs)
-        prereqs
-        exit 0
-    ;;
-esac
-    
-. "\${CONFDIR}/initramfs.conf"
-. /usr/share/initramfs-tools/hook-functions
-    
-if [ "\${DROPBEAR}" != "n" ] && [ -r "/etc/crypttab" ] ; then
-    # Convert SSH keys
-	echo "----- Installing host SSH keys into dropbear initramfs -----"
-	/usr/lib/dropbear/dropbearconvert openssh dropbear /etc/ssh/ssh_host_rsa_key \${DESTDIR}/etc/dropbear/dropbear_rsa_host_key
-	/usr/lib/dropbear/dropbearconvert openssh dropbear /etc/ssh/ssh_host_ecdsa_key \${DESTDIR}/etc/dropbear/dropbear_ecdsa_host_key
-
-    # Copy main user authorized_keys for dropbear
-    # This way main user can ssh into rebooted box to enter decryption key
-	[ ! -e /etc/initramfs-tools/root/.ssh ] && mkdir -p /etc/initramfs-tools/root/.ssh
-    cp -f /home/${USERNAME}/.ssh/authorized_keys /etc/initramfs-tools/root/.ssh
-fi
-__EOFF__
- 
-# Make it executable
-chmod a+x /etc/initramfs-tools/hooks/dropbear.fixup2
-  
-fi
-#------------------- Dropbear stuff between dashed lines ----------------------------------------------------------------------
+####    #------------------- Dropbear stuff between dashed lines ----------------------------------------------------------------------
+####    # Only if encrypted disk, LUKS or ZFSENC
+####    if [ ${DISCENC} != "NOENC" ] ; then
+####    
+####    	if [ "`cat /proc/cpuinfo | fgrep aes`" != "" ] ; then
+####    		echo "aesni-intel" >> /etc/modules
+####    		echo "aesni-intel" >> /etc/initramfs-tools/modules
+####    	fi
+####    	echo "aes-x86_64" >> /etc/modules
+####    	echo "aes-x86_64" >> /etc/initramfs-tools/modules
+####    
+####    #   ===========================================================================
+####    	# Reduce cryptroot timeout from 180s to 30s and remove dropping to shell if missing device
+####    	# Include system IP address on boot unlock screen
+####    	sed -i "
+####            s/slumber=180/slumber=30/g
+####            s/panic/break # panic/
+####    		s/Please unlock disk/For \$eth0IP Please unlock disk/
+####    		/PREREQ=/ {
+####    		a \
+####    # Need to pause here to let network come up\n\
+####    sleep 7\n\
+####    eth0IP=\$(/sbin/ip -4 addr show eth0 | /bin/sed -n '/inet /s/.*inet \([0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\).*/\1/p')
+####    		
+####    		}
+####    	" /usr/share/initramfs-tools/scripts/local-top/cryptroot
+####    	
+####    #   ===========================================================================
+####        # Install dropbear for ssh access into initramfs to unlock disk(s)
+####        # NOTE: openssh-server must be installed first (done above)
+####    	apt-get -qq -y install dropbear
+####    	cat > /etc/initramfs-tools/conf.d/dropbear_network << '__EOFF__'
+####    DROPBEAR=y
+####    CRYPTSETUP=y
+####    __EOFF__
+####    
+####    #   ===========================================================================
+####        ##### Need the full version of busybox if we use it
+####    	cat > /etc/initramfs-tools/hooks/busybox2 << '__EOFF__'
+####    #!/bin/sh
+####    ##### Need the full version of busybox if we use it
+####    
+####    PREREQ=""
+####    
+####    prereqs() {
+####            echo "$PREREQ"
+####    }
+####    
+####    case $1 in
+####    # get pre-requisites
+####    prereqs)
+####            prereqs
+####            exit 0
+####            ;;
+####    esac
+####    
+####    # busybox
+####    if [ "${BUSYBOX}" != "n" ] && [ -e /bin/busybox ]; then
+####    	. /usr/share/initramfs-tools/hook-functions
+####    	rm -f ${DESTDIR}/bin/busybox
+####    	copy_exec /bin/busybox /bin
+####    	copy_exec /usr/bin/xargs /bin
+####    fi
+####    __EOFF__
+####    	chmod +x /etc/initramfs-tools/hooks/busybox2
+####    
+####    #   ===========================================================================
+####        ##### Unlock script for dropbear in initramfs
+####    	cat > /etc/initramfs-tools/hooks/mount_cryptroot << '__EOFF__'
+####    #!/bin/sh
+####    
+####    # This script generates two scripts in the initramfs output,
+####    # /root/mount_cryptroot.sh and /root/.profile
+####    # https://projectgus.com/2013/05/encrypted-rootfs-over-ssh-with-debian-wheezy/
+####    
+####    ALLOW_SHELL=1
+####    # Set this to 1 before running update-initramfs if you want
+####    # to allow authorized users to type Ctrl-C to drop to a
+####    # root shell (useful for debugging, potential for abuse.)
+####    #
+####    # (Note that even with ALLOW_SHELL=0 it may still be possible
+####    # to achieve a root shell.)
+####    
+####    PREREQ="dropbear"
+####    prereqs() {
+####        echo "$PREREQ"
+####    }
+####    case "$1" in
+####        prereqs)
+####            prereqs
+####            exit 0
+####        ;;
+####    esac
+####    
+####    . "${CONFDIR}/initramfs.conf"
+####    . /usr/share/initramfs-tools/hook-functions
+####    
+####    if [ -z ${DESTDIR} ]; then
+####        exit
+####    fi
+####    
+####    # 16.04/xenial uses a tempdir for /root homedir, so need to find which one it is
+####    # something like /root-2EpTFt/
+####    ROOTDIR=`ls -1d ${DESTDIR}/root* | tail -1`
+####    SCRIPT="${ROOTDIR}/mount_cryptroot.sh"
+####    cat > "${SCRIPT}" << 'EOF'
+####    #!/bin/sh
+####    CMD=
+####    while [ -z "$CMD" -o -z "`pidof askpass plymouth`" ]; do
+####      # force use of busybox for ps
+####      CMD=`busybox ps -o args | grep cryptsetup | grep -i open | grep -v grep`
+####      # Not using busybox, using klibc
+####      # CMD=`ps -o args | grep cryptsetup | grep -i open | grep -v grep`
+####    
+####      sleep 0.1
+####    done
+####    while [ -n "`pidof askpass plymouth`" ]; do
+####      $CMD && kill -9 `pidof askpass plymouth` && echo "Success"
+####    done
+####    EOF
+####    
+####    chmod +x "${SCRIPT}"
+####    
+####    # Run mount_cryptroot by default and close the login session afterwards
+####    # If ALLOW_SHELL is set to 1, you can press Ctrl-C to get to an interactive prompt
+####    cat > "${ROOTDIR}/.profile" << EOF
+####    ctrl_c_exit() {
+####      exit 1
+####    }
+####    ctrl_c_shell() {
+####      # Ctrl-C during .profile appears to mangle terminal settings
+####      reset
+####    }
+####    if [ "$ALLOW_SHELL" == "1" ]; then
+####      echo "Unlocking rootfs... Type Ctrl-C for a shell."
+####      trap ctrl_c_shell INT
+####    else
+####      echo "Unlocking rootfs..."
+####      trap ctrl_c_exit INT
+####    fi
+####    ${ROOTDIR#$DESTDIR}/mount_cryptroot.sh && exit 1 || echo "Run ./mount_cryptroot.sh to try unlocking again"
+####    trap INT
+####    EOF
+####    __EOFF__
+####    	chmod +x /etc/initramfs-tools/hooks/mount_cryptroot
+####      
+####    #   ===========================================================================
+####    	##### Second script to handle converting host SSH keys.
+####    	# You might NOT want to use this as now your SSH keys are stored inside
+####    	# plaintext initramfs instead of only encypted volume.
+####        # NOTE: Need to escape $ because we need ${USERNAME}
+####    	cat > /etc/initramfs-tools/hooks/dropbear.fixup2 << __EOFF__
+####    #!/bin/sh
+####    PREREQ="dropbear"
+####    prereqs() {
+####        echo "\$PREREQ"
+####    }
+####    case "\$1" in
+####        prereqs)
+####            prereqs
+####            exit 0
+####        ;;
+####    esac
+####        
+####    . "\${CONFDIR}/initramfs.conf"
+####    . /usr/share/initramfs-tools/hook-functions
+####        
+####    if [ "\${DROPBEAR}" != "n" ] && [ -r "/etc/crypttab" ] ; then
+####        # Convert SSH keys
+####    	echo "----- Installing host SSH keys into dropbear initramfs -----"
+####    	/usr/lib/dropbear/dropbearconvert openssh dropbear /etc/ssh/ssh_host_rsa_key \${DESTDIR}/etc/dropbear/dropbear_rsa_host_key
+####    	/usr/lib/dropbear/dropbearconvert openssh dropbear /etc/ssh/ssh_host_ecdsa_key \${DESTDIR}/etc/dropbear/dropbear_ecdsa_host_key
+####    
+####        # Copy main user authorized_keys for dropbear
+####        # This way main user can ssh into rebooted box to enter decryption key
+####    	[ ! -e /etc/initramfs-tools/root/.ssh ] && mkdir -p /etc/initramfs-tools/root/.ssh
+####        [ -e /home/${USERNAME}/.ssh/authorized_keys ] && cp -f /home/${USERNAME}/.ssh/authorized_keys /etc/initramfs-tools/root/.ssh
+####    fi
+####    __EOFF__
+####     
+####    # Make it executable
+####    chmod a+x /etc/initramfs-tools/hooks/dropbear.fixup2
+####      
+####    fi
+####    #------------------- Dropbear stuff between dashed lines ----------------------------------------------------------------------
 
 
 # ===========================================================================
