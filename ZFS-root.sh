@@ -4,6 +4,8 @@
 # TODO: Finish dropbear setup
 # https://hamy.io/post/0009/how-to-install-luks-encrypted-ubuntu-18.04.x-server-and-enable-remote-unlocking/#gsc.tab=0
 
+# https://talldanestale.dk/2020/04/06/zfs-and-homedir-encryption/
+
 # NOTE: Intesting ideas
 # https://blobfolio.com/2018/06/replace-grub2-with-systemd-boot-on-ubuntu-18-04/
 # https://github.com/dyindude/ubuntu-zfs
@@ -18,7 +20,7 @@
 
 #
 # This will set up a single-disk system with root-on-zfs, using
-# xenial/16/04, bionic/18.04 or disco/19.04 ( and soon 20.04).
+# xenial/16/04, bionic/18.04 or focal/20.04.
 #
 # >>>>>>>>>> NOTE: This will totally overwrite the disk chosen <<<<<<<<<<<<<
 #
@@ -28,7 +30,7 @@
 # 4) Make it executable (chmod +x ZFS-root.sh)
 # 5) Run it (./ZFS-root.sh)
 #
-# It will ask a few questions (username, which disk, xenial/bionic/disco etc)
+# It will ask a few questions (username, which disk, xenial/bionic/focal etc)
 # and then fully install a minimal Ubuntu system. Depending on the choices
 # several partitions and zfs datasets will be created.
 # 
