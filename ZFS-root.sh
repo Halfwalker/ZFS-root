@@ -287,7 +287,7 @@ fi
 
 DISCENC=$(whiptail --title "Select disk encryption" --radiolist "Choose which (if any) disk encryption to use" 11 60 4 \
     NOENC "No disk encryption" ON \
-    ZFSENC "Enable ZFS pool encryption" OFF \
+    ZFSENC "Enable ZFS dataset encryption" OFF \
     LUKS "Enable LUKS full disk encryption" OFF \
     3>&1 1>&2 2>&3)
 RET=${?}
@@ -435,7 +435,7 @@ set -x
 
 # Clear disk *before* install zfs
 for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
-    wipefs -a /dev/disk/by-id/${zfsdisks[${disk}]}
+    wipefs --all --force /dev/disk/by-id/${zfsdisks[${disk}]}
     sgdisk --zap-all /dev/disk/by-id/${zfsdisks[${disk}]}
     sgdisk --clear /dev/disk/by-id/${zfsdisks[${disk}]}
 done
