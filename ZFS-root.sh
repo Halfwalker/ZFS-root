@@ -240,7 +240,7 @@ whiptail --title "Set options to install" --separate-output --checklist "Choose 
     GOOGLE "Add google authenticator via pam for ssh logins" OFF \
     UEFI "Enable UEFI grub install" $( [ -d /sys/firmware/efi ] && echo ON || echo OFF ) \
     HWE "Install Hardware Enablement kernel" OFF \
-    ZFS08 "Update to latest ZFS 0.8 from PPA" OFF \
+    ZFS08 "Update to latest ZFS 2.1 from PPA" OFF \
     HIBERNATE "Enable swap partition for hibernation" OFF \
     DELAY "Add delay before importing root pool - for many-disk systems" OFF \
     DESKTOP "Install full Ubuntu desktop" OFF 2>"${TMPFILE}"
@@ -417,7 +417,7 @@ whiptail --title "Summary of install options" --msgbox "These are the options we
     Poolname $(echo $POOLNAME)\n \
     User $(echo $USERNAME $UCOMMENT)\n\n \
     DELAY     = $(echo $DELAY)  : Enable delay before importing zpool\n \
-    ZFS ver   = $(echo $ZFS08)  : Update to latest ZFS 0.8 via PPA\n \
+    ZFS ver   = $(echo $ZFS08)  : Update to latest ZFS 2.1 via PPA\n \
     GOOGLE    = $(echo $GOOGLE) : Install google authenticator\n \
     DESKTOP   = $(echo $DESKTOP)  : Install full Ubuntu desktop\n \
     UEFI      = $(echo $UEFI)  : Enable UEFI\n \
@@ -900,7 +900,7 @@ echo "-------- right after installing linux-generic ----------------------------
 ls -la /boot
 echo "-----------------------------------------------------------------------------"
 
-# If using ZFS encryption we need the jonathonf PPA for latest 0.8
+# If using ZFS encryption we need the jonathonf PPA for latest 2.1
 if [ ${DISCENC} = "ZFSENC" ] || [ ${ZFS08} = "y" ] ; then
     dd if=/dev/urandom of=/root/pool.key bs=32 count=1
     apt-add-repository --yes --update ppa:jonathonf/zfs
