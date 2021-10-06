@@ -162,6 +162,15 @@ if [ ! ${POOLNAME} ]; then
     exit 1
 fi
 
+BPOOLNAME=bpool
+BPOOLNAME=$(whiptail --inputbox "Enter boot poolname to use for ZFS - defaults to bpool" --title "ZFS Boot poolname" 8 70 $(echo $POOLNAME) 3>&1 1>&2 2>&3)
+RET=${?}
+(( RET )) && BPOOLNAME=
+if [ ! ${BPOOLNAME} ]; then
+    echo "Must have a ZFS boot poolname"
+    exit 1
+fi
+
 # Set main disk here - be sure to include the FULL path
 # Get list of disks, ask user which one to install to
 # Ignore cdrom etc.
@@ -559,7 +568,7 @@ mkdir -p ${ZFSBUILD}
 # Only needed if encrypting disk
 # https://openzfs.github.io/openzfs-docs/Getting%20Started/Ubuntu/Ubuntu%2020.04%20Root%20on%20ZFS.html
 #DC# if [ ${DISCENC} = "LUKS" ] ; then
-    echo "Creating boot pool bpool"
+    echo "Creating boot pool ${BPOOLNAME}"
     zpool create -f -o ashift=12 -d -o autotrim=on \
       -o cachefile=/etc/zfs/zpool.cache \
       -o feature@async_destroy=enabled ${SUITE_BOOT_POOL} \
@@ -576,12 +585,12 @@ mkdir -p ${ZFSBUILD}
       -O acltype=posixacl -O canmount=off -O compression=lz4 -O devices=off \
       -O normalization=formD -O relatime=on -O xattr=sa \
       -O mountpoint=/ -R ${ZFSBUILD} \
-      bpool ${BPOOLRAID} ${PARTSBOOT}
+      ${BPOOLNAME} ${BPOOLRAID} ${PARTSBOOT}
 #DC# fi # DISCENC for LUKS
 
 # Grab the GUID of the new boot pool - will use below for zfs-import-bpool.service
 # to ensure we import the right bpool (in case there are others in the system)
-BPOOL_GUID=$(zpool get guid bpool -o value -H)
+BPOOL_GUID=$(zpool get guid ${BPOOLNAME} -o value -H)
 
 # Create root pool
 case ${DISCENC} in
@@ -631,7 +640,7 @@ esac
 #_# rm -rf ${ZFSBUILD}
 #_# if [ "${LUKS}" = "y" ]; then
 #_# 	zpool import -d /dev/mapper -R ${ZFSBUILD} ${POOLNAME}
-#_# 	zpool import -d /dev/mapper -R ${ZFSBUILD} bpool
+#_# 	zpool import -d /dev/mapper -R ${ZFSBUILD} ${BPOOLNAME}
 #_# else
 #_# 	zpool import -d /dev/disk/by-id -R ${ZFSBUILD} ${POOLNAME}
 #_# fi
@@ -699,12 +708,12 @@ zpool set bootfs=${POOLNAME}/ROOT/${SUITE}_${UUID} ${POOLNAME}
 zfs mount ${POOLNAME}/ROOT/${SUITE}_${UUID}
 
 # container for boot stuff
-zfs create -o canmount=off -o mountpoint=none bpool/BOOT
+zfs create -o canmount=off -o mountpoint=none ${BPOOLNAME}/BOOT
 # Actual /boot for kernels etc
-zfs create -o mountpoint=/boot bpool/BOOT/${SUITE}_${UUID}
-zfs mount bpool/BOOT/${SUITE}_${UUID}
-zfs create -o com.ubuntu.zsys:bootfs=no -o mountpoint=/boot/grub bpool/BOOT/grub
-zfs mount bpool/BOOT/grub
+zfs create -o mountpoint=/boot ${BPOOLNAME}/BOOT/${SUITE}_${UUID}
+zfs mount ${BPOOLNAME}/BOOT/${SUITE}_${UUID}
+zfs create -o com.ubuntu.zsys:bootfs=no -o mountpoint=/boot/grub ${BPOOLNAME}/BOOT/grub
+zfs mount ${BPOOLNAME}/BOOT/grub
 
 # Making sure we have the root pool key, to be copied into the initramfs
 if [ ${DISCENC} = "ZFSENC" ] ; then
@@ -797,6 +806,8 @@ cat > ${ZFSBUILD}/root/Setup.sh << __EOF__
 export DELAY=${DELAY}
 export SUITE=${SUITE}
 export POOLNAME=${POOLNAME}
+export BPOOLNAME=${BPOOLNAME}
+export PASSPHRASE=${PASSPHRASE}
 export USERNAME=${USERNAME}
 export UPASSWORD="${UPASSWORD}"
 export UCOMMENT="${UCOMMENT}"
@@ -1331,7 +1342,7 @@ fi
 # ===========================================================================
 # Enable importing bpool
 cat >> /etc/systemd/system/zfs-import-bpool.service << EOF
-# We use the specific GUID of the bpool (${BPOOL_GUID}) to ensure
+# We use the specific GUID of the bpool ${BPOOLNAME} (${BPOOL_GUID}) to ensure
 # we import the correct bpool (in case there are others on this system)
 
 [Unit]
@@ -1350,7 +1361,7 @@ RemainAfterExit=yes
 
 ExecStartPre=/bin/sh -c '[ -f /etc/zfs/zpool.cache ] && mv /etc/zfs/zpool.cache /etc/zfs/preboot_zpool.cache || true'
 # Import bpool with guid ${BPOOL_GUID}
-ExecStart=/sbin/zpool import -N -o cachefile=none ${BPOOL_GUID} bpool
+ExecStart=/sbin/zpool import -N -o cachefile=none ${BPOOL_GUID} ${BPOOLNAME}
 ExecStartPost=/bin/sh -c '[ -f /etc/zfs/preboot_zpool.cache ] && mv /etc/zfs/preboot_zpool.cache /etc/zfs/zpool.cache || true'
 
 # Need a delay to allow disks to settle to import other pools via zfs-import-cache
@@ -1469,10 +1480,10 @@ update-initramfs -c -k all
 #_# # Only if encrypted disk
 #_# if [ ${DISCENC} != "NOENC" ] ; then
 #_#     # Fix filesystem mount ordering
-#_#     zfs set mountpoint=legacy bpool/BOOT/${SUITE}
-#_#     echo bpool/BOOT/${SUITE} /boot zfs \
+#_#     zfs set mountpoint=legacy ${BPOOLNAME}/BOOT/${SUITE}
+#_#     echo ${BPOOLNAME}/BOOT/${SUITE} /boot zfs \
 #_#       nodev,relatime,x-systemd.requires=zfs-import-bpool.service 0 0 >> /etc/fstab
-#_#     echo "bpool/BOOT/grub /boot/grub zfs defaults,noatime 0 0" >> /etc/fstab
+#_#     echo "${BPOOLNAME}/BOOT/grub /boot/grub zfs defaults,noatime 0 0" >> /etc/fstab
 #_# else
 #_#     echo "Not encrypted"
 #_#     # echo "${POOLNAME}/boot/grub /boot/grub zfs defaults,noatime 0 0" >> /etc/fstab
@@ -1485,7 +1496,7 @@ echo "IP = \4{eth0}" >> /etc/issue
 cat > /etc/apt/apt.conf.d/30pre-snap << EOF
 # Snapshot main datasets before installing or removing packages
 # We use a DATE variable to ensure all snaps have SAME date
-Dpkg::Pre-Invoke { "export DATE=$(/usr/bin/date +%F-%H%M%S) ; /sbin/zfs snap ${POOLNAME}/ROOT/${SUITE}@apt_\${DATE}; /sbin/zfs snap bpool/BOOT/${SUITE}@apt_\${DATE}; /sbin/zfs snap bpool/BOOT/grub@apt_\${DATE}"; };
+Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; /sbin/zfs snap ${POOLNAME}/ROOT/${SUITE}_${UUID}@apt_\${DATE}; /sbin/zfs snap ${BPOOLNAME}/BOOT/${SUITE}_${UUID}@apt_\${DATE}; /sbin/zfs snap ${BPOOLNAME}/BOOT/grub@apt_\${DATE}"; };
 EOF
 
 # zfs set mountpoint=legacy rpool/var/log
@@ -1494,15 +1505,9 @@ EOF
 # zfs set mountpoint=legacy rpool/var/spool
 # echo ${POOLNAME}/var/spool /var/spool zfs nodev,relatime 0 0 >> /etc/fstab
 
-# Create install snaps
-#DC# if [ ${DISCENC} = "LUKS" ] ; then
-    zfs snapshot bpool/BOOT/${SUITE}@base_install
-    zfs snapshot bpool/BOOT/grub@base_install
-#DC# else
-#DC#     zfs snapshot ${POOLNAME}/boot/${SUITE}@base_install
-#DC#     zfs snapshot ${POOLNAME}/boot/grub@base_install
-#DC# fi
-zfs snapshot ${POOLNAME}/ROOT/${SUITE}@base_install
+zfs snapshot ${BPOOLNAME}/BOOT/${SUITE}_${UUID}@base_install
+zfs snapshot ${BPOOLNAME}/BOOT/grub@base_install
+zfs snapshot ${POOLNAME}/ROOT/${SUITE}_${UUID}@base_install
 
 # End of Setup.sh
 __EOF__
@@ -1537,9 +1542,9 @@ zfs umount ${POOLNAME}/home/${USERNAME}
 zfs umount ${POOLNAME}/docker
 # With LUKS boot is in bpool pool
 #DC# if [ ${DISCENC} = "LUKS" ] ; then
-    zfs umount bpool/BOOT/grub
-    zfs umount bpool/BOOT/${SUITE}
-    zpool export bpool
+    zfs umount ${BPOOLNAME}/BOOT/grub
+    zfs umount ${BPOOLNAME}/BOOT/${SUITE}_${UUID}
+    zpool export ${BPOOLNAME}
 #DC# else
 #DC#     zfs umount ${POOLNAME}/boot/grub
 #DC#     zfs umount ${POOLNAME}/boot/${SUITE}
