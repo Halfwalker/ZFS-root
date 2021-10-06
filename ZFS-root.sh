@@ -163,11 +163,11 @@ if [ ! ${POOLNAME} ]; then
 fi
 
 BPOOLNAME=bpool
-BPOOLNAME=$(whiptail --inputbox "Enter boot poolname to use for ZFS - defaults to bpool" --title "ZFS Boot poolname" 8 70 $(echo $POOLNAME) 3>&1 1>&2 2>&3)
+BPOOLNAME=$(whiptail --inputbox "Enter boot poolname to use for booting - defaults to bpool" --title "ZFS Boot poolname" 8 70 $(echo $BPOOLNAME) 3>&1 1>&2 2>&3)
 RET=${?}
 (( RET )) && BPOOLNAME=
 if [ ! ${BPOOLNAME} ]; then
-    echo "Must have a ZFS boot poolname"
+    echo "Must have a boot poolname"
     exit 1
 fi
 
