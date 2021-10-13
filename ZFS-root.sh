@@ -735,9 +735,6 @@ if [ ${DISCENC} = "ZFSENC" ] ; then
 else
     zfs create -o canmount=off -o mountpoint=none -o compression=lz4 -o atime=off ${POOLNAME}/home
 fi
-
-# zfs create rpool/home and main user home dataset
-zfs create -o canmount=off -o mountpoint=none -o compression=lz4 -o atime=off ${ZFSENC_OPTIONS} ${POOLNAME}/home
 zfs create -o canmount=on -o mountpoint=/home/${USERNAME} ${POOLNAME}/home/${USERNAME}
 
 ###  # Point zfs encryption to right location of keyfile for later
