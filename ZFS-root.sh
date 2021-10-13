@@ -4,7 +4,12 @@
 # TODO: Finish dropbear setup
 # https://hamy.io/post/0009/how-to-install-luks-encrypted-ubuntu-18.04.x-server-and-enable-remote-unlocking/#gsc.tab=0
 
+# >>>>>>>>>> ZFS native encryption <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+# https://arstechnica.com/gadgets/2021/06/a-quick-start-guide-to-openzfs-native-encryption/
 # https://talldanestale.dk/2020/04/06/zfs-and-homedir-encryption/
+### Simple script to unlock home dataset etc. at boot
+# https://gbyte.dev/blog/unlock-mount-several-zfs-datasets-boot-single-passphrase
+# https://github.com/dynerose/Remote-unlock-native-ZFS
 
 # NOTE: Intesting ideas
 # https://blobfolio.com/2018/06/replace-grub2-with-systemd-boot-on-ubuntu-18-04/
@@ -91,10 +96,10 @@ PARTITION_SWAP=4
 PARTITION_DATA=5
 
 # ZFS encryption options
-ZFSENC_OPTIONS="-O encryption=aes-256-gcm -O keylocation=prompt -O keyformat=passphrase"
-# NOTE: for keyfile, put key in /root, then later copy to target /boot and change
-#       root dataset properties to point to /boot/pool.key
-# ZFSENC_OPTIONS="-o encryption=aes-256-gcm -o keylocation=file://${ZFSBUILD}/boot/pool.key -o keyformat=raw"
+ZFSENC_ROOT_OPTIONS="-o encryption=aes-256-gcm -o keylocation=prompt -o keyformat=passphrase"
+# NOTE: for keyfile, put key in local /root, then later copy to target /root 
+#       to be used for encrypting /home
+ZFSENC_HOME_OPTIONS="-o encryption=aes-256-gcm -o keylocation=file:///root/pool.key -o keyformat=raw"
 
 # Check for a local apt-cacher-ng system - looking for these hosts
 # aptcacher.local
@@ -304,9 +309,10 @@ if [ "${DISCENC}" != "NOENC" ] ; then
     PASSPHRASE="$PW1"
 fi
 
-# If it's NOT a ZFS encryption setup, then clear out the ZFSENC_OPTIONS variable
+# If it's NOT a ZFS encryption setup, then clear out the ZFSENC_ROOT_OPTIONS variable
 if [ "${DISCENC}" != "ZFSENC" ] ; then
-    ZFSENC_OPTIONS=""
+    ZFSENC_ROOT_OPTIONS=""
+    ZFSENC_HOME_OPTIONS=""
 fi
 
 # We check /sys/power/state - if no "disk" in there, then HIBERNATE is disabled
@@ -459,8 +465,10 @@ echo "ZFS installed with ${ZFS_INSTALLED}, module with ${ZFS_MODULE}"
 
 if [ ${ZFS_INSTALLED} != ${ZFS_MODULE} ] || [ ${DISCENC} = "ZFSENC" ] || [ ${ZFS08} = "y" ] ; then
     echo "ZFS needs an update"
-    # Creating a key - might be used to encrypt the pool. Likely not though,
-    # as it seems to be better to encrypt datasets, not the whole pool.
+    # Create an encryption key for non-root datasets (/home).  The root dataset
+    # is encrypted with the passphrase above, but other datasets use a key that
+    # is stored in /root/pool.key.  This key isn't available unless the root
+    # dataset is unlocked, so we're still secure.
     dd if=/dev/urandom of=/root/pool.key bs=32 count=1
     apt-add-repository --yes --update ppa:jonathonf/zfs
     apt-get -qq --no-install-recommends --yes install libelf-dev zfs-dkms zfs-zed zfsutils-linux zfs-initramfs
@@ -606,17 +614,9 @@ case ${DISCENC} in
              ${POOLNAME} ${RAIDLEVEL} ${ZPOOLDISK}
         ;;
 
-    ZFSENC)
-        echo "Creating root pool ${POOLNAME}"
-        zpool create -f -o ashift=12 -o autotrim=on ${SUITE_ROOT_POOL} \
-          -O acltype=posixacl -O canmount=off -O compression=lz4 \
-          -O atime=off ${ZFSENC_OPTIONS} \
-          -O normalization=formD -O relatime=on -O xattr=sa \
-          -O mountpoint=/ -R ${ZFSBUILD} \
-          ${POOLNAME} ${RAIDLEVEL} ${ZPOOLDISK}
-        ;;
-
-    NOENC)
+    # With ZFS encryption we don't encrypt the pool, we encrypt individual
+    # datasets hierarchies
+    NOENC|ZFSENC)
         # Unencrypted
         # Certain features must be disabled to boot
         #  -o feature@project_quota=disabled \
@@ -699,7 +699,12 @@ UUID=$(dd if=/dev/urandom bs=1 count=100 2>/dev/null |
 
 echo "Creating main zfs datasets"
 # Container for root filesystems
-zfs create -o canmount=off -o mountpoint=none ${POOLNAME}/ROOT
+if [ ${DISCENC} = "ZFSENC" ] ; then
+    echo "${PASSPHRASE}" | zfs create -o canmount=off -o mountpoint=none ${ZFSENC_ROOT_OPTIONS} ${POOLNAME}/ROOT
+else
+    zfs create -o canmount=off -o mountpoint=none ${POOLNAME}/ROOT
+fi
+
 # Actual dataset for suite we are installing now
 zfs create -o canmount=noauto -o mountpoint=/ \
     -o com.ubuntu.zsys:bootfs=yes \
@@ -709,6 +714,12 @@ zfs create -o canmount=noauto -o mountpoint=/ \
 zpool set bootfs=${POOLNAME}/ROOT/${SUITE}_${UUID} ${POOLNAME}
 zfs mount ${POOLNAME}/ROOT/${SUITE}_${UUID}
 
+if [ ${DISCENC} = "ZFSENC" ] ; then
+    # Making sure we have the non-root pool key used for other datasets (/home)
+    mkdir ${ZFSBUILD}/root
+    cp /root/pool.key ${ZFSBUILD}/root
+fi
+
 # container for boot stuff
 zfs create -o canmount=off -o mountpoint=none ${BPOOLNAME}/BOOT
 # Actual /boot for kernels etc
@@ -717,20 +728,22 @@ zfs mount ${BPOOLNAME}/BOOT/${SUITE}_${UUID}
 zfs create -o com.ubuntu.zsys:bootfs=no -o mountpoint=/boot/grub ${BPOOLNAME}/BOOT/grub
 zfs mount ${BPOOLNAME}/BOOT/grub
 
-# Making sure we have the root pool key, to be copied into the initramfs
+# zfs create rpool/home and main user home dataset
 if [ ${DISCENC} = "ZFSENC" ] ; then
-    cp /root/pool.key ${ZFSBUILD}/boot
+    echo "${PASSPHRASE}" | zfs create -o canmount=off -o mountpoint=none -o compression=lz4 -o atime=off ${ZFSENC_HOME_OPTIONS} ${POOLNAME}/home
+else
+    zfs create -o canmount=off -o mountpoint=none -o compression=lz4 -o atime=off ${POOLNAME}/home
 fi
 
 # zfs create rpool/home and main user home dataset
 zfs create -o canmount=off -o mountpoint=none -o compression=lz4 -o atime=off ${ZFSENC_OPTIONS} ${POOLNAME}/home
 zfs create -o canmount=on -o mountpoint=/home/${USERNAME} ${POOLNAME}/home/${USERNAME}
 
-# Point zfs encryption to right location of keyfile for later
-if [ ${DISCENC} = "ZFSENC" ] ; then
-    zfs set keylocation=file:///boot/pool.key ${POOLNAME}/home
-    zfs set keylocation=file:///boot/pool.key ${POOLNAME}/home/${USERNAME}
-fi
+###  # Point zfs encryption to right location of keyfile for later
+###  if [ ${DISCENC} = "ZFSENC" ] ; then
+###      zfs set keylocation=file:///boot/pool.key ${POOLNAME}/home
+###      zfs set keylocation=file:///boot/pool.key ${POOLNAME}/home/${USERNAME}
+###  fi
 
 # Show what we got before installing
 echo "---------- $(tput setaf 1)About to debootstrap into ${ZFSBUILD}$(tput sgr0) -----------"
@@ -908,6 +921,10 @@ if [ ${DISCENC} = "ZFSENC" ] || [ ${ZFS08} = "y" ] ; then
 else
     # Just install current ubuntu ZFS as-is
     apt-get -qq --yes install zfs-initramfs zfs-zed
+fi
+
+if [ "${DISCENC}" != "NOENC" ] ; then
+    apt-get -qq --yes install cryptsetup dropbear-initramfs
 fi
 
 echo "-------- right after installing zfs -----------------------------------------"
@@ -1153,6 +1170,116 @@ apt-get -qq --no-install-recommends --yes install expect most vim-nox rsync whoi
 #_# Copy Avahi SSH service file into place
 #_#
 cp /usr/share/doc/avahi-daemon/examples/ssh.service /etc/avahi/services
+
+# For ZFSENC we need to set up a script and systemd unit to load the keyfile
+if [ ${DISCENC} = "ZFSENC" ] ; then
+  cat > /usr/local/bin/zfs-multi-mount.sh << 'EOF'
+#!/usr/bin/env bash
+
+PATH=/usr/bin:/sbin:/bin
+
+help() {
+    echo "Usage: $(basename "$0") [OPTION]... [SOURCE_POOL/DATASET]..."
+    echo
+    echo " -s, --systemd        use when within systemd context"
+    echo " -n, --no-mount       only load keys, do not mount datasets"
+    echo " -h, --help           show this help"
+    exit 0
+}
+
+for arg in "$@"; do
+  case $arg in
+  -s | --systemd)
+    systemd=1
+    shift
+    ;;
+  -n | --no-mount)
+    no_mount=1
+    shift
+    ;;
+  -h | --help) help ;;
+  -?*)
+    die "Invalid option '$1' Try '$(basename "$0") --help' for more information." ;;
+  esac
+done
+
+datasets=("$@")
+[ ${#datasets[@]} -eq 0 ] && mapfile -t datasets < <(zfs list -H -o name)
+attempt=0
+attempt_limit=3
+
+function ask_password {
+  if [ -v systemd ]; then
+    key=$(systemd-ask-password "Enter $dataset passphrase:" --no-tty) # While booting.
+  else
+    read -srp "Enter $dataset passphrase: " key ; echo # Other places.
+  fi
+}
+
+function load_key {
+  ! zfs list -H -o name | grep -qx "$dataset" && echo "ERROR: Dataset '$dataset' does not exist." && return 1
+  [[ $attempt == "$attempt_limit" ]] && echo "No more attempts left." && exit 1
+  keystatus=$(zfs get keystatus "$1" -H -o value)
+  echo "Testing $dataset status $keystatus"
+  [[ $keystatus != "unavailable" ]] && return 0
+  # Get the keylocation
+  key=$(zfs get keylocation "$1" -H -o value)
+  if [ $key != "prompt" ] ; then
+    if zfs load-key "$1" ; then
+      return 0
+    else
+      echo "Keyfile location invalid"
+      exit 1
+    fi
+  fi
+
+  if [ ! -v key ]; then
+    ((attempt++))
+    ask_password
+  fi
+  if ! echo "$key" | zfs load-key "$1"; then
+    unset key
+    load_key "$1"
+  fi
+  attempt=0
+  return 0
+}
+
+for dataset in "${datasets[@]}"; do
+  ! load_key "$dataset" && exit 1
+
+  # Mounting as non-root user on Linux is not possible,
+  # see https://github.com/openzfs/zfs/issues/10648.
+  [ ! -v no_mount ] && sudo zfs mount "$dataset" && echo "Dataset '$dataset' has been mounted."
+done
+
+unset key
+
+exit 0
+EOF
+  chmod 755 /usr/local/bin/zfs-multi-mount.sh
+
+  cat > /etc/systemd/system/zfs-load-key.service << 'EOF'
+[Unit]
+Description=Import keys for all datasets
+DefaultDependencies=no
+Before=zfs-mount.service
+Before=systemd-user-sessions.service
+After=zfs-import.target
+OnFailure=emergency.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+ExecStart=zfs-multi-mount.sh --systemd --no-mount
+
+[Install]
+WantedBy=zfs-mount.service
+EOF
+  systemctl enable zfs-load-key.service
+
+fi # if ZFSENC
 
 ####    #------------------- Dropbear stuff between dashed lines ----------------------------------------------------------------------
 ####    # Only if encrypted disk, LUKS or ZFSENC
