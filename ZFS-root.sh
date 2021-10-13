@@ -755,7 +755,7 @@ read -t 15 QUIT
 
 # Install basic system
 echo "debootstrap to build initial system"
-debootstrap ${SUITE} ${ZFSBUILD}
+debootstrap --include=${SUITE_BOOTSTRAP} ${SUITE} ${ZFSBUILD}
 zfs set devices=off ${POOLNAME}
 
 # If this system will use Docker (which manages its own datasets & snapshots):
@@ -917,7 +917,6 @@ echo "--------------------------------------------------------------------------
 
 # If using ZFS encryption we need the jonathonf PPA for latest 2.1
 if [ ${DISCENC} = "ZFSENC" ] || [ ${ZFS08} = "y" ] ; then
-    dd if=/dev/urandom of=/root/pool.key bs=32 count=1
     apt-add-repository --yes --update ppa:jonathonf/zfs
     apt-get -qq --no-install-recommends --yes install libelf-dev zfs-dkms zfs-zed zfsutils-linux zfs-initramfs
 else
@@ -1181,9 +1180,9 @@ if [ ${DISCENC} != "NOENC" ] ; then
       for SSHKEY in ${AUTHKEYS} ; do
       	FETCHKEY=$(wget --quiet -O- https://github.com/${SSHKEY}.keys)
         if [ ${#FETCHKEY} -ne 0 ] ; then
-          echo "#" > /etc/dropbear-initramfs/authorized_keys
-          echo "####### Github ${SSHKEY} keys #######" > /etc/dropbear-initramfs/authorized_keys
-          echo "no-port-forwarding,no-agent-forwarding,no-x11-forwarding$ {FETCHKEY}" > /etc/dropbear-initramfs/authorized_keys
+          echo "####### Github ${SSHKEY} keys #######" >> /etc/dropbear-initramfs/authorized_keys
+          echo "no-port-forwarding,no-agent-forwarding,no-x11-forwarding ${FETCHKEY}" >> /etc/dropbear-initramfs/authorized_keys
+          echo "#" >> /etc/dropbear-initramfs/authorized_keys
         fi
       done
     fi
@@ -1670,6 +1669,20 @@ EOF
 useradd -c "${UCOMMENT}" -p $(echo "${UPASSWORD}" | mkpasswd -m sha-512 --stdin) -M --home-dir /home/${USERNAME} --user-group --groups adm,cdrom,dip,lpadmin,plugdev,sambashare,sudo --shell /bin/bash ${USERNAME}
 # Since /etc/skel/* files aren't copied, have to do it manually
 rsync -a /etc/skel/ /home/${USERNAME}
+mkdir /home/${USERNAME}/.ssh
+chmod 700 /home/${USERNAME}/.ssh
+
+if [ "${AUTHKEYS}" != "none" ] ; then
+  for SSHKEY in ${AUTHKEYS} ; do
+  	FETCHKEY=$(wget --quiet -O- https://github.com/${SSHKEY}.keys)
+    if [ ${#FETCHKEY} -ne 0 ] ; then
+      echo "####### Github ${SSHKEY} keys #######" >> /home/${USERNAME}/.ssh/authorized_keys 
+      echo "${FETCHKEY}" >> /home/${USERNAME}/.ssh/authorized_keys 
+      echo "#" >> /home/${USERNAME}/.ssh/authorized_keys
+    fi
+  done
+fi
+
 chown -R ${USERNAME}.${USERNAME} /home/${USERNAME}
 
 # Allow read-only zfs commands with no sudo password
