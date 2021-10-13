@@ -309,6 +309,11 @@ if [ "${DISCENC}" != "NOENC" ] ; then
     PASSPHRASE="$PW1"
 fi
 
+# SSH authorized keys from github for dropbear and ssh
+AUTHKEYS=$(whiptail --inputbox "Dropbear and ssh need authorized ssh pubkeys to allow access to the server. Please enter any github users to pull ssh pubkeys from.  none means no keys to install" --title "SSH pubkeys for ssh and dropbear" 8 70 $(echo none) 3>&1 1>&2 2>&3)
+RET=${?}
+(( RET )) && AUTHKEYS=none
+
 # If it's NOT a ZFS encryption setup, then clear out the ZFSENC_ROOT_OPTIONS variable
 if [ "${DISCENC}" != "ZFSENC" ] ; then
     ZFSENC_ROOT_OPTIONS=""
@@ -498,9 +503,7 @@ for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
     sgdisk     -n2:1M:+512M   -c2:"UEFI_${disk}" -t2:EF00 /dev/disk/by-id/${zfsdisks[${disk}]}
     
     # boot pool
-#DC#    if [ ${DISCENC} = "LUKS" ] ; then
-        sgdisk     -n3:0:+1000M   -c3:"BOOT_${disk}" -t3:BF01 /dev/disk/by-id/${zfsdisks[${disk}]}
-#DC#    fi
+    sgdisk     -n3:0:+1000M   -c3:"BOOT_${disk}" -t3:BF01 /dev/disk/by-id/${zfsdisks[${disk}]}
     
     #
     # TODO: figure out partitions for both ZFS and LUKS encryption
@@ -825,6 +828,7 @@ export USERNAME=${USERNAME}
 export UPASSWORD="${UPASSWORD}"
 export UCOMMENT="${UCOMMENT}"
 export DISCENC=${DISCENC}
+export AUTHKEYS=${AUTHKEYS}
 export ZFS08=${ZFS08}
 export BPOOL_GUID=${BPOOL_GUID}
 export GOOGLE=${GOOGLE}
@@ -904,7 +908,7 @@ echo "America/New_York" > /etc/timezone
 ln -fs /usr/share/zoneinfo/US/Eastern /etc/localtime
 dpkg-reconfigure -f noninteractive tzdata
 
-apt-get -qq --no-install-recommends --yes install software-properties-common debconf-utils
+apt-get -qq --yes --no-install-recommends install software-properties-common debconf-utils
 apt-get -qq --yes --no-install-recommends install linux-generic${HWE}
 
 echo "-------- right after installing linux-generic -------------------------------"
@@ -1146,17 +1150,127 @@ if [ ${DELAY} = "y" ] ; then
     sed -i "s/ZFS_INITRD_PRE_MOUNTROOT_SLEEP=.*/ZFS_INITRD_PRE_MOUNTROOT_SLEEP='10'10/" /etc/default/zfs
 fi
 
-echo "--------- about to update initrd and grub -----------------------------------"
-ls -la /boot
-echo "-----------------------------------------------------------------------------"
 
-# Update initrd
-update-initramfs -c -k all
+#------------------- Dropbear stuff between dashed lines ----------------------------------------------------------------------
+# Only if encrypted disk, LUKS or ZFSENC
+if [ ${DISCENC} != "NOENC" ] ; then
 
-# Update boot config
-update-grub
+    apt-get -qq --no-install-recommends --yes install busybox dropbear-initramfs dropbear
+
+	if [ "$(cat /proc/cpuinfo | fgrep aes)" != "" ] ; then
+		echo "aesni-intel" >> /etc/modules
+		echo "aesni-intel" >> /etc/initramfs-tools/modules
+	fi
+	echo "aes-x86_64" >> /etc/modules
+	echo "aes-x86_64" >> /etc/initramfs-tools/modules
+
+    # Set up dropbear defaults
+    sed -i 's/NO_START=1/NO_START=0/g' /etc/default/dropbear
+    sed -i 's/DROPBEAR_PORT=22/DROPBEAR_PORT=2222/g' /etc/default/dropbear 
+    sed -i '/BUSYBOX=auto/c\BUSYBOX=y' /etc/initramfs-tools/initramfs.conf 
+    m_value='DROPBEAR_OPTIONS="-p 2222 -s -j -k -I 60"' 
+    sed -i "s/.DROPBEAR_OPTIONS./${m_value}/g" /etc/dropbear-initramfs/config
+
+    # Convert dropbear keys
+    /usr/lib/dropbear/dropbearconvert dropbear openssh /etc/dropbear-initramfs/dropbear_rsa_host_key /etc/dropbear-initramfs/id_rsa
+    dropbearkey -y -f /etc/dropbear-initramfs/dropbear_rsa_host_key |grep "^ssh-rsa " > /etc/dropbear-initramfs/id_rsa.pub
+
+    # Set up dropbear authorized_keys
+    touch /etc/dropbear-initramfs/authorized_keys
+    if [ "${AUTHKEYS}" != "none" ] ; then
+      for SSHKEY in ${AUTHKEYS} ; do
+      	FETCHKEY=$(wget --quiet -O- https://github.com/${SSHKEY}.keys)
+        if [ ${#FETCHKEY} -ne 0 ] ; then
+          echo "#" > /etc/dropbear-initramfs/authorized_keys
+          echo "####### Github ${SSHKEY} keys #######" > /etc/dropbear-initramfs/authorized_keys
+          echo "no-port-forwarding,no-agent-forwarding,no-x11-forwarding$ {FETCHKEY}" > /etc/dropbear-initramfs/authorized_keys
+        fi
+      done
+    fi
+
+    # Create crypt_unlock.sh script
+    cat > /usr/share/initramfs-tools/hooks/crypt_unlock.sh << EOFD
+#!/bin/sh
+# /usr/share/initramfs-tools/hooks/crypt_unlock.sh
+
+PREREQ="dropbear"
+
+prereqs() {
+  echo "\$PREREQ"
+}
+
+case "\$1" in
+  prereqs)
+    prereqs
+    exit 0
+  ;;
+esac
+
+. "\${CONFDIR}/initramfs.conf" 
+. /usr/share/initramfs-tools/hook-functions
+
+if [ "\${DROPBEAR}" != "n" ] && [ -r "/etc/zfs" ] ; then
+cat > "\${DESTDIR}/bin/unlock" << EOF 
+#!/bin/sh 
+if PATH=/lib/unlock:/bin:/sbin /scripts/local-top/cryptroot; then 
+  if [ ${DISCENC} == ZFSENC ] ; then
+    /sbin/zfs load-key ${POOLNAME}/ROOT
+    
+    # Get root dataset
+    DROP_ROOT=\`zfs get com.ubuntu.zsys:bootfs | grep yes | grep -v "@" | cut -d" " -f1\`
+    mount -o zfsutil -t zfs \\\${DROP_ROOT} /
+    if [ \\\$? == 0 ]; then 
+      echo OK - ZFS Root Pool Decrypted
+    fi
+  fi
+  if [ ${DISCENC} == LUKS ] ; then
+    echo "LUKS unlocking here"
+  fi
+  kill \\\`ps | grep [z]fs | awk '{print \\\$1}'\\\` 2>/dev/null
+  kill \\\`ps | grep [p]lymouth | awk '{print \\\$1}'\\\` 2>/dev/null
+  kill -9 \\\`ps | grep [-]sh | awk '{print \\\$1}'\\\` 2>/dev/null
+  exit 0 
+fi 
+exit 1 
+EOF
+
+chmod 755 "\${DESTDIR}/bin/unlock"
+mkdir -p "\${DESTDIR}/lib/unlock"
+
+cat > "\${DESTDIR}/lib/unlock/plymouth" << EOF 
+#!/bin/sh
+[ "\$1" == "--ping" ] && exit 1
+/bin/plymouth "\$@" 
+EOF
+
+chmod 755 "\${DESTDIR}/lib/unlock/plymouth"
+echo To unlock root-partition run "unlock" >> \${DESTDIR}/etc/motd
+fi
+EOFD
+
+chmod +x /usr/share/initramfs-tools/hooks/crypt_unlock.sh
+
+# Disable dropbear on main server
+systemctl disable dropbear
+
+fi # DISCENC != NOENC
+#------------------- Dropbear stuff between dashed lines ----------------------------------------------------------------------
 
 
+###  No need to update yet
+###
+###  echo "--------- about to update initrd and grub -----------------------------------"
+###  ls -la /boot
+###  echo "-----------------------------------------------------------------------------"
+###  
+###  # Update initrd
+###  update-initramfs -c -k all
+###  
+###  # Update boot config
+###  update-grub
+
+
+echo "-------- installing basic packages ------------------------------------------"
 #_#
 #_# Install basic packages
 #_#
@@ -1599,8 +1713,8 @@ if [ "${GOOGLE}" = "y" ]; then
     # sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/" /etc/ssh/sshd_config
 fi # GOOGLE_AUTH
 
-update-grub
 update-initramfs -c -k all
+update-grub
 
 #_# # Not needed any more - boots cleanly without bpool being legacy
 #_# # Only if encrypted disk
