@@ -161,7 +161,7 @@ if [ ! ${HOSTNAME} ]; then
 fi
 
 POOLNAME=${HOSTNAME}
-POOLNAME=$(whiptail --inputbox "Enter poolname to use for ZFS - defaults to hostname" --title "ZFS poolname" 8 70 $(echo $POOLNAME) 3>&1 1>&2 2>&3)
+POOLNAME=$(whiptail --inputbox "Enter poolname to use for main system - defaults to hostname" --title "ZFS main poolname" 8 70 $(echo $POOLNAME) 3>&1 1>&2 2>&3)
 RET=${?}
 (( RET )) && POOLNAME=
 if [ ! ${POOLNAME} ]; then
@@ -424,7 +424,7 @@ whiptail --title "Summary of install options" --msgbox "These are the options we
     User $(echo $USERNAME $UCOMMENT)\n\n \
     DELAY     = $(echo $DELAY)  : Enable delay before importing zpool\n \
     ZFS ver   = $(echo $ZFS08)  : Update to latest ZFS 2.1 via PPA\n \
-    GOOGLE    = $(echo $GOOGLE) : Install google authenticator\n \
+    GOOGLE    = $(echo $GOOGLE)  : Install google authenticator\n \
     DESKTOP   = $(echo $DESKTOP)  : Install full Ubuntu desktop\n \
     UEFI      = $(echo $UEFI)  : Enable UEFI\n \
     HIBERNATE = $(echo $HIBERNATE)  : Enable SWAP disk partition for hibernation\n \
@@ -502,14 +502,18 @@ for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
         sgdisk     -n3:0:+1000M   -c3:"BOOT_${disk}" -t3:BF01 /dev/disk/by-id/${zfsdisks[${disk}]}
 #DC#    fi
     
+    #
+    # TODO: figure out partitions for both ZFS and LUKS encryption
+    #       both swap and main partitions
+    #
     # For laptop hibernate need swap partition, encrypted or not
     if [ "${HIBERNATE}" = "y" ] ; then
         if [ ${DISCENC} != "NOENC" ] ; then
-            # LUKS Encrypted - should be partition type 8309
+            # ZFS or LUKS Encrypted - should be partition type 8309
             sgdisk -n4:0:+${SIZE_SWAP}M -c4:"SWAP_${disk}" -t4:8300 /dev/disk/by-id/${zfsdisks[${disk}]}
         else
             sgdisk -n4:0:+${SIZE_SWAP}M -c4:"SWAP_${disk}" -t4:8200 /dev/disk/by-id/${zfsdisks[${disk}]}
-        fi # DISCENC for LUKS
+        fi # DISCENC for ZFS or LUKS
     fi # HIBERNATE
     
     # Main data partition for root
@@ -575,9 +579,7 @@ rm -rf ${ZFSBUILD}
 mkdir -p ${ZFSBUILD}
 
 # Create boot pool - only uses features supported by grub and zfs version
-# Only needed if encrypting disk
 # https://openzfs.github.io/openzfs-docs/Getting%20Started/Ubuntu/Ubuntu%2020.04%20Root%20on%20ZFS.html
-#DC# if [ ${DISCENC} = "LUKS" ] ; then
     echo "Creating boot pool ${BPOOLNAME}"
     zpool create -f -o ashift=12 -d -o autotrim=on \
       -o cachefile=/etc/zfs/zpool.cache \
@@ -596,7 +598,6 @@ mkdir -p ${ZFSBUILD}
       -O normalization=formD -O relatime=on -O xattr=sa \
       -O mountpoint=/ -R ${ZFSBUILD} \
       ${BPOOLNAME} ${BPOOLRAID} ${PARTSBOOT}
-#DC# fi # DISCENC for LUKS
 
 # Grab the GUID of the new boot pool - will use below for zfs-import-bpool.service
 # to ensure we import the right bpool (in case there are others in the system)
@@ -938,8 +939,7 @@ systemctl enable zfs-import-cache
 
 # Set up /etc/crypttab - ugly-ass logic here
 if [ "${DISCENC}" = "LUKS" ] ; then
-    # Encrypted
-    apt-get -qq --yes install cryptsetup
+    # LUKS Encrypted
     if [ ${HIBERNATE} = "y" ] ; then
 
         for DISK in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
