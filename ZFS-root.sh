@@ -821,6 +821,7 @@ cat > ${ZFSBUILD}/root/Setup.sh << __EOF__
 
 export DELAY=${DELAY}
 export SUITE=${SUITE}
+export UUID=${UUID}
 export POOLNAME=${POOLNAME}
 export BPOOLNAME=${BPOOLNAME}
 export PASSPHRASE=${PASSPHRASE}
@@ -1091,7 +1092,7 @@ fi # UEFI
 
 
 # Ensure grub supports ZFS and reset timeouts to 5s
-sed -i "s/GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX=\"net.ifnames=0 biosdevname=0 rootdelay=9 root=ZFS=${POOLNAME}\/ROOT\/${SUITE}\"/" /etc/default/grub
+sed -i "s/GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX=\"net.ifnames=0 biosdevname=0 rootdelay=9 root=ZFS=${POOLNAME}\/ROOT\/${SUITE}_${UUID}\"/" /etc/default/grub
 sed -i 's/GRUB_TIMEOUT_STYLE=hidden/# GRUB_TIMEOUT_STYLE=hidden/' /etc/default/grub
 sed -i 's/GRUB_TIMEOUT=0/GRUB_TIMEOUT=5/' /etc/default/grub
 cat >> /etc/default/grub << EOF
@@ -1800,9 +1801,9 @@ zfs umount ${POOLNAME}/docker
     zpool export ${BPOOLNAME}
 #DC# else
 #DC#     zfs umount ${POOLNAME}/boot/grub
-#DC#     zfs umount ${POOLNAME}/boot/${SUITE}
+#DC#     zfs umount ${POOLNAME}/boot/${SUITE}_${UUID}
 #DC# fi
-zfs umount ${POOLNAME}/ROOT/${SUITE}
+zfs umount ${POOLNAME}/ROOT/${SUITE}_${UUID}
 
 # Back in livecd - unmount filesystems we may have missed
 # Have to escape any / in path
