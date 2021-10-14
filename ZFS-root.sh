@@ -356,6 +356,9 @@ SUITE=$(whiptail --title "Select Ubuntu distribtion" --radiolist "Choose distro"
 RET=${?}
 [[ ${RET} = 1 ]] && exit 1
 
+#
+# TODO: Make use of SUITE_EXTRAS maybe
+#
 case ${SUITE} in
 	focal)
         SUITE_NUM="20.04"
@@ -1113,6 +1116,7 @@ EOF
 #_#
 #_# Install grub to each disk in list
 #_#
+echo "-------- installing grub to each disk ---------------------------------------"
 for DISK in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
     # Install bootloader grub for either UEFI or legacy bios
     if [ "${UEFI}" = "y" ] ; then
@@ -1210,10 +1214,29 @@ esac
 . /usr/share/initramfs-tools/hook-functions
 
 if [ "\${DROPBEAR}" != "n" ] && [ -r "/etc/zfs" ] ; then
+
 cat > "\${DESTDIR}/bin/unlock" << EOF 
+# Automagicallly run the unlock command via /root/.profile
+ROOTDIR=`ls -1d \${DESTDIR}/root* | tail -1`
+cat > "\${ROOTDIR}/.profile" << EOF
+ctrl_c_exit() {
+  exit 1
+}
+ctrl_c_shell() {
+  # Ctrl-C during .profile appears to mangle terminal settings
+  reset
+}
+
+echo "Unlocking rootfs... Type Ctrl-C for a shell."
+trap ctrl_c_shell INT
+
+unlock && exit 1 || echo "Run unlock to try unlocking again"
+trap INT
+EOF
+
 #!/bin/sh 
-if PATH=/lib/unlock:/bin:/sbin /scripts/local-top/cryptroot; then 
-  if [ ${DISCENC} == ZFSENC ] ; then
+if [ ${DISCENC} == ZFSENC ] ; then
+  if PATH=/lib/unlock:/bin:/sbin /scripts/local-top/cryptroot; then 
     /sbin/zfs load-key ${POOLNAME}/ROOT
     
     # Get root dataset
@@ -1221,16 +1244,25 @@ if PATH=/lib/unlock:/bin:/sbin /scripts/local-top/cryptroot; then
     mount -o zfsutil -t zfs \\\${DROP_ROOT} /
     if [ \\\$? == 0 ]; then 
       echo OK - ZFS Root Pool Decrypted
+      kill \\\`ps | grep [z]fs | awk '{print \\\$1}'\\\` 2>/dev/null
+      kill \\\`ps | grep [p]lymouth | awk '{print \\\$1}'\\\` 2>/dev/null
+      kill -9 \\\`ps | grep [-]sh | awk '{print \\\$1}'\\\` 2>/dev/null
+      exit 0 
     fi
   fi
-  if [ ${DISCENC} == LUKS ] ; then
-    echo "LUKS unlocking here"
+fi
+
+if [ ${DISCENC} == LUKS ] ; then
+  cryptroot-unlock
+  if [ \\\$? == 0 ]; then 
+    echo OK - LUKS root disk Decrypted
+    kill \\\`ps | grep [z]fs | awk '{print \\\$1}'\\\` 2>/dev/null
+    kill \\\`ps | grep [p]lymouth | awk '{print \\\$1}'\\\` 2>/dev/null
+    kill -9 \\\`ps | grep [-]sh | awk '{print \\\$1}'\\\` 2>/dev/null
+    exit 0 
   fi
-  kill \\\`ps | grep [z]fs | awk '{print \\\$1}'\\\` 2>/dev/null
-  kill \\\`ps | grep [p]lymouth | awk '{print \\\$1}'\\\` 2>/dev/null
-  kill -9 \\\`ps | grep [-]sh | awk '{print \\\$1}'\\\` 2>/dev/null
-  exit 0 
-fi 
+fi
+
 exit 1 
 EOF
 
