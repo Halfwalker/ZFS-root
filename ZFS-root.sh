@@ -1226,12 +1226,15 @@ esac
 . "\${CONFDIR}/initramfs.conf" 
 . /usr/share/initramfs-tools/hook-functions
 
-if [ "\${DROPBEAR}" != "n" ] && [ -r "/etc/zfs" ] ; then
+# if [ "\${DROPBEAR}" != "n" ] && [ -r "/etc/zfs" ] ; then
+if [ "\${DROPBEAR}" != "n" ] ; then
 
-cat > "\${DESTDIR}/bin/unlock" << EOF 
-# Automagicallly run the unlock command via /root/.profile
-ROOTDIR=`ls -1d \${DESTDIR}/root* | tail -1`
-cat > "\${ROOTDIR}/.profile" << EOF
+  # Automagicallly run the unlock command via /root/.profile
+  # If preferred, could dispense with this and add "-c unlock"
+  # to the DROPBEAR_OPTIONS var in /etc/dropbear-initramfs/config
+  # But then no option to drop to a shell
+  ROOTDIR=\`ls -1d \${DESTDIR}/root* | tail -1\`
+  cat > "\${ROOTDIR}/.profile" << EOF
 ctrl_c_exit() {
   exit 1
 }
@@ -1247,13 +1250,14 @@ unlock && exit 1 || echo "Run unlock to try unlocking again"
 trap INT
 EOF
 
+  cat > "\${DESTDIR}/bin/unlock" << EOF 
 #!/bin/sh 
 if [ ${DISCENC} == ZFSENC ] ; then
   if PATH=/lib/unlock:/bin:/sbin /scripts/local-top/cryptroot; then 
     /sbin/zfs load-key ${POOLNAME}/ROOT
     
     # Get root dataset
-    DROP_ROOT=\`zfs get com.ubuntu.zsys:bootfs | grep yes | grep -v "@" | cut -d" " -f1\`
+    DROP_ROOT=\\\`zfs get com.ubuntu.zsys:bootfs | grep yes | grep -v "@" | cut -d" " -f1\\\`
     mount -o zfsutil -t zfs \\\${DROP_ROOT} /
     if [ \\\$? == 0 ]; then 
       echo OK - ZFS Root Pool Decrypted
