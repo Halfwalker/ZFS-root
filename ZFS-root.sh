@@ -1163,7 +1163,7 @@ fi
 
 if [ ${DISCENC} != "NOENC" ] ; then
 
-    apt-get -qq --no-install-recommends --yes install busybox dropbear-initramfs dropbear
+    apt-get -qq --no-install-recommends --yes install busybox dropbear-initramfs
 
 	if [ "$(cat /proc/cpuinfo | fgrep aes)" != "" ] ; then
 		echo "aesni-intel" >> /etc/modules
@@ -1206,6 +1206,12 @@ up/functions
     fi
 
     # Create crypt_unlock.sh script
+    # Lots of ugly \ and \\\ in place.  Single \ is to NOT dereference the
+    # variable in the crypt_unlock.sh script - that is, we want the name of
+    # the variable there, not the value.  Triple \\\ is inception - one level
+    # deeper.  crypt_unlock.sh ALSO creates a few scripts, and the triple \\\
+    # means to NOT dereference the variable or back-tick - pass them directly
+    # into the created scripts
     cat > /usr/share/initramfs-tools/hooks/crypt_unlock.sh << EOFD
 #!/bin/sh
 # /usr/share/initramfs-tools/hooks/crypt_unlock.sh
@@ -1283,18 +1289,18 @@ fi
 exit 1 
 EOF
 
-chmod 755 "\${DESTDIR}/bin/unlock"
-mkdir -p "\${DESTDIR}/lib/unlock"
+  chmod 755 "\${DESTDIR}/bin/unlock"
+  mkdir -p "\${DESTDIR}/lib/unlock"
 
-cat > "\${DESTDIR}/lib/unlock/plymouth" << EOF 
+  cat > "\${DESTDIR}/lib/unlock/plymouth" << EOF 
 #!/bin/sh
 [ "\$1" == "--ping" ] && exit 1
 /bin/plymouth "\$@" 
 EOF
 
-chmod 755 "\${DESTDIR}/lib/unlock/plymouth"
-echo To unlock root-partition run "unlock" >> \${DESTDIR}/etc/motd
-fi
+  chmod 755 "\${DESTDIR}/lib/unlock/plymouth"
+  echo To unlock root-partition run "unlock" >> \${DESTDIR}/etc/motd
+fi # DROPBEAR != n
 EOFD
 
 chmod +x /usr/share/initramfs-tools/hooks/crypt_unlock.sh
