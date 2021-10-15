@@ -1157,6 +1157,10 @@ fi
 
 #------------------- Dropbear stuff between dashed lines ----------------------------------------------------------------------
 # Only if encrypted disk, LUKS or ZFSENC
+# Want to embed the IP address(es) of the server into the decrypt prompt
+# ip a | fgrep "inet " | fgrep -v "host lo" | awk '{ print $2 }' | xargs
+# awk '/32 host/ { print f } {f=$2}' /proc/net/fib_trie | sort | uniq | grep -v 127.0.0.1
+
 if [ ${DISCENC} != "NOENC" ] ; then
 
     apt-get -qq --no-install-recommends --yes install busybox dropbear-initramfs dropbear
@@ -1172,6 +1176,15 @@ if [ ${DISCENC} != "NOENC" ] ; then
     sed -i 's/NO_START=1/NO_START=0/g' /etc/default/dropbear
     sed -i 's/DROPBEAR_PORT=22/DROPBEAR_PORT=2222/g' /etc/default/dropbear 
     sed -i '/BUSYBOX=auto/c\BUSYBOX=y' /etc/initramfs-tools/initramfs.conf 
+
+    # Add current IP address to "Please unlock" boot message
+    # Have to escapt $ and `
+    sed -i "s^Please unlock disk \$CRYPTTAB_NAME^Please unlock disk \$CRYPTTAB_NAME at \`awk '/32 host/ { print f } {f=\$2}' /proc/net/fib_trie | sort | uniq | grep -v 127.0.0.1\` ^" /usr/lib/cryptset
+up/functions
+
+    # NOTE: We *could* add the option "-c unlock" to automagically run the
+    #       unlock command here.  But doing it via /root/.profile below
+    #       allows us to drop to a shell if necessary.
     m_value='DROPBEAR_OPTIONS="-p 2222 -s -j -k -I 60"' 
     sed -i "s/.DROPBEAR_OPTIONS./${m_value}/g" /etc/dropbear-initramfs/config
 
