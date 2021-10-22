@@ -35,7 +35,7 @@
 # 4) Make it executable (chmod +x ZFS-root.sh)
 # 5) Run it (./ZFS-root.sh)
 #
-# It will ask a few questions (username, which disk, xenial/bionic/focal etc)
+# It will ask a few questions (username, which disk, bionic/focal etc)
 # and then fully install a minimal Ubuntu system. Depending on the choices
 # several partitions and zfs datasets will be created.
 # 
@@ -341,17 +341,16 @@ RET=${?}
 # Only used for swap partition (encrypted or not)
 USE_ZSWAP="\"zswap.enabled=1 zswap.compressor=lz4 zswap.max_pool_percent=25\""
 
-# What suite is this script running under ?  xenial or bionic
+# What suite is this script running under ?  bionic or focal
 # Xenial does not support a couple of zfs feature flags, so have to
 # not use them when creating the pools, even if the target system
 # is bionic.  Pool can be upgraded after booting into the target.
 SCRIPT_SUITE=$(lsb_release -cs)
 
-# Suite to install - xenial bionic
+# Suite to install - bionic focal
 SUITE=$(whiptail --title "Select Ubuntu distribtion" --radiolist "Choose distro" 11 50 4 \
     focal "20.04 focal" ON \
     bionic "18.04 Bionic" OFF \
-    xenial "16.04 Xenial" OFF \
     3>&1 1>&2 2>&3)
 RET=${?}
 [[ ${RET} = 1 ]] && exit 1
@@ -400,23 +399,26 @@ case ${SUITE} in
                 ;;
         esac
         ;;
-    xenial | loki | serena)
-        SUITE_NUM="16.04"
-        SUITE_EXTRAS="openssl-blacklist openssh-blacklist openssh-blacklist-extra bootlogd"
-        SUITE_BOOTSTRAP="wget,whois,rsync,gdisk"
-        [ "${HWE}" = "y" ] && HWE="-hwe-${SUITE_NUM}" || HWE=
-        # bionic features above not available in 0.6.x.x in xenial
-        SUITE_BOOT_POOL=""
-        SUITE_ROOT_POOL=""
-        ;;
+    # Default to focal 20.04
     *)
-        SUITE_NUM="16.04"
-        SUITE_EXTRAS="openssl-blacklist openssh-blacklist openssh-blacklist-extra bootlogd"
-        SUITE_BOOTSTRAP="wget,whois,rsync,gdisk"
+        SUITE_NUM="20.04"
+        SUITE_EXTRAS="netplan.io expect"
+        SUITE_BOOTSTRAP="wget,whois,rsync,gdisk,netplan.io"
+        # Install HWE packages - set to blank or to "-hwe-20.04"
+        # Gets tacked on to various packages below
         [ "${HWE}" = "y" ] && HWE="-hwe-${SUITE_NUM}" || HWE=
-        # bionic features above not available in 0.6.x.x in xenial
-        SUITE_BOOT_POOL=""
-        SUITE_ROOT_POOL=""
+        # Specific zpool features available in focal
+        # Depends on what suite this script is running under
+        case ${SCRIPT_SUITE} in
+            bionic | focal)
+                SUITE_BOOT_POOL="-o feature@userobj_accounting=enabled"
+                SUITE_ROOT_POOL="-O dnodesize=auto"
+                ;;
+            xenial)
+                SUITE_BOOT_POOL=""
+                SUITE_ROOT_POOL=""
+                ;;
+        esac
         ;;
 esac
 
@@ -772,9 +774,8 @@ if [ ${PROXY} ]; then
     echo "Acquire::http::proxy \"${PROXY}\";" > ${ZFSBUILD}/etc/apt/apt.conf.d/03proxy
 fi # PROXY
 
-# Set up networking for netplan or interfaces
+# Set up networking for netplan
 # renderer: networkd is for text mode only, use NetworkManager for gnome
-if [ ${SUITE} != xenial ] ; then
 cat > ${ZFSBUILD}/etc/netplan/01_netcfg.yaml << __EOF__
 network:
   version: 2
@@ -784,17 +785,6 @@ network:
       dhcp4: true
       optional: true
 __EOF__
-else
-cat >> ${ZFSBUILD}/etc/network/interfaces << __EOF__
-# The loopback network interface
-auto lo
-iface lo inet loopback
-
-# The primary network interface
-auto eth0
-iface eth0 inet dhcp
-__EOF__
-fi
 
 # Google Authenticator config - put to /root to be moved to /home/${USERNAME} in setup.sh
 if [ ${GOOGLE} = "y" ] ; then
