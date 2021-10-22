@@ -25,7 +25,7 @@
 
 #
 # This will set up a single-disk system with root-on-zfs, using
-# xenial/16/04, bionic/18.04 or focal/20.04.
+# bionic/18.04 or focal/20.04.
 #
 # >>>>>>>>>> NOTE: This will totally overwrite the disk chosen <<<<<<<<<<<<<
 #
@@ -69,12 +69,17 @@
 
 # >>>>>>>>>> ISSUES <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 # Multi-disk booting with LUKS
-# One disk must be chosed to be unlocked - all the others use a derived key
+# One disk must be chosen to be unlocked - all the others use a derived key
 # from that to unlock without extra prompts for passphrase.  Problem is that
 # one disk is hard-coded in /etc/crypttab.  If THAT disk goes bad or is missing
 # then unlocking fails.  Need a way to try other disks in order.
 
 # https://github.com/saveriomiroddi/zfs-installer
+
+# Return codes from whiptail
+# 0   OK in menu
+# 1   Cancel in menu
+# 255 Esc key hit
 
 if [[ $EUID -ne 0 ]]; then
     echo "This script must be run as root" 1>&2
@@ -366,7 +371,7 @@ case ${SUITE} in
         # Install HWE packages - set to blank or to "-hwe-20.04"
         # Gets tacked on to various packages below
         [ "${HWE}" = "y" ] && HWE="-hwe-${SUITE_NUM}" || HWE=
-        # Specific zpool features available in bionic
+        # Specific zpool features available in focal
         # Depends on what suite this script is running under
         case ${SCRIPT_SUITE} in
             bionic | focal)
