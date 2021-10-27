@@ -364,7 +364,7 @@ RET=${?}
 # TODO: Make use of SUITE_EXTRAS maybe
 #
 case ${SUITE} in
-	focal)
+    focal)
         SUITE_NUM="20.04"
         SUITE_EXTRAS="netplan.io expect"
         SUITE_BOOTSTRAP="wget,whois,rsync,gdisk,netplan.io"
@@ -384,7 +384,7 @@ case ${SUITE} in
                 ;;
         esac
         ;;
-	bionic)
+    bionic)
         SUITE_NUM="18.04"
         SUITE_EXTRAS="netplan.io expect"
         SUITE_BOOTSTRAP="wget,whois,rsync,gdisk,netplan.io"
@@ -552,14 +552,14 @@ PARTSEFI=
 # ZFS partitions to create zpool with
 ZPOOLDISK=
 for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
-	PARTSSWAP="/dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} ${PARTSSWAP}"
-	PARTSBOOT="/dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_BOOT} ${PARTSBOOT}"
-	PARTSEFI="/dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_EFI} ${PARTSEFI}"
-	if [ ${DISCENC} = "LUKS" ]; then
-		ZPOOLDISK="/dev/mapper/root_crypt${disk} ${ZPOOLDISK}"
-	else
-		ZPOOLDISK="/dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} ${ZPOOLDISK}"
-	fi
+    PARTSSWAP="/dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} ${PARTSSWAP}"
+    PARTSBOOT="/dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_BOOT} ${PARTSBOOT}"
+    PARTSEFI="/dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_EFI} ${PARTSEFI}"
+    if [ ${DISCENC} = "LUKS" ]; then
+        ZPOOLDISK="/dev/mapper/root_crypt${disk} ${ZPOOLDISK}"
+    else
+        ZPOOLDISK="/dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} ${ZPOOLDISK}"
+    fi
 done
 
 #_# ###################################
@@ -618,7 +618,7 @@ BPOOL_GUID=$(zpool get guid ${BPOOLNAME} -o value -H)
 
 # Create root pool
 case ${DISCENC} in
-	LUKS)
+    LUKS)
         echo "Creating root pool ${POOLNAME}"
         zpool create -f -o ashift=12 -o autotrim=on ${SUITE_ROOT_POOL} \
              -O acltype=posixacl -O canmount=off -O compression=lz4 \
@@ -655,10 +655,10 @@ esac
 #_# zpool export ${POOLNAME}
 #_# rm -rf ${ZFSBUILD}
 #_# if [ "${LUKS}" = "y" ]; then
-#_# 	zpool import -d /dev/mapper -R ${ZFSBUILD} ${POOLNAME}
-#_# 	zpool import -d /dev/mapper -R ${ZFSBUILD} ${BPOOLNAME}
+#_#     zpool import -d /dev/mapper -R ${ZFSBUILD} ${POOLNAME}
+#_#     zpool import -d /dev/mapper -R ${ZFSBUILD} ${BPOOLNAME}
 #_# else
-#_# 	zpool import -d /dev/disk/by-id -R ${ZFSBUILD} ${POOLNAME}
+#_#     zpool import -d /dev/disk/by-id -R ${ZFSBUILD} ${POOLNAME}
 #_# fi
 
 
@@ -670,12 +670,12 @@ if [ ${HIBERNATE} = "y" ] ; then
     for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
 
         case ${DISCENC} in
-	        LUKS)
+            LUKS)
                 echo "Encrypting swap partition ${disk} size ${SIZE_SWAP}M"
                 echo ${PASSPHRASE} | cryptsetup luksFormat --type luks2 -c aes-xts-plain64 -s 512 -h sha256 /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} 
                 echo ${PASSPHRASE} | cryptsetup luksOpen /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} swap_crypt${disk}
                 mkswap -f /dev/mapper/swap_crypt
-    
+
                 if [ ${disk} -eq 0 ] ; then
                     # Get derived key to insert into other encrypted devices
                     # To be more secure do this into a small ramdisk
@@ -844,7 +844,7 @@ export PARTITION_DATA=5
 __EOF__
 
 for DISK in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
-	echo "zfsdisks[${DISK}]=${zfsdisks[${DISK}]}" >> ${ZFSBUILD}/root/Setup.sh
+    echo "zfsdisks[${DISK}]=${zfsdisks[${DISK}]}" >> ${ZFSBUILD}/root/Setup.sh
 done
 
 cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
@@ -973,15 +973,15 @@ fi # DISCENC for LUKS crypttab
 
 # # Create grub device.map for just install drives - eg.
 # # grub-mkdevicemap -nvv
-# # (hd0)	/dev/disk/by-id/ata-VBOX_HARDDISK_VB7e33e873-e3c9fd91
-# # (hd1)	/dev/disk/by-id/ata-VBOX_HARDDISK_VB3f3328bd-1d7db667
-# # (hd2)	/dev/disk/by-id/ata-VBOX_HARDDISK_VB11f330ab-76c3340a
+# # (hd0)   /dev/disk/by-id/ata-VBOX_HARDDISK_VB7e33e873-e3c9fd91
+# # (hd1)   /dev/disk/by-id/ata-VBOX_HARDDISK_VB3f3328bd-1d7db667
+# # (hd2)   /dev/disk/by-id/ata-VBOX_HARDDISK_VB11f330ab-76c3340a
 # #
 # # We do this manually rather than grub-mkdevicemap to ensure we only use the disks
 # # listed in ZFS-setup.disks.txt, in case there are other disks in the system
 # echo "" > /boot/grub/device.map
 # for DISK in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
-# 	echo "(hd${DISK}) /dev/disk/by-id/${zfsdisks[${DISK}]}" >> /boot/grub/device.map
+#   echo "(hd${DISK}) /dev/disk/by-id/${zfsdisks[${DISK}]}" >> /boot/grub/device.map
 # done
 # echo "------------------ device.map ------------------------------"
 # cat /boot/grub/device.map
@@ -1030,8 +1030,8 @@ if [ ${HIBERNATE} = "y" ] ; then
 
     # If using zswap enable lz4 compresstion
     if [ "ZZ${USE_ZSWAP}" != "ZZ" ]; then
-    	echo "lz4" >> /etc/modules
-    	echo "lz4" >> /etc/initramfs-tools/modules
+        echo "lz4" >> /etc/modules
+        echo "lz4" >> /etc/initramfs-tools/modules
     fi
 
 else
@@ -1160,12 +1160,12 @@ if [ ${DISCENC} != "NOENC" ] ; then
 
     apt-get -qq --no-install-recommends --yes install busybox dropbear-initramfs
 
-	if [ "$(cat /proc/cpuinfo | fgrep aes)" != "" ] ; then
-		echo "aesni-intel" >> /etc/modules
-		echo "aesni-intel" >> /etc/initramfs-tools/modules
-	fi
-	echo "aes-x86_64" >> /etc/modules
-	echo "aes-x86_64" >> /etc/initramfs-tools/modules
+    if [ "$(cat /proc/cpuinfo | fgrep aes)" != "" ] ; then
+        echo "aesni-intel" >> /etc/modules
+        echo "aesni-intel" >> /etc/initramfs-tools/modules
+    fi
+    echo "aes-x86_64" >> /etc/modules
+    echo "aes-x86_64" >> /etc/initramfs-tools/modules
 
     # Set up dropbear defaults
     sed -i 's/NO_START=1/NO_START=0/g' /etc/default/dropbear
@@ -1190,14 +1190,14 @@ up/functions
     # Set up dropbear authorized_keys
     touch /etc/dropbear-initramfs/authorized_keys
     if [ "${AUTHKEYS}" != "none" ] ; then
-      for SSHKEY in ${AUTHKEYS} ; do
-      	FETCHKEY=$(wget --quiet -O- https://github.com/${SSHKEY}.keys)
-        if [ ${#FETCHKEY} -ne 0 ] ; then
-          echo "####### Github ${SSHKEY} keys #######" >> /etc/dropbear-initramfs/authorized_keys
-          echo "no-port-forwarding,no-agent-forwarding,no-x11-forwarding ${FETCHKEY}" >> /etc/dropbear-initramfs/authorized_keys
-          echo "#" >> /etc/dropbear-initramfs/authorized_keys
-        fi
-      done
+        for SSHKEY in ${AUTHKEYS} ; do
+            FETCHKEY=$(wget --quiet -O- https://github.com/${SSHKEY}.keys)
+            if [ ${#FETCHKEY} -ne 0 ] ; then
+                echo "####### Github ${SSHKEY} keys #######" >> /etc/dropbear-initramfs/authorized_keys
+                echo "no-port-forwarding,no-agent-forwarding,no-x11-forwarding ${FETCHKEY}" >> /etc/dropbear-initramfs/authorized_keys
+                echo "#" >> /etc/dropbear-initramfs/authorized_keys
+            fi
+        done
     fi
 
     # Create crypt_unlock.sh script
@@ -1258,31 +1258,31 @@ if [ "\${DROPBEAR}" != "n" ] ; then
     cat > "\${DESTDIR}/bin/unlock" <<- EOF 
 	#!/bin/sh 
 	if [ ${DISCENC} == ZFSENC ] ; then
-	  if PATH=/lib/unlock:/bin:/sbin /scripts/local-top/cryptroot; then 
-	    /sbin/zfs load-key ${POOLNAME}/ROOT
-    
-	    # Get root dataset
-	    DROP_ROOT=\\\`/sbin/zfs get com.ubuntu.zsys:bootfs | grep yes | grep -v "@" | cut -d" " -f1\\\`
-	    mount -o zfsutil -t zfs \\\${DROP_ROOT} /
-	    if [ \\\$? == 0 ]; then 
-	      echo OK - ZFS Root Pool Decrypted
-	      kill \\\`ps | grep [z]fs | awk '{print \\\$1}'\\\` 2>/dev/null
-	      kill \\\`ps | grep [p]lymouth | awk '{print \\\$1}'\\\` 2>/dev/null
-	      kill -9 \\\`ps | grep [-]sh | awk '{print \\\$1}'\\\` 2>/dev/null
-	      exit 0 
+	    if PATH=/lib/unlock:/bin:/sbin /scripts/local-top/cryptroot; then 
+	        /sbin/zfs load-key ${POOLNAME}/ROOT
+
+	        # Get root dataset
+	        DROP_ROOT=\\\`/sbin/zfs get com.ubuntu.zsys:bootfs | grep yes | grep -v "@" | cut -d" " -f1\\\`
+	        mount -o zfsutil -t zfs \\\${DROP_ROOT} /
+	        if [ \\\$? == 0 ]; then 
+	            echo OK - ZFS Root Pool Decrypted
+	            kill \\\`ps | grep [z]fs | awk '{print \\\$1}'\\\` 2>/dev/null
+	            kill \\\`ps | grep [p]lymouth | awk '{print \\\$1}'\\\` 2>/dev/null
+	            kill -9 \\\`ps | grep [-]sh | awk '{print \\\$1}'\\\` 2>/dev/null
+	            exit 0 
+	        fi
 	    fi
-	  fi
 	fi
 
 	if [ ${DISCENC} == LUKS ] ; then
-	  cryptroot-unlock
-	  if [ \\\$? == 0 ]; then 
-	    echo OK - LUKS root disk Decrypted
-	    kill \\\`ps | grep [z]fs | awk '{print \\\$1}'\\\` 2>/dev/null
-	    kill \\\`ps | grep [p]lymouth | awk '{print \\\$1}'\\\` 2>/dev/null
-	    kill -9 \\\`ps | grep [-]sh | awk '{print \\\$1}'\\\` 2>/dev/null
-	    exit 0 
-	  fi
+	    cryptroot-unlock
+	    if [ \\\$? == 0 ]; then 
+	        echo OK - LUKS root disk Decrypted
+	        kill \\\`ps | grep [z]fs | awk '{print \\\$1}'\\\` 2>/dev/null
+	        kill \\\`ps | grep [p]lymouth | awk '{print \\\$1}'\\\` 2>/dev/null
+	        kill -9 \\\`ps | grep [-]sh | awk '{print \\\$1}'\\\` 2>/dev/null
+	        exit 0 
+	    fi
 	fi
 
 	exit 1 
@@ -1731,12 +1731,12 @@ chmod 700 /home/${USERNAME}/.ssh
 
 if [ "${AUTHKEYS}" != "none" ] ; then
   for SSHKEY in ${AUTHKEYS} ; do
-  	FETCHKEY=$(wget --quiet -O- https://github.com/${SSHKEY}.keys)
-    if [ ${#FETCHKEY} -ne 0 ] ; then
-      echo "####### Github ${SSHKEY} keys #######" >> /home/${USERNAME}/.ssh/authorized_keys 
-      echo "${FETCHKEY}" >> /home/${USERNAME}/.ssh/authorized_keys 
-      echo "#" >> /home/${USERNAME}/.ssh/authorized_keys
-    fi
+      FETCHKEY=$(wget --quiet -O- https://github.com/${SSHKEY}.keys)
+      if [ ${#FETCHKEY} -ne 0 ] ; then
+          echo "####### Github ${SSHKEY} keys #######" >> /home/${USERNAME}/.ssh/authorized_keys 
+          echo "${FETCHKEY}" >> /home/${USERNAME}/.ssh/authorized_keys 
+          echo "#" >> /home/${USERNAME}/.ssh/authorized_keys
+      fi
   done
 fi
 
