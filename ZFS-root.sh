@@ -1230,71 +1230,77 @@ esac
 # if [ "\${DROPBEAR}" != "n" ] && [ -r "/etc/zfs" ] ; then
 if [ "\${DROPBEAR}" != "n" ] ; then
 
-  # Automagicallly run the unlock command via /root/.profile
-  # If preferred, could dispense with this and add "-c unlock"
-  # to the DROPBEAR_OPTIONS var in /etc/dropbear-initramfs/config
-  # But then no option to drop to a shell
-  ROOTDIR=\`ls -1d \${DESTDIR}/root* | tail -1\`
-  cat > "\${ROOTDIR}/.profile" << EOF
-ctrl_c_exit() {
-  exit 1
-}
-ctrl_c_shell() {
-  # Ctrl-C during .profile appears to mangle terminal settings
-  reset
-}
+    # Automagicallly run the unlock command via /root/.profile
+    # If preferred, could dispense with this and add "-c unlock"
+    # to the DROPBEAR_OPTIONS var in /etc/dropbear-initramfs/config
+    # But then no option to drop to a shell
+    # NOTE: 1st char here is a TAB, because <<- strips only leading TABS
+    #       from the HereDoc.  Spaces are left alone.  Makes for nice indentation
+    ROOTDIR=\`ls -1d \${DESTDIR}/root* | tail -1\`
+    cat > "\${ROOTDIR}/.profile" <<- EOF
+	ctrl_c_exit() {
+	  exit 1
+	}
+	ctrl_c_shell() {
+	  # Ctrl-C during .profile appears to mangle terminal settings
+	  reset
+	}
 
-echo "Unlocking rootfs... Type Ctrl-C for a shell."
-trap ctrl_c_shell INT
+	echo "Unlocking rootfs... Type Ctrl-C for a shell."
+	trap ctrl_c_shell INT
 
-unlock && exit 1 || echo "Run unlock to try unlocking again"
-trap INT
-EOF
+	unlock && exit 1 || echo "Run unlock to try unlocking again"
+	trap INT
+	EOF
 
-  cat > "\${DESTDIR}/bin/unlock" << EOF 
-#!/bin/sh 
-if [ ${DISCENC} == ZFSENC ] ; then
-  if PATH=/lib/unlock:/bin:/sbin /scripts/local-top/cryptroot; then 
-    /sbin/zfs load-key ${POOLNAME}/ROOT
+    # NOTE: 1st char here is a TAB, because <<- strips only leading TABS
+    #       from the HereDoc.  Spaces are left alone.  Makes for nice indentation
+    cat > "\${DESTDIR}/bin/unlock" <<- EOF 
+	#!/bin/sh 
+	if [ ${DISCENC} == ZFSENC ] ; then
+	  if PATH=/lib/unlock:/bin:/sbin /scripts/local-top/cryptroot; then 
+	    /sbin/zfs load-key ${POOLNAME}/ROOT
     
-    # Get root dataset
-    DROP_ROOT=\\\`zfs get com.ubuntu.zsys:bootfs | grep yes | grep -v "@" | cut -d" " -f1\\\`
-    mount -o zfsutil -t zfs \\\${DROP_ROOT} /
-    if [ \\\$? == 0 ]; then 
-      echo OK - ZFS Root Pool Decrypted
-      kill \\\`ps | grep [z]fs | awk '{print \\\$1}'\\\` 2>/dev/null
-      kill \\\`ps | grep [p]lymouth | awk '{print \\\$1}'\\\` 2>/dev/null
-      kill -9 \\\`ps | grep [-]sh | awk '{print \\\$1}'\\\` 2>/dev/null
-      exit 0 
-    fi
-  fi
-fi
+	    # Get root dataset
+	    DROP_ROOT=\\\`/sbin/zfs get com.ubuntu.zsys:bootfs | grep yes | grep -v "@" | cut -d" " -f1\\\`
+	    mount -o zfsutil -t zfs \\\${DROP_ROOT} /
+	    if [ \\\$? == 0 ]; then 
+	      echo OK - ZFS Root Pool Decrypted
+	      kill \\\`ps | grep [z]fs | awk '{print \\\$1}'\\\` 2>/dev/null
+	      kill \\\`ps | grep [p]lymouth | awk '{print \\\$1}'\\\` 2>/dev/null
+	      kill -9 \\\`ps | grep [-]sh | awk '{print \\\$1}'\\\` 2>/dev/null
+	      exit 0 
+	    fi
+	  fi
+	fi
 
-if [ ${DISCENC} == LUKS ] ; then
-  cryptroot-unlock
-  if [ \\\$? == 0 ]; then 
-    echo OK - LUKS root disk Decrypted
-    kill \\\`ps | grep [z]fs | awk '{print \\\$1}'\\\` 2>/dev/null
-    kill \\\`ps | grep [p]lymouth | awk '{print \\\$1}'\\\` 2>/dev/null
-    kill -9 \\\`ps | grep [-]sh | awk '{print \\\$1}'\\\` 2>/dev/null
-    exit 0 
-  fi
-fi
+	if [ ${DISCENC} == LUKS ] ; then
+	  cryptroot-unlock
+	  if [ \\\$? == 0 ]; then 
+	    echo OK - LUKS root disk Decrypted
+	    kill \\\`ps | grep [z]fs | awk '{print \\\$1}'\\\` 2>/dev/null
+	    kill \\\`ps | grep [p]lymouth | awk '{print \\\$1}'\\\` 2>/dev/null
+	    kill -9 \\\`ps | grep [-]sh | awk '{print \\\$1}'\\\` 2>/dev/null
+	    exit 0 
+	  fi
+	fi
 
-exit 1 
-EOF
+	exit 1 
+	EOF
 
-  chmod 755 "\${DESTDIR}/bin/unlock"
-  mkdir -p "\${DESTDIR}/lib/unlock"
+    chmod 755 "\${DESTDIR}/bin/unlock"
+    mkdir -p "\${DESTDIR}/lib/unlock"
 
-  cat > "\${DESTDIR}/lib/unlock/plymouth" << EOF 
-#!/bin/sh
-[ "\$1" == "--ping" ] && exit 1
-/bin/plymouth "\$@" 
-EOF
+    # NOTE: 1st char here is a TAB, because <<- strips only leading TABS
+    #       from the HereDoc.  Spaces are left alone.  Makes for nice indentation
+    cat > "\${DESTDIR}/lib/unlock/plymouth" <<- EOF 
+	#!/bin/sh
+	[ "\\\$1" == "--ping" ] && exit 1
+	/bin/plymouth "\\\$@" 
+	EOF
 
-  chmod 755 "\${DESTDIR}/lib/unlock/plymouth"
-  echo To unlock root-partition run "unlock" >> \${DESTDIR}/etc/motd
+    chmod 755 "\${DESTDIR}/lib/unlock/plymouth"
+    echo To unlock root-partition run "unlock" >> \${DESTDIR}/etc/motd
 fi # DROPBEAR != n
 EOFD
 
