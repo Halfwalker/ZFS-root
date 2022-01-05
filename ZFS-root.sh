@@ -1747,7 +1747,19 @@ cat /etc/sudoers.d/zfs | sed -e 's/#//' > /etc/sudoers.d/zfsALLOW
 
 # Install main ubuntu gnome desktop, plus maybe HWE packages
 if [ "${DESKTOP}" = "y" ] ; then
-    apt-get -qq --yes install ubuntu-desktop xserver-xorg${HWE}
+    # NOTE: 18.04 has an xserver-xorg-hwe-18.04 package, 20.04 does NOT
+    case ${SUITE} in 
+        focal)
+            apt-get -qq --yes install ubuntu-desktop
+            ;;
+        bionic)
+            apt-get -qq --yes install ubuntu-desktop xserver-xorg${HWE}
+            ;;
+        *)
+            # Default to not specifying hwe xorg just in case
+            apt-get -qq --yes install ubuntu-desktop
+            ;;
+    esac
     
     # Ensure networking is handled by Gnome
     sed -i 's/networkd/NetworkManager/' /etc/netplan/01_netcfg.yaml
