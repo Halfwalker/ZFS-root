@@ -1818,7 +1818,19 @@ echo "IP = \4{eth0}" >> /etc/issue
 cat > /etc/apt/apt.conf.d/30pre-snap << EOF
 # Snapshot main datasets before installing or removing packages
 # We use a DATE variable to ensure all snaps have SAME date
-Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; /sbin/zfs snap ${POOLNAME}/ROOT/${SUITE}_${UUID}@apt_\${DATE}; /sbin/zfs snap ${BPOOLNAME}/BOOT/${SUITE}_${UUID}@apt_\${DATE}; /sbin/zfs snap ${BPOOLNAME}/BOOT/grub@apt_\${DATE}"; };
+# Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; /sbin/zfs snap ${POOLNAME}/ROOT/${SUITE}_${UUID}@apt_\${DATE}; /sbin/zfs snap ${BPOOLNAME}/BOOT/${SUITE}_${UUID}@apt_\${DATE}; /sbin/zfs snap ${BPOOLNAME}/BOOT/grub@apt_\${DATE}"; };
+
+# Better version thanks rdurso - don't hard-code dataset UUIDs
+# NOTE: For now BOOT/grub dataset does NOT have a UUID on it
+# So datasets look like
+# bpool/BOOT/focal_wsduhl
+# bpool/BOOT/focal_wsduhl@apt_2021-11-07-184136
+# bpool/BOOT/grub
+# bpool/BOOT/grub@apt_2021-11-07-184136
+# To use full UUID on BOOT/grub
+#   change grep -E to use 'BOOT/.*_.{6}$')/grub@apt_${DATE}"
+
+ Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; /sbin/zfs snap \$(/sbin/zfs list -o name | /usr/bin/grep -E 'ROOT/.*_.{6}$')@apt_\${DATE}; /sbin/zfs snap \$(/sbin/zfs list -o name | /usr/bin/grep -E 'BOOT/.*_.{6}$')@apt_\${DATE}; /sbin/zfs snap \$(/sbin/zfs list -o name | /usr/bin/grep -E 'BOOT/grub')@apt_\${DATE}"; };
 EOF
 
 # zfs set mountpoint=legacy rpool/var/log
