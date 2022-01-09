@@ -247,15 +247,45 @@ fi
 # We use ${RAIDLEVEL} to set zpool raid level - just vdevs means that should be blank
 if [ "${RAIDLEVEL}" = "single" ] ; then RAIDLEVEL= ; fi
 
-# Set basic options for install
-whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 18 83 7 \
-    GOOGLE "Add google authenticator via pam for ssh logins" OFF \
-    UEFI "Enable UEFI grub install" $( [ -d /sys/firmware/efi ] && echo ON || echo OFF ) \
-    HWE "Install Hardware Enablement kernel" OFF \
-    ZFS08 "Update to latest ZFS 2.1 from PPA" OFF \
-    HIBERNATE "Enable swap partition for hibernation" OFF \
-    DELAY "Add delay before importing root pool - for many-disk systems" OFF \
-    DESKTOP "Install full Ubuntu desktop" OFF 2>"${TMPFILE}"
+DISCENC=$(whiptail --title "Select disk encryption" --radiolist "Choose which (if any) disk encryption to use" 11 60 4 \
+    NOENC "No disk encryption" ON \
+    ZFSENC "Enable ZFS dataset encryption" OFF \
+    LUKS "Enable LUKS full disk encryption" OFF \
+    3>&1 1>&2 2>&3)
+RET=${?}
+[[ ${RET} = 1 ]] && exit 1
+
+# If encryption enabled, need a passphrase
+if [ "${DISCENC}" != "NOENC" ] ; then
+    DONE=false
+    until ${DONE} ; do
+        PW1=$(whiptail --passwordbox "Please enter a good long encryption passphrase" 8 70 --title "Encryption passphrase" 3>&1 1>&2 2>&3)
+        PW2=$(whiptail --passwordbox "Please re-enter the encryption passphrase" 8 70 --title "Encryption passphrase confirmation" 3>&1 1>&2 2>&3)
+        [ "$PW1" = "$PW2" ] && DONE=true
+    done
+    PASSPHRASE="$PW1"
+fi
+
+if [ "${DISCENC}" == "ZFSENC" ] ; then
+    # Set basic options for install - ZFSENC so no Hibernate available (yet)
+    whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 18 83 7 \
+        GOOGLE "Add google authenticator via pam for ssh logins" OFF \
+        UEFI "Enable UEFI grub install" $( [ -d /sys/firmware/efi ] && echo ON || echo OFF ) \
+        HWE "Install Hardware Enablement kernel" OFF \
+        ZFS08 "Update to latest ZFS 2.1 from PPA" OFF \
+        DELAY "Add delay before importing root pool - for many-disk systems" OFF \
+        DESKTOP "Install full Ubuntu desktop" OFF 2>"${TMPFILE}"
+else
+    # Set basic options for install - ZFSENC so no Hibernate available (yet)
+    whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 18 83 7 \
+        GOOGLE "Add google authenticator via pam for ssh logins" OFF \
+        UEFI "Enable UEFI grub install" $( [ -d /sys/firmware/efi ] && echo ON || echo OFF ) \
+        HWE "Install Hardware Enablement kernel" OFF \
+        ZFS08 "Update to latest ZFS 2.1 from PPA" OFF \
+        HIBERNATE "Enable swap partition for hibernation" OFF \
+        DELAY "Add delay before importing root pool - for many-disk systems" OFF \
+        DESKTOP "Install full Ubuntu desktop" OFF 2>"${TMPFILE}"
+fi
 RET=${?}
 [[ ${RET} = 1 ]] && exit 1
 
