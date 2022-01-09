@@ -241,6 +241,8 @@ if [ ${#zfsdisks[@]} -gt 2 ] ; then
         raidz1 "All disks in raidz1 format" OFF \
         raidz2 "All disks in raidz2 format" OFF \
         raidz3 "All disks in raidz3 format" OFF 3>&1 1>&2 2>&3)
+    RET=${?}
+    [[ ${RET} = 1 ]] && exit 1
 fi
 # We use ${RAIDLEVEL} to set zpool raid level - just vdevs means that should be blank
 if [ "${RAIDLEVEL}" = "single" ] ; then RAIDLEVEL= ; fi
