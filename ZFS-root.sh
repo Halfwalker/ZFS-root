@@ -580,6 +580,43 @@ done
 #_# Create LUKS stuff here
 #_# ###################################
 
+# Create SWAP volume for HIBERNATE, encrypted maybe
+# Just using individual swap partitions - could use mdadm to mirror/raid
+# them up, but meh, why ?
+if [ ${HIBERNATE} = "y" ] ; then
+    # Hibernate, so we need a real swap partition(s)
+    for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
+
+        case ${DISCENC} in
+            LUKS)
+                echo "Encrypting swap partition ${disk} size ${SIZE_SWAP}M"
+                echo ${PASSPHRASE} | cryptsetup luksFormat --type luks2 -c aes-xts-plain64 -s 512 -h sha256 /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} 
+                echo ${PASSPHRASE} | cryptsetup luksOpen /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} swap_crypt${disk}
+                mkswap -f /dev/mapper/swap_crypt
+
+                if [ ${disk} -eq 0 ] ; then
+                    # Get derived key to insert into other encrypted devices
+                    # To be more secure do this into a small ramdisk
+                    # swap must be opened 1st to enable resume from hibernation
+                    /lib/cryptsetup/scripts/decrypt_derived swap_crypt${disk} > /tmp/key
+                fi
+                # Add the derived key to all the other devices
+                echo ${PASSPHRASE} | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} /tmp/key
+                ;;
+
+            ZFSENC)
+                echo "ZFSENC not supported yet"
+                exit 1
+                ;;
+
+            NOENC)
+                # Not LUKS, so just use a regular partition
+                mkswap -f /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP}
+                ;;
+        esac
+    done
+fi #HIBERNATE
+
 # Encrypt root volume maybe
 if [ ${DISCENC} = "LUKS" ] ; then
     for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
@@ -675,43 +712,10 @@ esac
 #_#     zpool import -d /dev/disk/by-id -R ${ZFSBUILD} ${POOLNAME}
 #_# fi
 
-
-# Create SWAP volume, encrypted maybe
-# Just using individual swap partitions - could use mdadm to mirror/raid
-# them up, but meh, why ?
-if [ ${HIBERNATE} = "y" ] ; then
-    # Hibernate, so we need a real swap partition(s)
-    for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
-
-        case ${DISCENC} in
-            LUKS)
-                echo "Encrypting swap partition ${disk} size ${SIZE_SWAP}M"
-                echo ${PASSPHRASE} | cryptsetup luksFormat --type luks2 -c aes-xts-plain64 -s 512 -h sha256 /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} 
-                echo ${PASSPHRASE} | cryptsetup luksOpen /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} swap_crypt${disk}
-                mkswap -f /dev/mapper/swap_crypt
-
-                if [ ${disk} -eq 0 ] ; then
-                    # Get derived key to insert into other encrypted devices
-                    # To be more secure do this into a small ramdisk
-                    # swap must be opened 1st to enable resume from hibernation
-                    /lib/cryptsetup/scripts/decrypt_derived swap_crypt${disk} > /tmp/key
-                fi
-                # Add the derived key to all the other devices
-                echo ${PASSPHRASE} | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} /tmp/key
-                ;;      
-
-            ZFSENC)
-                echo "ZFSENC not supported yet"
-                exit 1
-                ;;
-
-            NOENC)
-                # Not LUKS, so just use a regular partition
-                mkswap -f /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP}
-                ;;
-        esac
-    done
-else    
+# If no HIBERNATE partition (not laptop, no resume etc) then just create
+# a zvol for swap.  Could not create this in the block above for swap because
+# the root pool didn't exist yet.
+if [ ${HIBERNATE} = "n" ] ; then
     # No Hibernate, so just use a zfs volume for swap
     echo "Creating swap zfs dataset size ${SIZE_SWAP}M"
     zfs create -V ${SIZE_SWAP}M -b $(getconf PAGESIZE) -o compression=zle \
@@ -955,6 +959,8 @@ if [ "${DISCENC}" = "LUKS" ] ; then
     # LUKS Encrypted
     if [ ${HIBERNATE} = "y" ] ; then
 
+        # We have a LUKS encrypted swap partition, so that has to be unlocked FIRST
+        # THEN we use the derived key we pull from that to unlock the other disks
         for DISK in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
             # Set up 1st disk
             if [ ${DISK} -eq 0 ] ; then
