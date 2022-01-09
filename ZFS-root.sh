@@ -294,26 +294,7 @@ if [ ${GOOGLE} = "y" ] ; then
     whiptail --title "Google Authenticator QR code and config" --msgbox "Config for ${USERNAME} is in /home/${USERNAME}/.google_authenticator\n\nBe sure to save the 5 emergency codes below\n\n$(cat /tmp/google_auth.txt)\n\nQR Code for use with OTP application (Authy etc.)\notpauth://totp/${HOSTNAME}.local:${USERNAME}?secret=${GOOGLE_SECRET}&Issuer=Ubuntu\n\n$(qrencode -m 3 -t UTF8 otpauth://totp/${HOSTNAME}.local:${USERNAME}?secret=${GOOGLE_SECRET}&issuer=Ubuntu)" 45 83
     RET=${?}
     [[ ${RET} = 1 ]] && exit 1
-    unset NEWT_COLORS
-fi
-
-DISCENC=$(whiptail --title "Select disk encryption" --radiolist "Choose which (if any) disk encryption to use" 11 60 4 \
-    NOENC "No disk encryption" ON \
-    ZFSENC "Enable ZFS dataset encryption" OFF \
-    LUKS "Enable LUKS full disk encryption" OFF \
-    3>&1 1>&2 2>&3)
-RET=${?}
-[[ ${RET} = 1 ]] && exit 1
-
-# If encryption enabled, need a passphrase
-if [ "${DISCENC}" != "NOENC" ] ; then
-    DONE=false
-    until ${DONE} ; do
-        PW1=$(whiptail --passwordbox "Please enter a good long encryption passphrase" 8 70 --title "Encryption passphrase" 3>&1 1>&2 2>&3)
-        PW2=$(whiptail --passwordbox "Please re-enter the encryption passphrase" 8 70 --title "Encryption passphrase confirmation" 3>&1 1>&2 2>&3)
-        [ "$PW1" = "$PW2" ] && DONE=true
-    done
-    PASSPHRASE="$PW1"
+    export NEWT_COLORS="none"
 fi
 
 # SSH authorized keys from github for dropbear and ssh
