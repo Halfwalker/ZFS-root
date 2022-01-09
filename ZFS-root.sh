@@ -317,8 +317,9 @@ if [ "${DISCENC}" != "NOENC" ] ; then
 fi
 
 # SSH authorized keys from github for dropbear and ssh
-AUTHKEYS=$(whiptail --inputbox "Dropbear and ssh need authorized ssh pubkeys to allow access to the server. Please enter any github users to pull ssh pubkeys from.  none means no keys to install" --title "SSH pubkeys for ssh and dropbear" 8 70 $(echo none) 3>&1 1>&2 2>&3)
+AUTHKEYS=$(whiptail --inputbox "Dropbear and ssh need authorized ssh pubkeys to allow access to the server. Please enter any github users to pull ssh pubkeys from.  none means no keys to install\n\nDropbear is used for remote unlocking of disk encryption\n\n      ssh -p 2222 root@<ip addr>" --title "SSH pubkeys for ssh and dropbear" 13 70 $(echo none) 3>&1 1>&2 2>&3)
 RET=${?}
+[[ ${RET} = 1 ]] && exit 1
 (( RET )) && AUTHKEYS=none
 
 # If it's NOT a ZFS encryption setup, then clear out the ZFSENC_ROOT_OPTIONS variable
