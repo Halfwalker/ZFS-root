@@ -506,7 +506,7 @@ for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
     # For laptop hibernate need swap partition, encrypted or not
     if [ "${HIBERNATE}" = "y" ] ; then
         if [ ${DISCENC} != "NOENC" ] ; then
-            # ZFS or LUKS Encrypted - should be partition type 8309
+            # ZFS or LUKS Encrypted - should be partition type 8309 (Linux LUKS)
             sgdisk -n4:0:+${SIZE_SWAP}M -c4:"SWAP_${disk}" -t4:8300 /dev/disk/by-id/${zfsdisks[${disk}]}
         else
             sgdisk -n4:0:+${SIZE_SWAP}M -c4:"SWAP_${disk}" -t4:8200 /dev/disk/by-id/${zfsdisks[${disk}]}
@@ -515,7 +515,7 @@ for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
     
     # Main data partition for root
     if [ ${DISCENC} = "LUKS" ] ; then
-    # LUKS Encrypted - should be partition type 8309
+        # LUKS Encrypted - should be partition type 8309 (Linux LUKS)
         sgdisk -n5:0:0        -c5:"ZFS_${disk}"  -t5:8300 /dev/disk/by-id/${zfsdisks[${disk}]}
         apt-get -qq --no-install-recommends --yes install cryptsetup
     else
