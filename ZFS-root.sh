@@ -348,7 +348,7 @@ fi
 # If DISCENC == LUKS then partition will be encrypted.  If SIZE_SWAP is not
 # defined here, then will be calculated to accomodate memory size (plus fudge factor).
 MEMTOTAL=$(cat /proc/meminfo | fgrep MemTotal | tr -s ' ' | cut -d' ' -f2)
-SIZE_SWAP=$(( (${MEMTOTAL} + 10) / 1024 ))
+SIZE_SWAP=$(( (${MEMTOTAL} + 1024) / 1024 ))
 SIZE_SWAP=$(whiptail --inputbox "If HIBERNATE enabled then this will be a disk partition otherwise it will be a regular ZFS dataset. If LUKS enabled then the partition will be encrypted.\nIf SWAP size not set here (left blank), then it will be calculated to accomodate memory size.\n\nSize of swap space in megabytes (default is calculated value)" \
     --title "SWAP size" 14 70 $(echo $SIZE_SWAP) 3>&1 1>&2 2>&3)
 RET=${?}
