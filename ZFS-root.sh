@@ -1091,9 +1091,10 @@ if [ "${UEFI}" = "y" ] ; then
     for DISK in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
         mkdosfs -F 32 -s 1 -n EFI /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_EFI}
         mkdir /boot/efi
+        echo "# Ensure that /boot is mounted via zfs before trying to mount /boot/efi" >> /etc/fstab
         echo PARTUUID=$(blkid -s PARTUUID -o value \
               /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_EFI}) \
-              /boot/efi vfat nofail,x-systemd.device-timeout=1 0 1 >> /etc/fstab
+              /boot/efi vfat nofail,x-systemd.device-timeout=1,x-systemd.after=zfs-mount.service 0 1 >> /etc/fstab
     done
     mount /boot/efi
 
