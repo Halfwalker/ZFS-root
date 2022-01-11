@@ -266,7 +266,12 @@ if [ "${DISCENC}" != "NOENC" ] ; then
     PASSPHRASE="$PW1"
 fi
 
-if [ "${DISCENC}" == "ZFSENC" ] ; then
+# We check /sys/power/state - if no "disk" in there, then HIBERNATE is disabled
+cat /sys/power/state | fgrep disk
+HIBERNATE_AVAIL=${?}
+
+# Hibernate can only resume from a single disk, and currently not available for ZFS encryption
+if [ "${DISCENC}" == "ZFSENC" ] || [ ${#zfsdisks[@]} -gt 1 ] || [ ${HIBERNATE_AVAIL} -ne 0 ] ; then
     # Set basic options for install - ZFSENC so no Hibernate available (yet)
     whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 18 83 7 \
         GOOGLE "Add google authenticator via pam for ssh logins" OFF \
@@ -337,13 +342,6 @@ RET=${?}
 if [ "${DISCENC}" != "ZFSENC" ] ; then
     ZFSENC_ROOT_OPTIONS=""
     ZFSENC_HOME_OPTIONS=""
-fi
-
-# We check /sys/power/state - if no "disk" in there, then HIBERNATE is disabled
-cat /sys/power/state | fgrep disk
-if [ ${?} -ne 0 ] ; then
-    whiptail --title "Hibernate not available" --msgbox "The /sys/power/state file does not contain 'disk', so hibernate to disk is not available" 8 70
-    HIBERNATE=n
 fi
 
 # Swap size - if HIBERNATE enabled then this will be an actual disk partition.  
