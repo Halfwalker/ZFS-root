@@ -1030,12 +1030,13 @@ echo "--------------------------------------------------------------------------
 if [ ${HIBERNATE} = "y" ] ; then
 
     # Hibernate is enabled - we HAVE to use a swap partition
+    # Also, only works with a single disk (as in laptop)
     if [ "${DISCENC}" = "LUKS" ] ; then
 
         # LUKS encrypted
-        sed -i "s/GRUB_CMDLINE_LINUX_DEFAULT.*/GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash bootdegraded=true resume=\/dev\/mapper\/swap_crypt ${USE_ZSWAP}\"/" /etc/default/grub
-        echo "/dev/mapper/swap_crypt none swap discard,sw 0 0" >> /etc/fstab
-        echo "RESUME=/dev/mapper/swap_crypt" > /etc/initramfs-tools/conf.d/resume
+        sed -i "s/GRUB_CMDLINE_LINUX_DEFAULT.*/GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash bootdegraded=true resume=\/dev\/mapper\/swap_crypt0 ${USE_ZSWAP}\"/" /etc/default/grub
+        echo "/dev/mapper/swap_crypt0 none swap discard,sw 0 0" >> /etc/fstab
+        echo "RESUME=/dev/mapper/swap_crypt0" > /etc/initramfs-tools/conf.d/resume
 
     else
 
