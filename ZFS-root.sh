@@ -590,7 +590,7 @@ if [ ${HIBERNATE} = "y" ] ; then
                 echo "Encrypting swap partition ${disk} size ${SIZE_SWAP}M"
                 echo ${PASSPHRASE} | cryptsetup luksFormat --type luks2 -c aes-xts-plain64 -s 512 -h sha256 /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} 
                 echo ${PASSPHRASE} | cryptsetup luksOpen /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} swap_crypt${disk}
-                mkswap -f /dev/mapper/swap_crypt
+                mkswap -f /dev/mapper/swap_crypt${disk}
 
                 if [ ${disk} -eq 0 ] ; then
                     # Get derived key to insert into other encrypted devices
