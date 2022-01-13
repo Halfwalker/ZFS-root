@@ -279,17 +279,19 @@ if [ "${DISCENC}" == "ZFSENC" ] || [ ${#zfsdisks[@]} -gt 1 ] || [ ${HIBERNATE_AV
         HWE "Install Hardware Enablement kernel" OFF \
         ZFS08 "Update to latest ZFS 2.1 from PPA" OFF \
         DELAY "Add delay before importing root pool - for many-disk systems" OFF \
-        DESKTOP "Install full Ubuntu desktop" OFF 2>"${TMPFILE}"
+        GNOME "Install full Ubuntu Gnome desktop" OFF \
+        KDE "Install full Ubuntu KDE Plasma desktop" OFF 2>"${TMPFILE}"
 else
     # Set basic options for install - ZFSENC so no Hibernate available (yet)
-    whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 18 83 7 \
+    whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 19 83 8 \
         GOOGLE "Add google authenticator via pam for ssh logins" OFF \
         UEFI "Enable UEFI grub install" $( [ -d /sys/firmware/efi ] && echo ON || echo OFF ) \
         HWE "Install Hardware Enablement kernel" OFF \
         ZFS08 "Update to latest ZFS 2.1 from PPA" OFF \
         HIBERNATE "Enable swap partition for hibernation" OFF \
         DELAY "Add delay before importing root pool - for many-disk systems" OFF \
-        DESKTOP "Install full Ubuntu desktop" OFF 2>"${TMPFILE}"
+        GNOME "Install full Ubuntu Gnome desktop" OFF \
+        KDE "Install full Ubuntu KDE Plasma desktop" OFF 2>"${TMPFILE}"
 fi
 RET=${?}
 [[ ${RET} = 1 ]] && exit 1
@@ -300,7 +302,7 @@ while read -r TODO ; do
 done < "${TMPFILE}"
 
 # Any options not enabled in the basic options menu we now set to 'n'
-for option in DESKTOP UEFI HWE HIBERNATE ZFS08 DELAY GOOGLE; do
+for option in GNOME KDE UEFI HWE HIBERNATE ZFS08 DELAY GOOGLE; do
     [ ${!option} ] || eval "${option}"='n'
 done
 
@@ -439,7 +441,7 @@ case ${SUITE} in
         ;;
 esac
 
-box_height=$(( ${#zfsdisks[@]} + 22 ))
+box_height=$(( ${#zfsdisks[@]} + 23 ))
 whiptail --title "Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
     Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
     $(echo $SUITE $SUITE_NUM) $([ ${HWE} ] && echo WITH || echo without) $(echo hwe kernel ${HWE})\n \
@@ -452,7 +454,8 @@ whiptail --title "Summary of install options" --msgbox "These are the options we
     DELAY     = $(echo $DELAY)  : Enable delay before importing zpool\n \
     ZFS ver   = $(echo $ZFS08)  : Update to latest ZFS 2.1 via PPA\n \
     GOOGLE    = $(echo $GOOGLE)  : Install google authenticator\n \
-    DESKTOP   = $(echo $DESKTOP)  : Install full Ubuntu desktop\n \
+    GNOME     = $(echo $GNOME)  : Install full Ubuntu Gnome desktop\n \
+    KDE       = $(echo $KDE)  : Install full Ubuntu KDE Plasma desktop\n \
     UEFI      = $(echo $UEFI)  : Enable UEFI\n \
     HIBERNATE = $(echo $HIBERNATE)  : Enable SWAP disk partition for hibernation\n \
     DISCENC   = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
@@ -850,7 +853,8 @@ export GOOGLE=${GOOGLE}
 export UEFI=${UEFI}
 export PROXY=${PROXY}
 export HWE=${HWE}
-export DESKTOP=${DESKTOP}
+export GNOME=${GNOME}
+export KDE=${KDE}
 export HIBERNATE=${HIBERNATE}
 export PARTITION_GRUB=1
 export PARTITION_EFI=2
@@ -1766,7 +1770,7 @@ chown -R ${USERNAME}.${USERNAME} /home/${USERNAME}
 cat /etc/sudoers.d/zfs | sed -e 's/#//' > /etc/sudoers.d/zfsALLOW
 
 # Install main ubuntu gnome desktop, plus maybe HWE packages
-if [ "${DESKTOP}" = "y" ] ; then
+if [ "${GNOME}" = "y" ] ; then
     # NOTE: 18.04 has an xserver-xorg-hwe-18.04 package, 20.04 does NOT
     case ${SUITE} in 
         focal)
@@ -1780,13 +1784,24 @@ if [ "${DESKTOP}" = "y" ] ; then
             apt-get -qq --yes install ubuntu-desktop
             ;;
     esac
+fi # GNOME
+
+# Install main ubuntu kde desktop
+if [ "${KDE}" = "y" ] ; then
+    apt-get -qq --yes install kde-full
+fi # KDE
     
-    # Ensure networking is handled by Gnome
-    sed -i 's/networkd/NetworkManager/' /etc/netplan/01_netcfg.yaml
+if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] ; then
+    # Ensure networking is handled by NetworkManager
+    cat > /etc/netplan/01_netcfg.yaml << EOF
+    network:
+      version: 2
+      renderer: NetworkManager
+EOF
     
     # Enable hibernate in upower and logind if desktop is installed
     if [ -d /etc/polkit-1/localauthority/50-local.d ] ; then
-    cat > /etc/polkit-1/localauthority/50-local.d/com.ubuntu.enable-hibernate.pkla << EOF
+        cat > /etc/polkit-1/localauthority/50-local.d/com.ubuntu.enable-hibernate.pkla << EOF
 [Re-enable hibernate by default in upower]
 Identity=unix-user:*
 Action=org.freedesktop.upower.hibernate
@@ -1798,7 +1813,7 @@ Action=org.freedesktop.login1.hibernate;org.freedesktop.login1.handle-hibernate-
 ResultActive=yes
 EOF
     fi # Hibernate
-fi # DESKTOP
+fi # GNOME KDE
 
 # Configure google authenticator if we have a config
 if [ "${GOOGLE}" = "y" ]; then
