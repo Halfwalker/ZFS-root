@@ -1793,25 +1793,31 @@ fi # KDE
     
 if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] ; then
     # Ensure networking is handled by NetworkManager
-    cat > /etc/netplan/01_netcfg.yaml << EOF
-    network:
-      version: 2
-      renderer: NetworkManager
-EOF
+    # NOTE: Using <<-EOF so it wills strip leading TAB chars
+    #       MUST be TAB chars, not spaces
+    cat > /etc/netplan/01_netcfg.yaml <<-EOF
+	network:
+	  version: 2
+	  renderer: NetworkManager
+	EOF
+    cat > /etc/NetworkManager/conf.d/10-globally-managed-devices.conf <<-EOF
+	[keyfile]
+	unmanaged-devices=*,except:type:wifi,except:type:wwan,except:type:ethernet
+	EOF
     
     # Enable hibernate in upower and logind if desktop is installed
     if [ -d /etc/polkit-1/localauthority/50-local.d ] ; then
-        cat > /etc/polkit-1/localauthority/50-local.d/com.ubuntu.enable-hibernate.pkla << EOF
-[Re-enable hibernate by default in upower]
-Identity=unix-user:*
-Action=org.freedesktop.upower.hibernate
-ResultActive=yes
+        cat > /etc/polkit-1/localauthority/50-local.d/com.ubuntu.enable-hibernate.pkla <<-EOF
+		[Re-enable hibernate by default in upower]
+		Identity=unix-user:*
+		Action=org.freedesktop.upower.hibernate
+		ResultActive=yes
 
-[Re-enable hibernate by default in logind]
-Identity=unix-user:*
-Action=org.freedesktop.login1.hibernate;org.freedesktop.login1.handle-hibernate-key;org.freedesktop.login1;org.freedesktop.login1.hibernate-multiple-sessions;org.freedesktop.login1.hibernate-ignore-inhibit
-ResultActive=yes
-EOF
+		[Re-enable hibernate by default in logind]
+		Identity=unix-user:*
+		Action=org.freedesktop.login1.hibernate;org.freedesktop.login1.handle-hibernate-key;org.freedesktop.login1;org.freedesktop.login1.hibernate-multiple-sessions;org.freedesktop.login1.hibernate-ignore-inhibit
+		ResultActive=yes
+		EOF
     fi # Hibernate
 fi # GNOME KDE
 
