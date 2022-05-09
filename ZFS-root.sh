@@ -3,6 +3,7 @@
 # TODO: Set up EFI mirror partitions
 # TODO: Finish dropbear setup
 # https://hamy.io/post/0009/how-to-install-luks-encrypted-ubuntu-18.04.x-server-and-enable-remote-unlocking/#gsc.tab=0
+# https://www.arminpech.de/2019/12/23/debian-unlock-luks-root-partition-remotely-by-ssh-using-dropbear/
 
 # >>>>>>>>>> ZFS native encryption <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 # https://arstechnica.com/gadgets/2021/06/a-quick-start-guide-to-openzfs-native-encryption/
