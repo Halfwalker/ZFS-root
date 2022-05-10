@@ -136,7 +136,7 @@ fi # PROXY
 
 apt-get -qq update
 apt-get -qq --no-install-recommends --yes install software-properties-common
-apt-add-repository universe
+apt-add-repository -y universe
 
 # Get userid and full name of main user
 USERNAME=deano
