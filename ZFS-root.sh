@@ -26,7 +26,7 @@
 
 #
 # This will set up a single-disk system with root-on-zfs, using
-# bionic/18.04 or focal/20.04.
+# bionic/18.04 or focal/20.04 or jammy/22.04.
 #
 # >>>>>>>>>> NOTE: This will totally overwrite the disk chosen <<<<<<<<<<<<<
 #
@@ -368,8 +368,9 @@ USE_ZSWAP="\"zswap.enabled=1 zswap.compressor=lz4 zswap.max_pool_percent=25\""
 SCRIPT_SUITE=$(lsb_release -cs)
 
 # Suite to install - bionic focal
-SUITE=$(whiptail --title "Select Ubuntu distribtion" --radiolist "Choose distro" 11 50 4 \
-    focal "20.04 focal" ON \
+SUITE=$(whiptail --title "Select Ubuntu distribtion" --radiolist "Choose distro" 11 50 5 \
+    jammy "22.04 jammy" ON \
+    focal "20.04 focal" OFF \
     bionic "18.04 Bionic" OFF \
     3>&1 1>&2 2>&3)
 RET=${?}
@@ -379,6 +380,26 @@ RET=${?}
 # TODO: Make use of SUITE_EXTRAS maybe
 #
 case ${SUITE} in
+    jammy)
+        SUITE_NUM="22.04"
+        SUITE_EXTRAS="netplan.io expect"
+        SUITE_BOOTSTRAP="wget,whois,rsync,gdisk,netplan.io,gpg-agent"
+        # Install HWE packages - set to blank or to "-hwe-22.04"
+        # Gets tacked on to various packages below
+        [ "${HWE}" = "y" ] && HWE="-hwe-${SUITE_NUM}" || HWE=
+        # Specific zpool features available in focal
+        # Depends on what suite this script is running under
+        case ${SCRIPT_SUITE} in
+            bionic | focal | jammy)
+                SUITE_BOOT_POOL="-o feature@userobj_accounting=enabled"
+                SUITE_ROOT_POOL="-O dnodesize=auto"
+                ;;
+            xenial)
+                SUITE_BOOT_POOL=""
+                SUITE_ROOT_POOL=""
+                ;;
+        esac
+        ;;
     focal)
         SUITE_NUM="20.04"
         SUITE_EXTRAS="netplan.io expect"
@@ -389,7 +410,7 @@ case ${SUITE} in
         # Specific zpool features available in focal
         # Depends on what suite this script is running under
         case ${SCRIPT_SUITE} in
-            bionic | focal)
+            bionic | focal | jammy)
                 SUITE_BOOT_POOL="-o feature@userobj_accounting=enabled"
                 SUITE_ROOT_POOL="-O dnodesize=auto"
                 ;;
@@ -409,7 +430,7 @@ case ${SUITE} in
         # Specific zpool features available in bionic
         # Depends on what suite this script is running under
         case ${SCRIPT_SUITE} in
-            bionic | focal)
+            bionic | focal | jammy)
                 SUITE_BOOT_POOL="-o feature@userobj_accounting=enabled"
                 SUITE_ROOT_POOL="-O dnodesize=legacy"
                 ;;
@@ -1781,7 +1802,7 @@ cat /etc/sudoers.d/zfs | sed -e 's/#//' > /etc/sudoers.d/zfsALLOW
 if [ "${GNOME}" = "y" ] ; then
     # NOTE: 18.04 has an xserver-xorg-hwe-18.04 package, 20.04 does NOT
     case ${SUITE} in 
-        focal)
+        focal | jammy)
             apt-get -qq --yes install ubuntu-desktop
             ;;
         bionic)
