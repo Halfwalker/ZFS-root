@@ -352,7 +352,7 @@ fi
 # defined here, then will be calculated to accomodate memory size (plus fudge factor).
 MEMTOTAL=$(cat /proc/meminfo | fgrep MemTotal | tr -s ' ' | cut -d' ' -f2)
 SIZE_SWAP=$(( (${MEMTOTAL} + 1024) / 1024 ))
-SIZE_SWAP=$(whiptail --inputbox "If HIBERNATE enabled then this will be a disk partition otherwise it will be a regular ZFS dataset. If LUKS enabled then the partition will be encrypted.\nIf SWAP size not set here (left blank), then it will be calculated to accomodate memory size.\n\nSize of swap space in megabytes (default is calculated value)" \
+SIZE_SWAP=$(whiptail --inputbox "If HIBERNATE enabled then this will be a disk partition otherwise it will be a regular ZFS dataset. If LUKS enabled then the partition will be encrypted.\nIf SWAP size not set here (left blank), then it will be calculated to accomodate memory size. Set to zero (0) to disable swap.\n\nSize of swap space in megabytes (default is calculated value)" \
     --title "SWAP size" 14 70 $(echo $SIZE_SWAP) 3>&1 1>&2 2>&3)
 RET=${?}
 [[ ${RET} = 1 ]] && exit 1
@@ -442,7 +442,7 @@ case ${SUITE} in
         ;;
 esac
 
-box_height=$(( ${#zfsdisks[@]} + 23 ))
+box_height=$(( ${#zfsdisks[@]} + 24 ))
 whiptail --title "Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
     Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
     $(echo $SUITE $SUITE_NUM) $([ ${HWE} ] && echo WITH || echo without) $(echo hwe kernel ${HWE})\n \
@@ -460,7 +460,7 @@ whiptail --title "Summary of install options" --msgbox "These are the options we
     UEFI      = $(echo $UEFI)  : Enable UEFI\n \
     HIBERNATE = $(echo $HIBERNATE)  : Enable SWAP disk partition for hibernation\n \
     DISCENC   = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
-    Swap size = $(echo $SIZE_SWAP)M\n" \
+    Swap size = $(echo $SIZE_SWAP)M $([ ${SIZE_SWAP} -eq 0 ] && echo ': DISABLED')\n" \
     ${box_height} 70
 RET=${?}
 [[ ${RET} = 1 ]] && exit 1
@@ -717,14 +717,13 @@ esac
 # If no HIBERNATE partition (not laptop, no resume etc) then just create
 # a zvol for swap.  Could not create this in the block above for swap because
 # the root pool didn't exist yet.
-if [ ${HIBERNATE} = "n" ] ; then
+if [ ${HIBERNATE} = "n" ] && [ ${SIZE_SWAP} -ne 0 ] ; then
     # No Hibernate, so just use a zfs volume for swap
     echo "Creating swap zfs dataset size ${SIZE_SWAP}M"
     zfs create -V ${SIZE_SWAP}M -b $(getconf PAGESIZE) -o compression=zle \
       -o logbias=throughput -o sync=always \
       -o primarycache=metadata -o secondarycache=none \
       -o com.sun:auto-snapshot=false ${POOLNAME}/swap
-    mkswap -f /dev/zvol/${POOLNAME}/swap
 fi #HIBERNATE
 
 # Main filesystem datasets
@@ -857,6 +856,7 @@ export HWE=${HWE}
 export GNOME=${GNOME}
 export KDE=${KDE}
 export HIBERNATE=${HIBERNATE}
+export SIZE_SWAP=${SIZE_SWAP}
 export PARTITION_GRUB=1
 export PARTITION_EFI=2
 export PARTITION_BOOT=3
@@ -927,6 +927,11 @@ locale-gen --purge "en_US.UTF-8"
 echo "America/New_York" > /etc/timezone
 ln -fs /usr/share/zoneinfo/US/Eastern /etc/localtime
 dpkg-reconfigure -f noninteractive tzdata
+
+if [ ${HIBERNATE} = "n" ] && [ ${SIZE_SWAP} -ne 0 ] ; then
+    echo "Enabling swap size ${SIZE_SWAP} on /dev/zvol/${POOLNAME}/swap"
+    mkswap -f /dev/zvol/${POOLNAME}/swap
+fi
 
 apt-get -qq --yes --no-install-recommends install software-properties-common debconf-utils
 apt-get -qq --yes --no-install-recommends install linux-generic${HWE}
@@ -1061,7 +1066,9 @@ if [ ${HIBERNATE} = "y" ] ; then
 else
     # No swap partition
     sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash bootdegraded=true"/' /etc/default/grub
-    echo "/dev/zvol/${POOLNAME}/swap none swap discard,sw 0 0" >> /etc/fstab
+    if [ ${SIZE_SWAP} -ne 0 ] ; then
+        echo "/dev/zvol/${POOLNAME}/swap none swap discard,sw 0 0" >> /etc/fstab
+    fi
     echo "RESUME=none" > /etc/initramfs-tools/conf.d/resume
 fi # HIBERNATE
 
