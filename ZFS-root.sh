@@ -1891,7 +1891,8 @@ __EOF__
 chmod +x ${ZFSBUILD}/root/Setup.sh
 
 # Bind mount virtual filesystem, create Setup.sh, then chroot
-mount --bind /sys  ${ZFSBUILD}/sys
+mount --rbind /sys  ${ZFSBUILD}/sys
+mount --make-rslave ${ZFSBUILD}/sys
 mount --bind /dev  ${ZFSBUILD}/dev
 mount -t proc /proc ${ZFSBUILD}/proc
 # Make the mounts rslaves to make umounting later cleaner
@@ -1908,7 +1909,7 @@ rm -f ${ZFSBUILD}/var/crash/*
 
 umount -n ${ZFSBUILD}/proc
 umount -n ${ZFSBUILD}/dev
-umount -n ${ZFSBUILD}/sys
+umount -n -R ${ZFSBUILD}/sys
 
 # Copy setup log
 cp /root/ZFS-setup.log ${ZFSBUILD}/home/${USERNAME}
