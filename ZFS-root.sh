@@ -391,7 +391,7 @@ case ${SUITE} in
         # Depends on what suite this script is running under
         case ${SCRIPT_SUITE} in
             bionic | focal | jammy)
-                SUITE_BOOT_POOL="-o feature@userobj_accounting=enabled"
+                SUITE_BOOT_POOL="-o feature@userobj_accounting=disabled"
                 SUITE_ROOT_POOL="-O dnodesize=auto"
                 ;;
             xenial)
@@ -411,7 +411,7 @@ case ${SUITE} in
         # Depends on what suite this script is running under
         case ${SCRIPT_SUITE} in
             bionic | focal | jammy)
-                SUITE_BOOT_POOL="-o feature@userobj_accounting=enabled"
+                SUITE_BOOT_POOL="-o feature@userobj_accounting=disabled"
                 SUITE_ROOT_POOL="-O dnodesize=auto"
                 ;;
             xenial)
@@ -431,7 +431,7 @@ case ${SUITE} in
         # Depends on what suite this script is running under
         case ${SCRIPT_SUITE} in
             bionic | focal | jammy)
-                SUITE_BOOT_POOL="-o feature@userobj_accounting=enabled"
+                SUITE_BOOT_POOL="-o feature@userobj_accounting=disabled"
                 SUITE_ROOT_POOL="-O dnodesize=legacy"
                 ;;
             xenial)
