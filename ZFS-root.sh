@@ -489,7 +489,7 @@ RET=${?}
 # Log everything we do
 rm -f /root/ZFS-setup.log
 exec > >(tee -a "/root/ZFS-setup.log") 2>&1
-set -x
+[ "$1" = "-d" ] && set -x
 
 # Clear disk *before* install zfs
 for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
