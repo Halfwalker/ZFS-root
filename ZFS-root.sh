@@ -277,7 +277,7 @@ if [ "${DISCENC}" == "ZFSENC" ] || [ ${#zfsdisks[@]} -gt 1 ] || [ ${HIBERNATE_AV
     whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 18 83 7 \
         GOOGLE "Add google authenticator via pam for ssh logins" OFF \
         UEFI "Enable UEFI grub install" $( [ -d /sys/firmware/efi ] && echo ON || echo OFF ) \
-        HWE "Install Hardware Enablement kernel" OFF \
+        HWE "Install Hardware Enablement kernel" ON \
         ZFS08 "Update to latest ZFS 2.1 from PPA" OFF \
         DELAY "Add delay before importing root pool - for many-disk systems" OFF \
         GNOME "Install full Ubuntu Gnome desktop" OFF \
@@ -287,7 +287,7 @@ else
     whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 19 83 8 \
         GOOGLE "Add google authenticator via pam for ssh logins" OFF \
         UEFI "Enable UEFI grub install" $( [ -d /sys/firmware/efi ] && echo ON || echo OFF ) \
-        HWE "Install Hardware Enablement kernel" OFF \
+        HWE "Install Hardware Enablement kernel" ON \
         ZFS08 "Update to latest ZFS 2.1 from PPA" OFF \
         HIBERNATE "Enable swap partition for hibernation" OFF \
         DELAY "Add delay before importing root pool - for many-disk systems" OFF \
@@ -784,16 +784,17 @@ zfs mount ${BPOOLNAME}/BOOT/grub
 
 # zfs create rpool/home and main user home dataset
 if [ ${DISCENC} = "ZFSENC" ] ; then
-    echo "${PASSPHRASE}" | zfs create -o canmount=off -o mountpoint=none -o compression=lz4 -o atime=off ${ZFSENC_HOME_OPTIONS} ${POOLNAME}/home
+    echo "${PASSPHRASE}" | zfs create -o canmount=off -o mountpoint=none -o compression=lz4 -o atime=off ${ZFSENC_HOME_OPTIONS} ${POOLNAME}/USERDATA
 else
-    zfs create -o canmount=off -o mountpoint=none -o compression=lz4 -o atime=off ${POOLNAME}/home
+    zfs create -o canmount=off -o mountpoint=none -o compression=lz4 -o atime=off ${POOLNAME}/USERDATA
 fi
-zfs create -o canmount=on -o mountpoint=/home/${USERNAME} ${POOLNAME}/home/${USERNAME}
+zfs create -o canmount=on -o mountpoint=/home/${USERNAME} ${POOLNAME}/USERDATA/${USERNAME}_${UUID}
+zfs set com.ubuntu.zsys:bootfs-datasets=${POOLNAME}/ROOT/${SUITE}_${UUID} ${POOLNAME}/USERDATA/${USERNAME}_${UUID}
 
 ###  # Point zfs encryption to right location of keyfile for later
 ###  if [ ${DISCENC} = "ZFSENC" ] ; then
-###      zfs set keylocation=file:///boot/pool.key ${POOLNAME}/home
-###      zfs set keylocation=file:///boot/pool.key ${POOLNAME}/home/${USERNAME}
+###      zfs set keylocation=file:///boot/pool.key ${POOLNAME}/USERDATA
+###      zfs set keylocation=file:///boot/pool.key ${POOLNAME}/USERDATA/${USERNAME}
 ###  fi
 
 # Show what we got before installing
@@ -883,6 +884,8 @@ export PARTITION_EFI=2
 export PARTITION_BOOT=3
 export PARTITION_SWAP=4
 export PARTITION_DATA=5
+
+[ "$1" = "-d" ] && set -x
 __EOF__
 
 for DISK in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
@@ -891,7 +894,6 @@ done
 
 cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 # Setup inside chroot
-set -x
 
 ln -s /proc/self/mounts /etc/mtab
 apt-get -qq update
@@ -968,6 +970,11 @@ if [ ${DISCENC} = "ZFSENC" ] || [ ${ZFS08} = "y" ] ; then
 else
     # Just install current ubuntu ZFS as-is
     apt-get -qq --yes install zfs-initramfs zfs-zed
+fi
+
+# Install Ubuntu zsys for releases focal and above
+if [ "${SUITE}" != "bionic" ] ; then
+    apt-get -qq --yes install zsys
 fi
 
 if [ "${DISCENC}" != "NOENC" ] ; then
@@ -1884,24 +1891,27 @@ update-grub
 # Add IP address to main tty issue
 echo "IP = \4{eth0}" >> /etc/issue
 
+#
+# Commenting out 30pre-snap for now since zsys takes care of that function
+#
 # Set apt/dpkg to automagically snap the system datasets on install/remove
-cat > /etc/apt/apt.conf.d/30pre-snap << EOF
-# Snapshot main datasets before installing or removing packages
-# We use a DATE variable to ensure all snaps have SAME date
-# Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; /sbin/zfs snap ${POOLNAME}/ROOT/${SUITE}_${UUID}@apt_\${DATE}; /sbin/zfs snap ${BPOOLNAME}/BOOT/${SUITE}_${UUID}@apt_\${DATE}; /sbin/zfs snap ${BPOOLNAME}/BOOT/grub@apt_\${DATE}"; };
+# cat > /etc/apt/apt.conf.d/30pre-snap << EOF
+# # Snapshot main datasets before installing or removing packages
+# # We use a DATE variable to ensure all snaps have SAME date
+# # Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; /sbin/zfs snap ${POOLNAME}/ROOT/${SUITE}_${UUID}@apt_\${DATE}; /sbin/zfs snap ${BPOOLNAME}/BOOT/${SUITE}_${UUID}@apt_\${DATE}; /sbin/zfs snap ${BPOOLNAME}/BOOT/grub@apt_\${DATE}"; };
 
-# Better version thanks rdurso - don't hard-code dataset UUIDs
-# NOTE: For now BOOT/grub dataset does NOT have a UUID on it
-# So datasets look like
-# bpool/BOOT/focal_wsduhl
-# bpool/BOOT/focal_wsduhl@apt_2021-11-07-184136
-# bpool/BOOT/grub
-# bpool/BOOT/grub@apt_2021-11-07-184136
-# To use full UUID on BOOT/grub
-#   change grep -E to use 'BOOT/.*_.{6}$')/grub@apt_${DATE}"
+# # Better version thanks rdurso - don't hard-code dataset UUIDs
+# # NOTE: For now BOOT/grub dataset does NOT have a UUID on it
+# # So datasets look like
+# # bpool/BOOT/focal_wsduhl
+# # bpool/BOOT/focal_wsduhl@apt_2021-11-07-184136
+# # bpool/BOOT/grub
+# # bpool/BOOT/grub@apt_2021-11-07-184136
+# # To use full UUID on BOOT/grub
+# #   change grep -E to use 'BOOT/.*_.{6}$')/grub@apt_${DATE}"
 
- Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; /sbin/zfs snap \$(/sbin/zfs list -o name | /usr/bin/grep -E 'ROOT/.*_.{6}$')@apt_\${DATE}; /sbin/zfs snap \$(/sbin/zfs list -o name | /usr/bin/grep -E 'BOOT/.*_.{6}$')@apt_\${DATE}; /sbin/zfs snap \$(/sbin/zfs list -o name | /usr/bin/grep -E 'BOOT/grub')@apt_\${DATE}"; };
-EOF
+#  Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; /sbin/zfs snap \$(/sbin/zfs list -o name | /usr/bin/grep -E 'ROOT/.*_.{6}$')@apt_\${DATE}; /sbin/zfs snap \$(/sbin/zfs list -o name | /usr/bin/grep -E 'BOOT/.*_.{6}$')@apt_\${DATE}; /sbin/zfs snap \$(/sbin/zfs list -o name | /usr/bin/grep -E 'BOOT/grub')@apt_\${DATE}"; };
+# EOF
 
 # zfs set mountpoint=legacy rpool/var/log
 # echo ${POOLNAME}/var/log /var/log zfs nodev,relatime 0 0 >> /etc/fstab
@@ -1921,7 +1931,7 @@ chmod +x ${ZFSBUILD}/root/Setup.sh
 # Bind mount virtual filesystem, create Setup.sh, then chroot
 mount --rbind /sys  ${ZFSBUILD}/sys
 mount --make-rslave ${ZFSBUILD}/sys
-mount --bind /dev  ${ZFSBUILD}/dev
+mount --make-private --rbind /dev  ${ZFSBUILD}/dev
 mount -t proc /proc ${ZFSBUILD}/proc
 # Make the mounts rslaves to make umounting later cleaner
 # mount --make-rslave ${ZFSBUILD}/dev
@@ -1943,7 +1953,7 @@ umount -n -R ${ZFSBUILD}/sys
 cp /root/ZFS-setup.log ${ZFSBUILD}/home/${USERNAME}
 
 # umount to be ready for export
-zfs umount ${POOLNAME}/home/${USERNAME}
+zfs umount ${POOLNAME}/USERDATA/${USERNAME}_${UUID}
 zfs umount ${POOLNAME}/docker
 # With LUKS boot is in bpool pool
 #DC# if [ ${DISCENC} = "LUKS" ] ; then
