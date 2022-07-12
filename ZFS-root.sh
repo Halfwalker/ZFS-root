@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# LUKS
+# https://fossies.org/linux/cryptsetup/docs/Keyring.txt
+
 # TODO: Set up EFI mirror partitions
 # TODO: Finish dropbear setup
 # https://hamy.io/post/0009/how-to-install-luks-encrypted-ubuntu-18.04.x-server-and-enable-remote-unlocking/#gsc.tab=0
@@ -606,6 +609,8 @@ done
 # Create SWAP volume for HIBERNATE, encrypted maybe
 # Just using individual swap partitions - could use mdadm to mirror/raid
 # them up, but meh, why ?
+# NOTE: Need --disable-keyring so we can pull the derived key from the encrypted partition
+#       otherwise it's in the kernel keyring
 if [ ${HIBERNATE} = "y" ] ; then
     # Hibernate, so we need a real swap partition(s)
     for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
@@ -613,8 +618,8 @@ if [ ${HIBERNATE} = "y" ] ; then
         case ${DISCENC} in
             LUKS)
                 echo "Encrypting swap partition ${disk} size ${SIZE_SWAP}M"
-                echo ${PASSPHRASE} | cryptsetup luksFormat --type luks2 -c aes-xts-plain64 -s 512 -h sha256 /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} 
-                echo ${PASSPHRASE} | cryptsetup luksOpen /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} swap_crypt${disk}
+                echo ${PASSPHRASE} | cryptsetup luksFormat --type luks2 --disable-keyring -c aes-xts-plain64 -s 512 -h sha256 /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} 
+                echo ${PASSPHRASE} | cryptsetup luksOpen --disable-keyring /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} swap_crypt${disk}
                 mkswap -f /dev/mapper/swap_crypt${disk}
 
                 if [ ${disk} -eq 0 ] ; then
@@ -641,6 +646,8 @@ if [ ${HIBERNATE} = "y" ] ; then
 fi #HIBERNATE
 
 # Encrypt root volume maybe
+# NOTE: Need --disable-keyring so we can pull the derived key from the encrypted partition
+#       otherwise it's in the kernel keyring
 if [ ${DISCENC} = "LUKS" ] ; then
     for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
         # Encrypted LUKS root
@@ -971,7 +978,7 @@ else
 fi
 
 if [ "${DISCENC}" != "NOENC" ] ; then
-    apt-get -qq --yes install cryptsetup dropbear-initramfs
+    apt-get -qq --yes install cryptsetup dropbear-initramfs keyutils
 fi
 
 echo "-------- right after installing zfs -----------------------------------------"
@@ -994,11 +1001,13 @@ if [ "${DISCENC}" = "LUKS" ] ; then
             # Set up 1st disk
             if [ ${DISK} -eq 0 ] ; then
                 # Open 1st disk swap to be source of derived key
-                echo "swap_crypt0 UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_SWAP}) none luks,discard,initramfs" > /etc/crypttab
-                echo "root_crypt0 UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) swap_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_derived" >> /etc/crypttab
+                # echo "swap_crypt0 UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_SWAP}) none luks,discard,initramfs" > /etc/crypttab
+                # echo "root_crypt0 UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) swap_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_derived" >> /etc/crypttab
+                echo "swap_crypt0 UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_SWAP}) swap_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_keyctl" > /etc/crypttab
+                echo "root_crypt0 UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) swap_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_keyctl" >> /etc/crypttab
             else
-                echo "swap_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_SWAP}) swap_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_derived" >> /etc/crypttab
-                echo "root_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) swap_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_derived" >> /etc/crypttab
+                echo "swap_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_SWAP}) swap_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_keyctl" >> /etc/crypttab
+                echo "root_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) swap_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_keyctl" >> /etc/crypttab
             fi
         done
 
@@ -1010,9 +1019,11 @@ if [ "${DISCENC}" = "LUKS" ] ; then
             # Set up 1st disk
             if [ ${DISK} -eq 0 ] ; then
                 # Open 1st disk root to be source of derived key
-                echo "root_crypt0 UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) none luks,discard,initramfs" > /etc/crypttab
+                # echo "root_crypt0 UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) none luks,discard,initramfs" > /etc/crypttab
+                echo "root_crypt0 UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) root_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_keyctl" > /etc/crypttab
             else
-                echo "root_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) root_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_derived" >> /etc/crypttab
+                # echo "root_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) root_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_derived" >> /etc/crypttab
+                echo "root_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) root_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_keyctl" >> /etc/crypttab
             fi
         done
 
@@ -1220,15 +1231,14 @@ if [ ${DISCENC} != "NOENC" ] ; then
     echo "aes-x86_64" >> /etc/modules
     echo "aes-x86_64" >> /etc/initramfs-tools/modules
 
-    # Set up dropbear defaults
-    sed -i 's/NO_START=1/NO_START=0/g' /etc/default/dropbear
-    sed -i 's/DROPBEAR_PORT=22/DROPBEAR_PORT=2222/g' /etc/default/dropbear 
-    sed -i '/BUSYBOX=auto/c\BUSYBOX=y' /etc/initramfs-tools/initramfs.conf 
+    # Set up dropbear defaults - OLD location for defaults
+    # sed -i 's/NO_START=1/NO_START=0/g' /etc/default/dropbear
+    # sed -i 's/DROPBEAR_PORT=22/DROPBEAR_PORT=2222/g' /etc/default/dropbear 
+    # sed -i '/BUSYBOX=auto/c\BUSYBOX=y' /etc/initramfs-tools/initramfs.conf 
 
     # Add current IP address to "Please unlock" boot message
     # Have to escapt $ and `
-    sed -i "s^Please unlock disk \$CRYPTTAB_NAME^Please unlock disk \$CRYPTTAB_NAME at \`awk '/32 host/ { print f } {f=\$2}' /proc/net/fib_trie | sort | uniq | grep -v 127.0.0.1\` ^" /usr/lib/cryptset
-up/functions
+    sed -i "s^Please unlock disk \$CRYPTTAB_NAME^Please unlock disk \$CRYPTTAB_NAME at \`awk '/32 host/ { print f } {f=\$2}' /proc/net/fib_trie | sort | uniq | grep -v 127.0.0.1\` ^" /usr/lib/cryptsetup/functions
 
     # NOTE: We *could* add the option "-c unlock" to automagically run the
     #       unlock command here.  But doing it via /root/.profile below
@@ -1240,15 +1250,16 @@ up/functions
     /usr/lib/dropbear/dropbearconvert dropbear openssh /etc/dropbear-initramfs/dropbear_rsa_host_key /etc/dropbear-initramfs/id_rsa
     dropbearkey -y -f /etc/dropbear-initramfs/dropbear_rsa_host_key |grep "^ssh-rsa " > /etc/dropbear-initramfs/id_rsa.pub
 
-    # Set up dropbear authorized_keys
-    touch /etc/dropbear-initramfs/authorized_keys
+    # Set up dropbear authorized_keys - NOTE: new location
+    # from /etc/dropbear-initramfs to /etc/dropbear/initramfs
+    touch /etc/dropbear/initramfs/authorized_keys
     if [ "${AUTHKEYS}" != "none" ] ; then
         for SSHKEY in ${AUTHKEYS} ; do
             FETCHKEY=$(wget --quiet -O- https://github.com/${SSHKEY}.keys)
             if [ ${#FETCHKEY} -ne 0 ] ; then
-                echo "####### Github ${SSHKEY} keys #######" >> /etc/dropbear-initramfs/authorized_keys
-                echo "no-port-forwarding,no-agent-forwarding,no-x11-forwarding ${FETCHKEY}" >> /etc/dropbear-initramfs/authorized_keys
-                echo "#" >> /etc/dropbear-initramfs/authorized_keys
+                echo "####### Github ${SSHKEY} keys #######" >> /etc/dropbear/initramfs/authorized_keys
+                echo "no-port-forwarding,no-agent-forwarding,no-x11-forwarding ${FETCHKEY}" >> /etc/dropbear/initramfs/authorized_keys
+                echo "#" >> /etc/dropbear/initramfs/authorized_keys
             fi
         done
     fi
@@ -1279,6 +1290,10 @@ esac
 
 . "\${CONFDIR}/initramfs.conf" 
 . /usr/share/initramfs-tools/hook-functions
+
+# For 22.04+ we need the openssl compatibility stuff
+# https://bugs.launchpad.net/ubuntu/+source/cryptsetup/+bug/1979159
+copy_exec /usr/lib/x86_64-linux-gnu/ossl-modules/legacy.so /usr/lib/x86_64-linux-gnu/ossl-modules/
 
 # if [ "\${DROPBEAR}" != "n" ] && [ -r "/etc/zfs" ] ; then
 if [ "\${DROPBEAR}" != "n" ] ; then
