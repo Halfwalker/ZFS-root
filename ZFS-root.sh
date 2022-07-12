@@ -1231,11 +1231,6 @@ if [ ${DISCENC} != "NOENC" ] ; then
     echo "aes-x86_64" >> /etc/modules
     echo "aes-x86_64" >> /etc/initramfs-tools/modules
 
-    # Set up dropbear defaults - OLD location for defaults
-    # sed -i 's/NO_START=1/NO_START=0/g' /etc/default/dropbear
-    # sed -i 's/DROPBEAR_PORT=22/DROPBEAR_PORT=2222/g' /etc/default/dropbear 
-    # sed -i '/BUSYBOX=auto/c\BUSYBOX=y' /etc/initramfs-tools/initramfs.conf 
-
     # Add current IP address to "Please unlock" boot message
     # Have to escapt $ and `
     sed -i "s^Please unlock disk \$CRYPTTAB_NAME^Please unlock disk \$CRYPTTAB_NAME at \`awk '/32 host/ { print f } {f=\$2}' /proc/net/fib_trie | sort | uniq | grep -v 127.0.0.1\` ^" /usr/lib/cryptsetup/functions
@@ -1244,11 +1239,11 @@ if [ ${DISCENC} != "NOENC" ] ; then
     #       unlock command here.  But doing it via /root/.profile below
     #       allows us to drop to a shell if necessary.
     m_value='DROPBEAR_OPTIONS="-p 2222 -s -j -k -I 60"' 
-    sed -i "s/.DROPBEAR_OPTIONS./${m_value}/g" /etc/dropbear-initramfs/config
+    sed -i "s/.DROPBEAR_OPTIONS./${m_value}/g" /etc/dropbear/initramfs/dropbear.conf
 
-    # Convert dropbear keys
-    /usr/lib/dropbear/dropbearconvert dropbear openssh /etc/dropbear-initramfs/dropbear_rsa_host_key /etc/dropbear-initramfs/id_rsa
-    dropbearkey -y -f /etc/dropbear-initramfs/dropbear_rsa_host_key |grep "^ssh-rsa " > /etc/dropbear-initramfs/id_rsa.pub
+    # # Convert dropbear keys - looks like not needed any more ?
+    # /usr/lib/dropbear/dropbearconvert dropbear openssh /etc/dropbear/initramfs/dropbear_rsa_host_key /etc/dropbear/initramfs/id_rsa
+    # dropbearkey -y -f /etc/dropbear/initramfs/dropbear_rsa_host_key |grep "^ssh-rsa " > /etc/dropbear/initramfs/id_rsa.pub
 
     # Set up dropbear authorized_keys - NOTE: new location
     # from /etc/dropbear-initramfs to /etc/dropbear/initramfs
