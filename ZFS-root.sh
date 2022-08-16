@@ -550,10 +550,10 @@ for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
     sgdisk -a1 -n1:24K:+1000K -c1:"GRUB_${disk}" -t1:EF02 /dev/disk/by-id/${zfsdisks[${disk}]}
     
     # UEFI booting
-    sgdisk     -n2:1M:+512M   -c2:"UEFI_${disk}" -t2:EF00 /dev/disk/by-id/${zfsdisks[${disk}]}
+    sgdisk     -n2:1M:+1000M  -c2:"UEFI_${disk}" -t2:EF00 /dev/disk/by-id/${zfsdisks[${disk}]}
     
     # boot pool
-    sgdisk     -n3:0:+1000M   -c3:"BOOT_${disk}" -t3:BF01 /dev/disk/by-id/${zfsdisks[${disk}]}
+    sgdisk     -n3:0:+3000M   -c3:"BOOT_${disk}" -t3:BF01 /dev/disk/by-id/${zfsdisks[${disk}]}
     
     #
     # TODO: figure out partitions for both ZFS and LUKS encryption
