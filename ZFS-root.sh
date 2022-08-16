@@ -277,23 +277,25 @@ HIBERNATE_AVAIL=${?}
 # Hibernate can only resume from a single disk, and currently not available for ZFS encryption
 if [ "${DISCENC}" == "ZFSENC" ] || [ ${#zfsdisks[@]} -gt 1 ] || [ ${HIBERNATE_AVAIL} -ne 0 ] ; then
     # Set basic options for install - ZFSENC so no Hibernate available (yet)
-    whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 18 83 7 \
+    whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 19 83 8 \
         GOOGLE "Add google authenticator via pam for ssh logins" OFF \
         UEFI "Enable UEFI grub install" $( [ -d /sys/firmware/efi ] && echo ON || echo OFF ) \
         HWE "Install Hardware Enablement kernel" OFF \
         ZFS08 "Update to latest ZFS 2.1 from PPA" OFF \
         DELAY "Add delay before importing root pool - for many-disk systems" OFF \
+        SOF "Install Sound Open Firmware binaries (for some laptops)" OFF \
         GNOME "Install full Ubuntu Gnome desktop" OFF \
         KDE "Install full Ubuntu KDE Plasma desktop" OFF 2>"${TMPFILE}"
 else
     # Set basic options for install - ZFSENC so no Hibernate available (yet)
-    whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 19 83 8 \
+    whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 20 83 9 \
         GOOGLE "Add google authenticator via pam for ssh logins" OFF \
         UEFI "Enable UEFI grub install" $( [ -d /sys/firmware/efi ] && echo ON || echo OFF ) \
         HWE "Install Hardware Enablement kernel" OFF \
         ZFS08 "Update to latest ZFS 2.1 from PPA" OFF \
         HIBERNATE "Enable swap partition for hibernation" OFF \
         DELAY "Add delay before importing root pool - for many-disk systems" OFF \
+        SOF "Install Sound Open Firmware binaries (for some laptops)" OFF \
         GNOME "Install full Ubuntu Gnome desktop" OFF \
         KDE "Install full Ubuntu KDE Plasma desktop" OFF 2>"${TMPFILE}"
 fi
@@ -306,7 +308,7 @@ while read -r TODO ; do
 done < "${TMPFILE}"
 
 # Any options not enabled in the basic options menu we now set to 'n'
-for option in GNOME KDE UEFI HWE HIBERNATE ZFS08 DELAY GOOGLE; do
+for option in GNOME KDE UEFI HWE HIBERNATE ZFS08 DELAY SOF GOOGLE; do
     [ ${!option} ] || eval "${option}"='n'
 done
 
@@ -466,7 +468,7 @@ case ${SUITE} in
         ;;
 esac
 
-box_height=$(( ${#zfsdisks[@]} + 24 ))
+box_height=$(( ${#zfsdisks[@]} + 25 ))
 whiptail --title "Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
     Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
     $(echo $SUITE $SUITE_NUM) $([ ${HWE} ] && echo WITH || echo without) $(echo hwe kernel ${HWE})\n \
@@ -481,6 +483,7 @@ whiptail --title "Summary of install options" --msgbox "These are the options we
     GOOGLE    = $(echo $GOOGLE)  : Install google authenticator\n \
     GNOME     = $(echo $GNOME)  : Install full Ubuntu Gnome desktop\n \
     KDE       = $(echo $KDE)  : Install full Ubuntu KDE Plasma desktop\n \
+    SOF       = $(echo $SOF)  : Install Sound Open Firmware binaries\n \
     UEFI      = $(echo $UEFI)  : Enable UEFI\n \
     HIBERNATE = $(echo $HIBERNATE)  : Enable SWAP disk partition for hibernation\n \
     DISCENC   = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
@@ -878,6 +881,7 @@ export AUTHKEYS=${AUTHKEYS}
 export ZFS08=${ZFS08}
 export BPOOL_GUID=${BPOOL_GUID}
 export GOOGLE=${GOOGLE}
+export SOF=${SOF}
 export UEFI=${UEFI}
 export PROXY=${PROXY}
 export HWE=${HWE}
@@ -1859,6 +1863,18 @@ if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] ; then
 		EOF
     fi # Hibernate
 fi # GNOME KDE
+
+# Install Sound Open Firmware binaries if requested
+if [ "${SOF}" = "y" ]; then
+    # Ensure we have the tools we need
+    apt-get -qq --yes install rsync git
+    git clone https://github.com/thesofproject/sof-bin.git /usr/local/share/sof-project
+    cd /usr/local/share/sof-project
+    LATEST=$(ls -dC1 v* | tail -1)
+    LATESTBASE=$(basename $LATEST .x)
+    LATESTFILE=$(ls -C1 ${LATEST}/${LATESTBASE}-rc* | tail -1)
+    ./install.sh $LATESTFILE
+fi # Sound Open Firmware
 
 # Configure google authenticator if we have a config
 if [ "${GOOGLE}" = "y" ]; then
