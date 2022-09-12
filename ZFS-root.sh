@@ -836,8 +836,11 @@ network:
   version: 2
   renderer: networkd
   ethernets:
-    eth0:
+    alleths:
+      match:
+        name: e*
       dhcp4: true
+      dhcp6: true
       optional: true
 __EOF__
 
