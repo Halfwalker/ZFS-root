@@ -1910,8 +1910,8 @@ update-grub
 #_#     # echo "${POOLNAME}/boot/grub /boot/grub zfs defaults,noatime 0 0" >> /etc/fstab
 #_# fi
 
-# Add IP address to main tty issue
-echo "IP = \4{eth0}" >> /etc/issue
+# Add IP address(es) to main tty issue
+ls -1 /sys/class/net | egrep -v "lo|vir|docker" | xargs -I {} echo " {} : \4{{}}" >> /etc/issue
 
 # Set apt/dpkg to automagically snap the system datasets on install/remove
 cat > /etc/apt/apt.conf.d/30pre-snap << EOF
