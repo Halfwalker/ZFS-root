@@ -1,0 +1,68 @@
+#
+# Pre-configuration for ZFS-root.sh
+# Any vars not set here will be prompted for
+#
+
+#
+# Proxy config - apt-cacher-ng
+#
+# PROXY="http://bondi.local:3142/"
+PROXY=
+
+#
+# Main username and comment
+#
+USERNAME="cloud-user"
+UCOMMENT="Cloud User"
+UPASSWORD="password"
+
+#
+# Space-separated list of github users from which to pull SSH keys
+#
+AUTHKEYS=
+
+#
+# System name, main zfs pool name, boot pool name
+#
+HOSTNAME="test"
+POOLNAME="test"
+BPOOLNAME="bpool"
+
+#
+# What version of Ubuntu to install
+# jammy, focal, bionic
+#
+SUITE="jammy"
+
+#
+# If multidisk, select main pool raid level
+# single, mirror, raidz1, raidz2, raidz3
+RAIDLEVEL="single"
+
+#
+# Swap size in megabytes - if HIBERNATE or LUKS set then this
+# is a partition otherise it's a zfs dataset.
+# Set to 0 to disable swap
+SIZE_SWAP=300
+
+#
+# Disk encryption and passphrase if ZFSENC or LUKS
+# NOENC, ZFSENC, LUKS
+#
+DISCENC="NOENC"
+PASSPHRASE="password"
+
+#
+# Basic options for install
+# See script for descriptions
+# Be sure to set ALL vars here to y or n, otherwise script will prompt for them
+#
+GOOGLE=n
+UEFI=y
+HWE=y
+ZFS08=y
+HIBERNATE=y
+DELAY=n
+SOF=n
+GNOME=n
+KDE=n

@@ -90,6 +90,11 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
+# Grab any possible pre-config settings in ZFS-root.conf
+if [ -e ZFS-root.conf ] ; then
+    . ZFS-root.conf
+fi
+
 # No magenta overrides for whiptail dialogs please
 export NEWT_COLORS="none"
 
@@ -113,23 +118,26 @@ ZFSENC_HOME_OPTIONS="-o encryption=aes-256-gcm -o keylocation=file:///root/pool.
 # Check for a local apt-cacher-ng system - looking for these hosts
 # aptcacher.local
 # bondi.local
-echo "Searching for local apt-cacher-ng proxy systems ..."
-PROXY=""
-for CACHER in bondi.local aptcacher.local ; do
-    echo -n "... testing ${CACHER}"
-    CACHER=$(ping -w 2 -c 1 ${CACHER} | fgrep "bytes from" | cut -d' ' -f4)
-    if [ "${CACHER}" != "" ] ; then
-        echo " - found !"
-        PROXY="http://${CACHER}:3142/"
-        break
-    else
-        echo " - not found :("
-    fi
-done
-
-PROXY=$(whiptail --inputbox "Enter an apt proxy. Cancel or hit <esc> for no proxy" --title "APT proxy setup" 8 70 $(echo $PROXY) 3>&1 1>&2 2>&3)
-RET=${?}
-(( RET )) && PROXY=
+# First see if PROXY is already set in ZFS-root.conf
+if [[ ! -v PROXY ]] ; then
+    echo "Searching for local apt-cacher-ng proxy systems ..."
+    PROXY=""
+    for CACHER in bondi.local aptcacher.local ; do
+        echo -n "... testing ${CACHER}"
+        CACHER=$(ping -w 2 -c 1 ${CACHER} | fgrep "bytes from" | cut -d' ' -f4)
+        if [ "${CACHER}" != "" ] ; then
+            echo " - found !"
+            PROXY="http://${CACHER}:3142/"
+            break
+        else
+            echo " - not found :("
+        fi
+    done
+    
+    PROXY=$(whiptail --inputbox "Enter an apt proxy. Cancel or hit <esc> for no proxy" --title "APT proxy setup" 8 70 $(echo $PROXY) 3>&1 1>&2 2>&3)
+    RET=${?}
+    (( RET )) && PROXY=
+fi # Check if PROXY is set already
 if [ ${PROXY} ]; then
     export http_proxy=${PROXY}
     export ftp_proxy=${PROXY}
@@ -142,50 +150,61 @@ apt-get -qq --no-install-recommends --yes install software-properties-common
 apt-add-repository -y universe
 
 # Get userid and full name of main user
-USERNAME=deano
-UCOMMENT="Dean Carpenter"
-USERINFO=$(whiptail --inputbox "Enter username (login id) and full name of user\nAs in <username> <space> <First and Last name>\n\nlogin full name here\n|---| |------------ - - -  -  -" --title "User information" 11 70 "$(echo $USERNAME $UCOMMENT)" 3>&1 1>&2 2>&3)
-RET=${?}
-[[ ${RET} = 1 ]] && exit 1
-USERNAME=$(echo $USERINFO | cut -d' ' -f1)
-UCOMMENT=$(echo $USERINFO | cut -d' ' -f2-)
+# First see if USERNAME or UCOMMENT are already set in ZFS-root.conf
+if [[ ! -v USERNAME ]] || [[ ! -v UCOMMENT ]] ; then
+    [[ ! -v USERNAME ]] && USERNAME=deano
+    [[ ! -v UCOMMENT ]] && UCOMMENT="Dean Carpenter"
+    USERINFO=$(whiptail --inputbox "Enter username (login id) and full name of user\nAs in <username> <space> <First and Last name>\n\nlogin full name here\n|---| |------------ - - -  -  -" --title "User information" 11 70 "$(echo $USERNAME $UCOMMENT)" 3>&1 1>&2 2>&3)
+    RET=${?}
+    [[ ${RET} = 1 ]] && exit 1
+    USERNAME=$(echo $USERINFO | cut -d' ' -f1)
+    UCOMMENT=$(echo $USERINFO | cut -d' ' -f2-)
+fi # Check if USERNAME/UCOMMENT set
 
 # Get password, confirm and loop until confirmation OK
-DONE=false
-until ${DONE} ; do
-    PW1=$(whiptail --passwordbox "Please enter a password for user $(echo $USERNAME)" 8 70 --title "User password" 3>&1 1>&2 2>&3)
-    PW2=$(whiptail --passwordbox "Please re-enter the password to confirm" 8 70 --title "User password confirmation" 3>&1 1>&2 2>&3)
-    [ "$PW1" = "$PW2" ] && DONE=true
-done
-UPASSWORD="$PW1"
+if [[ ! -v UPASSWORD ]]; then
+    DONE=false
+    until ${DONE} ; do
+        PW1=$(whiptail --passwordbox "Please enter a password for user $(echo $USERNAME)" 8 70 --title "User password" 3>&1 1>&2 2>&3)
+        PW2=$(whiptail --passwordbox "Please re-enter the password to confirm" 8 70 --title "User password confirmation" 3>&1 1>&2 2>&3)
+        [ "$PW1" = "$PW2" ] && DONE=true
+    done
+    UPASSWORD="$PW1"
+fi # Check if UPASSWORD already set
 
 # Hostname - cancel or blank name will exit
-HOSTNAME=test
-HOSTNAME=$(whiptail --inputbox "Enter hostname to be used for new system. This name may also be used for the main ZFS poolname." --title "Hostname for new system." 8 70 $(echo $HOSTNAME) 3>&1 1>&2 2>&3)
-RET=${?}
-(( RET )) && HOSTNAME=
-if [ ! ${HOSTNAME} ]; then
-    echo "Must have a hostname" 
-    exit 1
-fi
+if [[ ! -v HOSTNAME ]] ; then
+    HOSTNAME=test
+    HOSTNAME=$(whiptail --inputbox "Enter hostname to be used for new system. This name may also be used for the main ZFS poolname." --title "Hostname for new system." 8 70 $(echo $HOSTNAME) 3>&1 1>&2 2>&3)
+    RET=${?}
+    (( RET )) && HOSTNAME=
+    if [ ! ${HOSTNAME} ]; then
+        echo "Must have a hostname" 
+        exit 1
+    fi
+fi # Check if HOSTNAME already set
 
-POOLNAME=${HOSTNAME}
-POOLNAME=$(whiptail --inputbox "Enter poolname to use for main system - defaults to hostname" --title "ZFS main poolname" 8 70 $(echo $POOLNAME) 3>&1 1>&2 2>&3)
-RET=${?}
-(( RET )) && POOLNAME=
-if [ ! ${POOLNAME} ]; then
-    echo "Must have a ZFS poolname"
-    exit 1
-fi
+if [[ ! -v HOSTNAME ]] ; then
+    POOLNAME=${HOSTNAME}
+    POOLNAME=$(whiptail --inputbox "Enter poolname to use for main system - defaults to hostname" --title "ZFS main poolname" 8 70 $(echo $POOLNAME) 3>&1 1>&2 2>&3)
+    RET=${?}
+    (( RET )) && POOLNAME=
+    if [ ! ${POOLNAME} ]; then
+        echo "Must have a ZFS poolname"
+        exit 1
+    fi
+fi # Check if POOLNAME already set
 
-BPOOLNAME=bpool
-BPOOLNAME=$(whiptail --inputbox "Enter boot poolname to use for booting - defaults to bpool" --title "ZFS Boot poolname" 8 70 $(echo $BPOOLNAME) 3>&1 1>&2 2>&3)
-RET=${?}
-(( RET )) && BPOOLNAME=
-if [ ! ${BPOOLNAME} ]; then
-    echo "Must have a boot poolname"
-    exit 1
-fi
+if [[ ! -v BPOOLNAME ]] ; then
+    BPOOLNAME=bpool
+    BPOOLNAME=$(whiptail --inputbox "Enter boot poolname to use for booting - defaults to bpool" --title "ZFS Boot poolname" 8 70 $(echo $BPOOLNAME) 3>&1 1>&2 2>&3)
+    RET=${?}
+    (( RET )) && BPOOLNAME=
+    if [ ! ${BPOOLNAME} ]; then
+        echo "Must have a boot poolname"
+        exit 1
+    fi
+fi # Check if BPOOLNAME already set
 
 # Set main disk here - be sure to include the FULL path
 # Get list of disks, ask user which one to install to
@@ -201,7 +220,7 @@ fi
 TMPFILE=$(mktemp)
 # Find longest disk name
 m=-1
-for disk in ${disks[@]}
+for disk in "${disks[@]}"
 do
    if [ ${#disk} -gt $m ]
    then
@@ -237,80 +256,92 @@ else
     BPOOLRAID=
 fi
 
-#_# DISK="/dev/disk/by-id/${DISK}"
-if [ ${#zfsdisks[@]} -gt 2 ] ; then
-    RAIDLEVEL=$(whiptail --title "ZPOOL raid level" --radiolist "Select ZPOOL raid level" 12 60 5 \
-        single "No raid, just single disks as vdevs" OFF \
-        mirror "All disks mirrored" OFF \
-        raidz1 "All disks in raidz1 format" OFF \
-        raidz2 "All disks in raidz2 format" OFF \
-        raidz3 "All disks in raidz3 format" OFF 3>&1 1>&2 2>&3)
-    RET=${?}
-    [[ ${RET} = 1 ]] && exit 1
-fi
+# Check if raid level already set in ZFS-root.conf
+if [[ ! -v RAIDLEVEL ]] ; then
+    #_# DISK="/dev/disk/by-id/${DISK}"
+    if [ ${#zfsdisks[@]} -gt 2 ] ; then
+        RAIDLEVEL=$(whiptail --title "ZPOOL raid level" --radiolist "Select ZPOOL raid level" 12 60 5 \
+            single "No raid, just single disks as vdevs" OFF \
+            mirror "All disks mirrored" OFF \
+            raidz1 "All disks in raidz1 format" OFF \
+            raidz2 "All disks in raidz2 format" OFF \
+            raidz3 "All disks in raidz3 format" OFF 3>&1 1>&2 2>&3)
+        RET=${?}
+        [[ ${RET} = 1 ]] && exit 1
+    fi
+fi # Check RAIDLEVEL already set
 # We use ${RAIDLEVEL} to set zpool raid level - just vdevs means that should be blank
 if [ "${RAIDLEVEL}" = "single" ] ; then RAIDLEVEL= ; fi
 
-DISCENC=$(whiptail --title "Select disk encryption" --radiolist "Choose which (if any) disk encryption to use" 11 60 4 \
-    NOENC "No disk encryption" ON \
-    ZFSENC "Enable ZFS dataset encryption" OFF \
-    LUKS "Enable LUKS full disk encryption" OFF \
-    3>&1 1>&2 2>&3)
-RET=${?}
-[[ ${RET} = 1 ]] && exit 1
+if [[ ! -v DISCENC ]] ; then
+    DISCENC=$(whiptail --title "Select disk encryption" --radiolist "Choose which (if any) disk encryption to use" 11 60 4 \
+        NOENC "No disk encryption" ON \
+        ZFSENC "Enable ZFS dataset encryption" OFF \
+        LUKS "Enable LUKS full disk encryption" OFF \
+        3>&1 1>&2 2>&3)
+    RET=${?}
+    [[ ${RET} = 1 ]] && exit 1
+fi # Check DISCENC already set
 
 # If encryption enabled, need a passphrase
 if [ "${DISCENC}" != "NOENC" ] ; then
-    DONE=false
-    until ${DONE} ; do
-        PW1=$(whiptail --passwordbox "Please enter a good long encryption passphrase" 8 70 --title "Encryption passphrase" 3>&1 1>&2 2>&3)
-        PW2=$(whiptail --passwordbox "Please re-enter the encryption passphrase" 8 70 --title "Encryption passphrase confirmation" 3>&1 1>&2 2>&3)
-        [ "$PW1" = "$PW2" ] && DONE=true
-    done
-    PASSPHRASE="$PW1"
+    if [[ ! -v PASSPHRASE ]] ; then
+        DONE=false
+        until ${DONE} ; do
+            PW1=$(whiptail --passwordbox "Please enter a good long encryption passphrase" 8 70 --title "Encryption passphrase" 3>&1 1>&2 2>&3)
+            PW2=$(whiptail --passwordbox "Please re-enter the encryption passphrase" 8 70 --title "Encryption passphrase confirmation" 3>&1 1>&2 2>&3)
+            [ "$PW1" = "$PW2" ] && DONE=true
+        done
+        PASSPHRASE="$PW1"
+    fi # If PASSPHRASE not already set in ZFS-root.conf
 fi
 
 # We check /sys/power/state - if no "disk" in there, then HIBERNATE is disabled
-cat /sys/power/state | fgrep disk
+cat /sys/power/state | fgrep disk > /dev/null
 HIBERNATE_AVAIL=${?}
 
-# Hibernate can only resume from a single disk, and currently not available for ZFS encryption
-if [ "${DISCENC}" == "ZFSENC" ] || [ ${#zfsdisks[@]} -gt 1 ] || [ ${HIBERNATE_AVAIL} -ne 0 ] ; then
-    # Set basic options for install - ZFSENC so no Hibernate available (yet)
-    whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 19 83 8 \
-        GOOGLE "Add google authenticator via pam for ssh logins" OFF \
-        UEFI "Enable UEFI grub install" $( [ -d /sys/firmware/efi ] && echo ON || echo OFF ) \
-        HWE "Install Hardware Enablement kernel" OFF \
-        ZFS08 "Update to latest ZFS 2.1 from PPA" OFF \
-        DELAY "Add delay before importing root pool - for many-disk systems" OFF \
-        SOF "Install Sound Open Firmware binaries (for some laptops)" OFF \
-        GNOME "Install full Ubuntu Gnome desktop" OFF \
-        KDE "Install full Ubuntu KDE Plasma desktop" OFF 2>"${TMPFILE}"
-else
-    # Set basic options for install - ZFSENC so no Hibernate available (yet)
-    whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 20 83 9 \
-        GOOGLE "Add google authenticator via pam for ssh logins" OFF \
-        UEFI "Enable UEFI grub install" $( [ -d /sys/firmware/efi ] && echo ON || echo OFF ) \
-        HWE "Install Hardware Enablement kernel" OFF \
-        ZFS08 "Update to latest ZFS 2.1 from PPA" OFF \
-        HIBERNATE "Enable swap partition for hibernation" OFF \
-        DELAY "Add delay before importing root pool - for many-disk systems" OFF \
-        SOF "Install Sound Open Firmware binaries (for some laptops)" OFF \
-        GNOME "Install full Ubuntu Gnome desktop" OFF \
-        KDE "Install full Ubuntu KDE Plasma desktop" OFF 2>"${TMPFILE}"
-fi
-RET=${?}
-[[ ${RET} = 1 ]] && exit 1
+#
+# Slightly fugly - have to check if ANY of these are not set
+#
+if [[ ! -v GOOGLE ]] || [[ ! -v UEFI ]] || [[ ! -v HWE ]] || [[ ! -v ZFS08 ]] || [[ ! -v HIBERNATE ]] || [[ ! -v DELAY ]] || [[ ! -v SOF ]] || [[ ! -v GNOME ]] || [[ ! -v KDE ]] ; then
+    # Hibernate can only resume from a single disk, and currently not available for ZFS encryption
+    if [ "${DISCENC}" == "ZFSENC" ] || [ ${#zfsdisks[@]} -gt 1 ] || [ ${HIBERNATE_AVAIL} -ne 0 ] ; then
+        # Set basic options for install - ZFSENC so no Hibernate available (yet)
+        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 19 83 8 \
+            GOOGLE "Add google authenticator via pam for ssh logins" OFF \
+            UEFI "Enable UEFI grub install" $( [ -d /sys/firmware/efi ] && echo ON || echo OFF ) \
+            HWE "Install Hardware Enablement kernel" OFF \
+            ZFS08 "Update to latest ZFS 2.1 from PPA" OFF \
+            DELAY "Add delay before importing root pool - for many-disk systems" OFF \
+            SOF "Install Sound Open Firmware binaries (for some laptops)" OFF \
+            GNOME "Install full Ubuntu Gnome desktop" OFF \
+            KDE "Install full Ubuntu KDE Plasma desktop" OFF 2>"${TMPFILE}"
+    else
+        # Set basic options for install - ZFSENC so no Hibernate available (yet)
+        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 20 83 9 \
+            GOOGLE "Add google authenticator via pam for ssh logins" OFF \
+            UEFI "Enable UEFI grub install" $( [ -d /sys/firmware/efi ] && echo ON || echo OFF ) \
+            HWE "Install Hardware Enablement kernel" OFF \
+            ZFS08 "Update to latest ZFS 2.1 from PPA" OFF \
+            HIBERNATE "Enable swap partition for hibernation" OFF \
+            DELAY "Add delay before importing root pool - for many-disk systems" OFF \
+            SOF "Install Sound Open Firmware binaries (for some laptops)" OFF \
+            GNOME "Install full Ubuntu Gnome desktop" OFF \
+            KDE "Install full Ubuntu KDE Plasma desktop" OFF 2>"${TMPFILE}"
+    fi
+    RET=${?}
+    [[ ${RET} = 1 ]] && exit 1
 
-# Set any selected options to 'y'
-while read -r TODO ; do
-    eval "${TODO}"='y'
-done < "${TMPFILE}"
+    # Set any selected options to 'y'
+    while read -r TODO ; do
+        eval "${TODO}"='y'
+    done < "${TMPFILE}"
 
-# Any options not enabled in the basic options menu we now set to 'n'
-for option in GNOME KDE UEFI HWE HIBERNATE ZFS08 DELAY SOF GOOGLE; do
-    [ ${!option} ] || eval "${option}"='n'
-done
+    # Any options not enabled in the basic options menu we now set to 'n'
+    for option in GNOME KDE UEFI HWE HIBERNATE ZFS08 DELAY SOF GOOGLE; do
+        [ ${!option} ] || eval "${option}"='n'
+    done
+fi # Check ALL options from ZFS-root.conf
 
 # Show google authenticator info - file in /root/google_auth.txt is like
 # AGNGG2UOIDJXDJNZ
@@ -341,10 +372,12 @@ if [ ${GOOGLE} = "y" ] ; then
 fi
 
 # SSH authorized keys from github for dropbear and ssh
-AUTHKEYS=$(whiptail --inputbox "Dropbear and ssh need authorized ssh pubkeys to allow access to the server. Please enter any github users to pull ssh pubkeys from.  none means no keys to install\n\nDropbear is used for remote unlocking of disk encryption\n\n      ssh -p 2222 root@<ip addr>" --title "SSH pubkeys for ssh and dropbear" 13 70 $(echo none) 3>&1 1>&2 2>&3)
-RET=${?}
-[[ ${RET} = 1 ]] && exit 1
-(( RET )) && AUTHKEYS=none
+if [[ ! -v AUTHKEYS ]] ; then
+    AUTHKEYS=$(whiptail --inputbox "Dropbear and ssh need authorized ssh pubkeys to allow access to the server. Please enter any github users to pull ssh pubkeys from.  none means no keys to install\n\nDropbear is used for remote unlocking of disk encryption\n\n      ssh -p 2222 root@<ip addr>" --title "SSH pubkeys for ssh and dropbear" 13 70 $(echo none) 3>&1 1>&2 2>&3)
+    RET=${?}
+    [[ ${RET} = 1 ]] && exit 1
+    (( RET )) && AUTHKEYS=none
+fi # Check for github user ssh keys in AUTHKEYS
 
 # If it's NOT a ZFS encryption setup, then clear out the ZFSENC_ROOT_OPTIONS variable
 if [ "${DISCENC}" != "ZFSENC" ] ; then
@@ -355,12 +388,14 @@ fi
 # Swap size - if HIBERNATE enabled then this will be an actual disk partition.  
 # If DISCENC == LUKS then partition will be encrypted.  If SIZE_SWAP is not
 # defined here, then will be calculated to accomodate memory size (plus fudge factor).
-MEMTOTAL=$(cat /proc/meminfo | fgrep MemTotal | tr -s ' ' | cut -d' ' -f2)
-SIZE_SWAP=$(( (${MEMTOTAL} + 1024) / 1024 ))
-SIZE_SWAP=$(whiptail --inputbox "If HIBERNATE enabled then this will be a disk partition otherwise it will be a regular ZFS dataset. If LUKS enabled then the partition will be encrypted.\nIf SWAP size not set here (left blank), then it will be calculated to accomodate memory size. Set to zero (0) to disable swap.\n\nSize of swap space in megabytes (default is calculated value)\nSet to zero (0) to disable swap" \
-    --title "SWAP size" 15 70 $(echo $SIZE_SWAP) 3>&1 1>&2 2>&3)
-RET=${?}
-[[ ${RET} = 1 ]] && exit 1
+if [[ ! -v SIZE_SWAP ]] ; then
+    MEMTOTAL=$(cat /proc/meminfo | fgrep MemTotal | tr -s ' ' | cut -d' ' -f2)
+    SIZE_SWAP=$(( (${MEMTOTAL} + 1024) / 1024 ))
+    SIZE_SWAP=$(whiptail --inputbox "If HIBERNATE enabled then this will be a disk partition otherwise it will be a regular ZFS dataset. If LUKS enabled then the partition will be encrypted.\nIf SWAP size not set here (left blank), then it will be calculated to accomodate memory size. Set to zero (0) to disable swap.\n\nSize of swap space in megabytes (default is calculated value)\nSet to zero (0) to disable swap" \
+        --title "SWAP size" 15 70 $(echo $SIZE_SWAP) 3>&1 1>&2 2>&3)
+    RET=${?}
+    [[ ${RET} = 1 ]] && exit 1
+fi # Check for Swap size in ZFS-root.conf
 
 # Use zswap compressed page cache in front of swap ? https://wiki.archlinux.org/index.php/Zswap
 # Only used for swap partition (encrypted or not)
@@ -372,14 +407,16 @@ USE_ZSWAP="\"zswap.enabled=1 zswap.compressor=lz4 zswap.max_pool_percent=25\""
 # is bionic.  Pool can be upgraded after booting into the target.
 SCRIPT_SUITE=$(lsb_release -cs)
 
-# Suite to install - bionic focal
-SUITE=$(whiptail --title "Select Ubuntu distribtion" --radiolist "Choose distro" 11 50 5 \
-    jammy "22.04 jammy" ON \
-    focal "20.04 focal" OFF \
-    bionic "18.04 Bionic" OFF \
-    3>&1 1>&2 2>&3)
-RET=${?}
-[[ ${RET} = 1 ]] && exit 1
+# Suite to install - bionic focal jammy
+if [[ ! -v SUITE ]] ; then
+    SUITE=$(whiptail --title "Select Ubuntu distribtion" --radiolist "Choose distro" 11 50 5 \
+        jammy "22.04 jammy" ON \
+        focal "20.04 focal" OFF \
+        bionic "18.04 Bionic" OFF \
+        3>&1 1>&2 2>&3)
+    RET=${?}
+    [[ ${RET} = 1 ]] && exit 1
+fi # Check for Ubuntu suite to install
 
 #
 # TODO: Make use of SUITE_EXTRAS maybe
