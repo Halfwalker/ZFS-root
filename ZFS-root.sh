@@ -303,13 +303,12 @@ HIBERNATE_AVAIL=${?}
 #
 # Slightly fugly - have to check if ANY of these are not set
 #
-if [[ ! -v GOOGLE ]] || [[ ! -v UEFI ]] || [[ ! -v HWE ]] || [[ ! -v ZFS08 ]] || [[ ! -v HIBERNATE ]] || [[ ! -v DELAY ]] || [[ ! -v SOF ]] || [[ ! -v GNOME ]] || [[ ! -v KDE ]] ; then
+if [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFS08 ]] || [[ ! -v HIBERNATE ]] || [[ ! -v DELAY ]] || [[ ! -v SOF ]] || [[ ! -v GNOME ]] || [[ ! -v KDE ]] ; then
     # Hibernate can only resume from a single disk, and currently not available for ZFS encryption
     if [ "${DISCENC}" == "ZFSENC" ] || [ ${#zfsdisks[@]} -gt 1 ] || [ ${HIBERNATE_AVAIL} -ne 0 ] ; then
         # Set basic options for install - ZFSENC so no Hibernate available (yet)
-        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 19 83 8 \
+        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 18 83 7 \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
-            UEFI "Enable UEFI grub install" $( [ -d /sys/firmware/efi ] && echo ON || echo OFF ) \
             HWE "Install Hardware Enablement kernel" OFF \
             ZFS08 "Update to latest ZFS 2.1 from PPA" OFF \
             DELAY "Add delay before importing root pool - for many-disk systems" OFF \
@@ -318,9 +317,8 @@ if [[ ! -v GOOGLE ]] || [[ ! -v UEFI ]] || [[ ! -v HWE ]] || [[ ! -v ZFS08 ]] ||
             KDE "Install full Ubuntu KDE Plasma desktop" OFF 2>"${TMPFILE}"
     else
         # Set basic options for install - ZFSENC so no Hibernate available (yet)
-        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 20 83 9 \
+        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 19 83 8 \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
-            UEFI "Enable UEFI grub install" $( [ -d /sys/firmware/efi ] && echo ON || echo OFF ) \
             HWE "Install Hardware Enablement kernel" OFF \
             ZFS08 "Update to latest ZFS 2.1 from PPA" OFF \
             HIBERNATE "Enable swap partition for hibernation" OFF \
@@ -338,7 +336,7 @@ if [[ ! -v GOOGLE ]] || [[ ! -v UEFI ]] || [[ ! -v HWE ]] || [[ ! -v ZFS08 ]] ||
     done < "${TMPFILE}"
 
     # Any options not enabled in the basic options menu we now set to 'n'
-    for option in GNOME KDE UEFI HWE HIBERNATE ZFS08 DELAY SOF GOOGLE; do
+    for option in GNOME KDE HWE HIBERNATE ZFS08 DELAY SOF GOOGLE; do
         [ ${!option} ] || eval "${option}"='n'
     done
 fi # Check ALL options from ZFS-root.conf
@@ -505,7 +503,7 @@ case ${SUITE} in
         ;;
 esac
 
-box_height=$(( ${#zfsdisks[@]} + 25 ))
+box_height=$(( ${#zfsdisks[@]} + 24 ))
 whiptail --title "Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
     Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
     $(echo $SUITE $SUITE_NUM) $([ ${HWE} ] && echo WITH || echo without) $(echo hwe kernel ${HWE})\n \
@@ -521,7 +519,6 @@ whiptail --title "Summary of install options" --msgbox "These are the options we
     GNOME     = $(echo $GNOME)  : Install full Ubuntu Gnome desktop\n \
     KDE       = $(echo $KDE)  : Install full Ubuntu KDE Plasma desktop\n \
     SOF       = $(echo $SOF)  : Install Sound Open Firmware binaries\n \
-    UEFI      = $(echo $UEFI)  : Enable UEFI\n \
     HIBERNATE = $(echo $HIBERNATE)  : Enable SWAP disk partition for hibernation\n \
     DISCENC   = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
     Swap size = $(echo $SIZE_SWAP)M $([ ${SIZE_SWAP} -eq 0 ] && echo ': DISABLED')\n" \
@@ -922,7 +919,6 @@ export ZFS08=${ZFS08}
 export BPOOL_GUID=${BPOOL_GUID}
 export GOOGLE=${GOOGLE}
 export SOF=${SOF}
-export UEFI=${UEFI}
 export PROXY=${PROXY}
 export HWE=${HWE}
 export GNOME=${GNOME}
