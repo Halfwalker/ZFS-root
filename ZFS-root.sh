@@ -547,23 +547,34 @@ cat /tmp/selections | debconf-set-selections
 
 # In case ZFS is already installed in this liveCD, check versions to see
 # if we need to update/upgrade
-# NOTE: Chances are that the kernel module is 0.8.x and the packages are 0.7.x
+# NOTE: Chances are that the kernel module is (eg) 0.8.x and the packages are 0.7.x
 #       so we may as well just upgrade to latest by PPA. Which means building
 #       the newest module, which can take a while.
 # Update ZFS if module mismatch, ZFS encryption selected or update-zfs selected
-ZFS_INSTALLED=$(dpkg -s zfsutils-linux | fgrep Version | cut -d' ' -f2)
-ZFS_MODULE=$(cat /sys/module/zfs/version)
-echo "ZFS installed with ${ZFS_INSTALLED}, module with ${ZFS_MODULE}"
 
-if [ ${ZFS_INSTALLED} != ${ZFS_MODULE} ] || [ ${DISCENC} = "ZFSENC" ] || [ ${ZFS08} = "y" ] ; then
-    echo "ZFS needs an update"
-    # Create an encryption key for non-root datasets (/home).  The root dataset
-    # is encrypted with the passphrase above, but other datasets use a key that
-    # is stored in /root/pool.key.  This key isn't available unless the root
-    # dataset is unlocked, so we're still secure.
-    dd if=/dev/urandom of=/root/pool.key bs=32 count=1
+# Check if ZFS currently installed in this livecd env
+ZFS_LIVECD=
+if [ -f /usr/sbin/zfs ] || [ -f /sbin/zfs ] ; then
+    # Get currently installed version
+    ZFS_INSTALLED=$(dpkg -s zfsutils-linux | fgrep Version | cut -d' ' -f2)
+    modprobe zfs
+    ZFS_MODULE=$(cat /sys/module/zfs/version)
+    ZFS_LIVECD=y
+fi
+[ "$ZFS_LIVECD" = "y" ] && echo "ZFS installed with ${ZFS_INSTALLED}, module with ${ZFS_MODULE}"
+
+# Add ZFS ppa if requested
+if [ ${ZFS08} = "y" ] ; then
     apt-add-repository --yes --update ppa:jonathonf/zfs
-    apt-get -qq --no-install-recommends --yes install libelf-dev zfs-dkms zfs-zed zfsutils-linux zfs-initramfs
+fi
+# NOW, install ZFS, perhaps from ppa above
+apt-get -qq --no-install-recommends --yes install libelf-dev zfs-zed zfsutils-linux zfs-initramfs
+# Logic for restarting ZFS
+#   If livecd package version != currently running module, OR
+#   If ppa requested
+#   Then restart ZFS
+if [[ ("${ZFS_LIVECD}" = "y" && "${ZFS_INSTALLED}" != "${ZFS_MODULE}")  || "${ZFS08}" = "y" ]] ; then
+    echo "ZFS needs an update"
     systemctl stop zfs-zed
     modprobe -r zfs
     modprobe zfs
@@ -572,7 +583,13 @@ if [ ${ZFS_INSTALLED} != ${ZFS_MODULE} ] || [ ${DISCENC} = "ZFSENC" ] || [ ${ZFS
     ZFS08="y"
 fi                                                                      
 
-apt-get -qq --no-install-recommends --yes install openssh-server debootstrap gdisk zfs-initramfs
+# Create an encryption key for non-root datasets (/home).  The root dataset
+# is encrypted with the passphrase above, but other datasets use a key that
+# is stored in /root/pool.key.  This key isn't available unless the root
+# dataset is unlocked, so we're still secure.
+dd if=/dev/urandom of=/root/pool.key bs=32 count=1
+
+apt-get -qq --no-install-recommends --yes install openssh-server debootstrap gdisk zfs-initramfs dosfstools
 
 for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
     zpool labelclear -f /dev/disk/by-id/${zfsdisks[${disk}]}
