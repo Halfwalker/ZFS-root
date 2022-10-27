@@ -758,8 +758,6 @@ if [ ${HIBERNATE} = "n" ] && [ ${SIZE_SWAP} -ne 0 ] ; then
 fi #HIBERNATE
 
 # Main filesystem datasets
-UUID=$(dd if=/dev/urandom bs=1 count=100 2>/dev/null |
-    tr -dc 'a-z0-9' | cut -c-6)
 
 echo "Creating main zfs datasets"
 # Container for root filesystems
@@ -771,12 +769,10 @@ fi
 
 # Actual dataset for suite we are installing now
 zfs create -o canmount=noauto -o mountpoint=/ \
-    -o com.ubuntu.zsys:bootfs=yes \
-    -o com.ubuntu.zsys:last-used=$(date +%s) \
-    ${POOLNAME}/ROOT/${SUITE}_${UUID}
+    ${POOLNAME}/ROOT/${SUITE}
 
-zpool set bootfs=${POOLNAME}/ROOT/${SUITE}_${UUID} ${POOLNAME}
-zfs mount ${POOLNAME}/ROOT/${SUITE}_${UUID}
+zpool set bootfs=${POOLNAME}/ROOT/${SUITE} ${POOLNAME}
+zfs mount ${POOLNAME}/ROOT/${SUITE}
 
 if [ ${DISCENC} = "ZFSENC" ] ; then
     # Making sure we have the non-root pool key used for other datasets (/home)
