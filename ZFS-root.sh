@@ -303,14 +303,14 @@ HIBERNATE_AVAIL=${?}
 #
 # Slightly fugly - have to check if ANY of these are not set
 #
-if [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFS08 ]] || [[ ! -v HIBERNATE ]] || [[ ! -v DELAY ]] || [[ ! -v SOF ]] || [[ ! -v GNOME ]] || [[ ! -v KDE ]] ; then
+if [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]] || [[ ! -v HIBERNATE ]] || [[ ! -v DELAY ]] || [[ ! -v SOF ]] || [[ ! -v GNOME ]] || [[ ! -v KDE ]] ; then
     # Hibernate can only resume from a single disk, and currently not available for ZFS encryption
     if [ "${DISCENC}" == "ZFSENC" ] || [ ${#zfsdisks[@]} -gt 1 ] || [ ${HIBERNATE_AVAIL} -ne 0 ] ; then
         # Set basic options for install - ZFSENC so no Hibernate available (yet)
         whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 18 83 7 \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
             HWE "Install Hardware Enablement kernel" OFF \
-            ZFS08 "Update to latest ZFS 2.1 from PPA" OFF \
+            ZFSPPA "Update to latest ZFS 2.1 from PPA" OFF \
             DELAY "Add delay before importing root pool - for many-disk systems" OFF \
             SOF "Install Sound Open Firmware binaries (for some laptops)" OFF \
             GNOME "Install full Ubuntu Gnome desktop" OFF \
@@ -320,7 +320,7 @@ if [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFS08 ]] || [[ ! -v HIBERNATE 
         whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 19 83 8 \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
             HWE "Install Hardware Enablement kernel" OFF \
-            ZFS08 "Update to latest ZFS 2.1 from PPA" OFF \
+            ZFSPPA "Update to latest ZFS 2.1 from PPA" OFF \
             HIBERNATE "Enable swap partition for hibernation" OFF \
             DELAY "Add delay before importing root pool - for many-disk systems" OFF \
             SOF "Install Sound Open Firmware binaries (for some laptops)" OFF \
@@ -336,7 +336,7 @@ if [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFS08 ]] || [[ ! -v HIBERNATE 
     done < "${TMPFILE}"
 
     # Any options not enabled in the basic options menu we now set to 'n'
-    for option in GNOME KDE HWE HIBERNATE ZFS08 DELAY SOF GOOGLE; do
+    for option in GNOME KDE HWE HIBERNATE ZFSPPA DELAY SOF GOOGLE; do
         [ ${!option} ] || eval "${option}"='n'
     done
 fi # Check ALL options from ZFS-root.conf
@@ -514,7 +514,7 @@ whiptail --title "Summary of install options" --msgbox "These are the options we
     Poolname $(echo $POOLNAME)\n \
     User $(echo $USERNAME $UCOMMENT)\n\n \
     DELAY     = $(echo $DELAY)  : Enable delay before importing zpool\n \
-    ZFS ver   = $(echo $ZFS08)  : Update to latest ZFS 2.1 via PPA\n \
+    ZFS ver   = $(echo $ZFSPPA)  : Update to latest ZFS 2.1 via PPA\n \
     GOOGLE    = $(echo $GOOGLE)  : Install google authenticator\n \
     GNOME     = $(echo $GNOME)  : Install full Ubuntu Gnome desktop\n \
     KDE       = $(echo $KDE)  : Install full Ubuntu KDE Plasma desktop\n \
@@ -564,7 +564,7 @@ fi
 [ "$ZFS_LIVECD" = "y" ] && echo "ZFS installed with ${ZFS_INSTALLED}, module with ${ZFS_MODULE}"
 
 # Add ZFS ppa if requested
-if [ ${ZFS08} = "y" ] ; then
+if [ ${ZFSPPA} = "y" ] ; then
     apt-add-repository --yes --update ppa:jonathonf/zfs
 fi
 # NOW, install ZFS, perhaps from ppa above
@@ -573,14 +573,14 @@ apt-get -qq --no-install-recommends --yes install libelf-dev zfs-zed zfsutils-li
 #   If livecd package version != currently running module, OR
 #   If ppa requested
 #   Then restart ZFS
-if [[ ("${ZFS_LIVECD}" = "y" && "${ZFS_INSTALLED}" != "${ZFS_MODULE}")  || "${ZFS08}" = "y" ]] ; then
+if [[ ("${ZFS_LIVECD}" = "y" && "${ZFS_INSTALLED}" != "${ZFS_MODULE}")  || "${ZFSPPA}" = "y" ]] ; then
     echo "ZFS needs an update"
     systemctl stop zfs-zed
     modprobe -r zfs
     modprobe zfs
     systemctl start zfs-zed
     # ensure new system uses updated ZFS
-    ZFS08="y"
+    ZFSPPA="y"
 fi                                                                      
 
 # Create an encryption key for non-root datasets (/home).  The root dataset
@@ -932,8 +932,7 @@ export UPASSWORD="${UPASSWORD}"
 export UCOMMENT="${UCOMMENT}"
 export DISCENC=${DISCENC}
 export AUTHKEYS=${AUTHKEYS}
-export ZFS08=${ZFS08}
-export BPOOL_GUID=${BPOOL_GUID}
+export ZFSPPA=${ZFSPPA}
 export GOOGLE=${GOOGLE}
 export SOF=${SOF}
 export PROXY=${PROXY}
@@ -1021,12 +1020,7 @@ fi
 apt-get -qq --yes --no-install-recommends install software-properties-common debconf-utils
 apt-get -qq --yes --no-install-recommends install linux-generic${HWE}
 
-echo "-------- right after installing linux-generic -------------------------------"
-ls -la /boot
-echo "-----------------------------------------------------------------------------"
-
-# If using ZFS encryption we need the jonathonf PPA for latest 2.1
-if [ ${DISCENC} = "ZFSENC" ] || [ ${ZFS08} = "y" ] ; then
+if [ ${ZFSPPA} = "y" ] ; then
     apt-add-repository --yes --update ppa:jonathonf/zfs
     apt-get -qq --no-install-recommends --yes install libelf-dev zfs-dkms zfs-zed zfsutils-linux zfs-initramfs
 else
