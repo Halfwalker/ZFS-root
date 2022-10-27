@@ -510,13 +510,6 @@ rm -f /root/ZFS-setup.log
 exec > >(tee -a "/root/ZFS-setup.log") 2>&1
 [ "$1" = "-d" ] && set -x
 
-# Clear disk *before* install zfs
-for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
-    wipefs --all --force /dev/disk/by-id/${zfsdisks[${disk}]}
-    sgdisk --zap-all /dev/disk/by-id/${zfsdisks[${disk}]}
-    sgdisk --clear /dev/disk/by-id/${zfsdisks[${disk}]}
-done
-
 # Pre-OK the zfs-dkms licenses notification
 cat > /tmp/selections << EOFPRE
 # zfs-dkms license notification
@@ -568,12 +561,20 @@ fi
 # dataset is unlocked, so we're still secure.
 dd if=/dev/urandom of=/root/pool.key bs=32 count=1
 
-apt-get -qq --no-install-recommends --yes install openssh-server debootstrap gdisk zfs-initramfs dosfstools
+apt-get -qq --no-install-recommends --yes install openssh-server debootstrap gdisk zfs-initramfs dosfstools mdadm
+
+# Unmount any mdadm disks that might have been automounted
+# Stop all found mdadm arrays - again, just in case.  Sheesh.
+find /dev -iname md* -type b -exec bash -c "umount {} > /dev/null 2>&1 ; mdadm --stop --force {} > /dev/null 2>&1 ; mdadm --remove {} > /dev/null 2>&1" \;
 
 for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
     zpool labelclear -f /dev/disk/by-id/${zfsdisks[${disk}]}
 
-    # Create new GPT partition label on disks
+    # Wipe mdadm superblock from all partitions found, even if not md raid partition
+    mdadm --zero-superblock --force /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} > /dev/null 2>&1
+ 
+    wipefs --all --force /dev/disk/by-id/${zfsdisks[${disk}]}
+    sgdisk --zap-all /dev/disk/by-id/${zfsdisks[${disk}]}
     sgdisk --clear /dev/disk/by-id/${zfsdisks[${disk}]}
 
     ## From old ZFS-setup.sh
@@ -605,13 +606,17 @@ for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
     # Main data partition for root
     if [ ${DISCENC} = "LUKS" ] ; then
         # LUKS Encrypted - should be partition type 8309 (Linux LUKS)
-        sgdisk -n5:0:0        -c5:"ZFS_${disk}"  -t5:8300 /dev/disk/by-id/${zfsdisks[${disk}]}
+        # wipefs --all --force /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA}
+        zpool labelclear -f /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA}
+        sgdisk -n ${PARTITION_DATA}:0:0 -c ${PARTITION_DATA}:"ZFS_${disk}" -t ${PARTITION_DATA}:8300 /dev/disk/by-id/${zfsdisks[${disk}]}
         apt-get -qq --no-install-recommends --yes install cryptsetup
     else
     # Unencrypted or ZFS encrypted
         sgdisk -n5:0:0        -c5:"ZFS_${disk}"  -t5:BF01 /dev/disk/by-id/${zfsdisks[${disk}]}
     fi # DISCENC for LUKS
 done
+# Refresh partition information
+partprobe
 
 # Have to wait a bit for the partitions to actually show up
 echo "Wait for partition info to settle out"
