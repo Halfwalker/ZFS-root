@@ -952,6 +952,21 @@ for DISK in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
     echo "zfsdisks[${DISK}]=${zfsdisks[${DISK}]}" >> ${ZFSBUILD}/root/Setup.sh
 done
 
+# Add SSHPUBKEY and Host keys from ZFS-root.conf if defined
+[[ -v SSHPUBKEY ]] && echo "export SSHPUBKEY=\"${SSHPUBKEY}\"" >> ${ZFSBUILD}/root/Setup.sh
+[[ -v HOST_ECDSA_KEY_PUB ]] && echo "export HOST_ECDSA_KEY_PUB=\"${HOST_ECDSA_KEY_PUB}\"" >> ${ZFSBUILD}/root/Setup.sh
+[[ -v HOST_RSA_KEY_PUB ]] && echo "export HOST_RSA_KEY_PUB=\"${HOST_RSA_KEY_PUB}\"" >> ${ZFSBUILD}/root/Setup.sh
+# Ugly hack to get multiline variable into Setup.sh
+# Note using single quotes like this  HOST_RSA_KEY='blahblah' surrounded by double quotes
+if [[ -v HOST_ECDSA_KEY ]] ; then
+    echo -n "export HOST_ECDSA_KEY='" >> ${ZFSBUILD}/root/Setup.sh
+    echo "${HOST_ECDSA_KEY}'" >> ${ZFSBUILD}/root/Setup.sh
+fi
+if [[ -v HOST_RSA_KEY ]] ; then
+    echo -n "export HOST_RSA_KEY='" >> ${ZFSBUILD}/root/Setup.sh
+    echo "${HOST_RSA_KEY}'" >> ${ZFSBUILD}/root/Setup.sh
+fi
+
 cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 # Setup inside chroot
 set -x
@@ -1774,13 +1789,19 @@ ExecStartPre=/bin/sh -c '[ -f /etc/zfs/zpool.cache ] && mv /etc/zfs/zpool.cache 
 ExecStart=/sbin/zpool import -N -o cachefile=none ${BPOOL_GUID} ${BPOOLNAME}
 ExecStartPost=/bin/sh -c '[ -f /etc/zfs/preboot_zpool.cache ] && mv /etc/zfs/preboot_zpool.cache /etc/zfs/zpool.cache || true'
 
-# Need a delay to allow disks to settle to import other pools via zfs-import-cache
-ExecStartPost=/bin/sleep 15
-
-[Install]
-WantedBy=zfs-import.target
-EOF
-systemctl enable zfs-import-bpool.service
+# Set hostkeys if defined via ZFS-root.conf
+if [[ -v HOST_ECDSA_KEY ]] ; then
+	echo "${HOST_ECDSA_KEY}" > /etc/ssh/ssh_host_ecdsa_key
+	echo "${HOST_ECDSA_KEY_PUB}" > /etc/ssh/ssh_host_ecdsa_key.pub
+	chmod 600 /etc/ssh/ssh_host_ecdsa_key
+	chmod 644 /etc/ssh/ssh_host_ecdsa_key.pub
+fi
+if [[ -v HOST_RSA_KEY ]] ; then
+	echo "${HOST_RSA_KEY}" > /etc/ssh/ssh_host_rsa_key
+	echo "${HOST_RSA_KEY_PUB}" > /etc/ssh/ssh_host_rsa_key.pub
+	chmod 600 /etc/ssh/ssh_host_rsa_key
+	chmod 644 /etc/ssh/ssh_host_rsa_key.pub
+fi
 
 # Setup system groups
 addgroup --system lpadmin
