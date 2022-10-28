@@ -802,6 +802,22 @@ zfs set devices=off ${POOLNAME}
 # If this system will use Docker (which manages its own datasets & snapshots):
 zfs create -o com.sun:auto-snapshot=false -o mountpoint=/var/lib/docker ${POOLNAME}/docker
 
+
+# Set up boot partition (UEFI) potentially as mdadm mirror for multi-disk
+if [ ${#zfsdisks[@]} -eq 1 ] ; then
+    BOOTDEVRAW=${PARTSBOOT}
+else
+    apt-get -qq --no-install-recommends --yes install mdadm
+    BOOTDEVRAW="/dev/md/${HOSTNAME}:efi"
+	echo y | mdadm --create ${BOOTDEVRAW} --metadata=1.0 --force --level=mirror --raid-devices=${#zfsdisks[@]} --homehost=${HOSTNAME} --name=efi  --assume-clean ${PARTSBOOT}
+fi
+
+mkfs.vfat -v -F 32 -s 1 -n "${HOSTNAME^^}_EFI" ${BOOTDEVRAW} > /dev/null
+echo "UUID=$(blkid -s UUID -o value ${BOOTDEVRAW}) \
+      /boot/efi vfat nofail,x-systemd.device-timeout=1,x-systemd.after=zfs-mount.service 0 1" >> ${ZFSBUILD}/etc/fstab
+mkdir ${ZFSBUILD}/boot/efi
+
+
 echo ${HOSTNAME} > ${ZFSBUILD}/etc/hostname
 echo "127.0.1.1  ${HOSTNAME}" >> ${ZFSBUILD}/etc/hosts
 
@@ -851,6 +867,7 @@ echo "Creating Setup.sh in new system for chroot"
 cat > ${ZFSBUILD}/root/Setup.sh << __EOF__
 #!/bin/bash
 
+export BOOTDEVRAW=${BOOTDEVRAW}
 export DELAY=${DELAY}
 export SUITE=${SUITE}
 export POOLNAME=${POOLNAME}
