@@ -926,7 +926,7 @@ tzdata  tzdata/Zones/America                    select New_York
 tzdata  tzdata/Areas                            select US
 console-setup   console-setup/codeset47         select  # Latin1 and Latin5 - western Europe and Turkic languages
 EOFPRE
-
+cat /tmp/selections | debconf-set-selections
 
 # Set up locale - must set langlocale variable (defaults to en_US)
 cat > /etc/default/locale << EOFLOCALE
@@ -1544,13 +1544,10 @@ fi # KDE
     
 if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] ; then
     # Ensure networking is handled by NetworkManager
+    sed -i 's/networkd/NetworkManager/' /etc/netplain/01_netcfg.yaml
+
     # NOTE: Using <<-EOF so it wills strip leading TAB chars
     #       MUST be TAB chars, not spaces
-    cat > /etc/netplan/01_netcfg.yaml <<-EOF
-	network:
-	  version: 2
-	  renderer: NetworkManager
-	EOF
     cat > /etc/NetworkManager/conf.d/10-globally-managed-devices.conf <<-EOF
 	[keyfile]
 	unmanaged-devices=*,except:type:wifi,except:type:wwan,except:type:ethernet
