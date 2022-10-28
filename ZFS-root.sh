@@ -1242,7 +1242,7 @@ EOF
 
 
 # Create user
-useradd -c "${UCOMMENT}" -p $(echo "${UPASSWORD}" | mkpasswd -m sha-512 --stdin) -M --home-dir /home/${USERNAME} --user-group --groups adm,cdrom,dip,lpadmin,plugdev,sambashare,sudo --shell /bin/bash ${USERNAME}
+useradd -c "${UCOMMENT}" -p $(echo "${UPASSWORD}" | mkpasswd -m sha-512 --stdin) -M --home-dir /home/${USERNAME} --user-group --groups adm,cdrom,dip,lpadmin,plugdev,sambashare,sudo --shell /bin/bash ${USERNAME} > /dev/null 2>&1
 # Since /etc/skel/* files aren't copied, have to do it manually
 rsync -a /etc/skel/ /home/${USERNAME}
 mkdir /home/${USERNAME}/.ssh
@@ -1252,7 +1252,7 @@ if [ "${AUTHKEYS}" != "none" ] ; then
   for SSHKEY in ${AUTHKEYS} ; do
       FETCHKEY=$(wget --quiet -O- https://github.com/${SSHKEY}.keys)
       if [ ${#FETCHKEY} -ne 0 ] ; then
-          echo "####### Github ${SSHKEY} keys #######" >> /home/${USERNAME}/.ssh/authorized_keys 
+          echo "####### Github ${SSHKEY} key #######" >> /home/${USERNAME}/.ssh/authorized_keys 
           echo "${FETCHKEY}" >> /home/${USERNAME}/.ssh/authorized_keys 
           echo "#" >> /home/${USERNAME}/.ssh/authorized_keys
       fi
