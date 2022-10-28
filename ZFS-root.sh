@@ -1472,6 +1472,51 @@ fi
 
 chown -R ${USERNAME}.${USERNAME} /home/${USERNAME}
 
+#
+# Set up Dropbear - after user is created with .ssh/authorized_keys
+# so those keys can be used in the initramfs
+#
+if [ "${DISCENC}" != "NOENC" ] ; then
+  echo "------------------------------------------------------------"
+  echo " Installing dropbear for remote unlocking"
+  echo "------------------------------------------------------------"
+
+  apt-get install --yes dracut-network dropbear-bin
+  rm -rf /tmp/dracut-crypt-ssh && mkdir -p /tmp/dracut-crypt-ssh
+  cd /tmp/dracut-crypt-ssh && curl -L https://github.com/dracut-crypt-ssh/dracut-crypt-ssh/tarball/master | tar xz --strip=1
+
+  ##comment out references to /helper/ folder from module-setup.sh
+  sed -i '/inst \"\$moddir/s/^\(.*\)$/#&/' /tmp/dracut-crypt-ssh/modules/60crypt-ssh/module-setup.sh
+  cp -ri /tmp/dracut-crypt-ssh/modules/60crypt-ssh /usr/lib/dracut/modules.d
+
+  mkdir -p /etc/cmdline.d
+  echo 'ip=dhcp rd.neednet=1' > /etc/cmdline.d/dracut-network.conf
+
+  echo 'add_dracutmodules+=" crypt-ssh "'                      >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
+  echo 'install_items+=" /etc/cmdline.d/dracut-network.conf "' >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
+  # Have dracut use main user authorized_keys for access
+  echo "dropbear_acl=/home/${USERNAME}/.ssh/authorized_keys"   >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
+
+  echo ${PASSPHRASE} > /etc/zfs/zroot.key
+  chmod 000 /etc/zfs/zroot.key
+  echo 'install_items+=" /etc/zfs/zroot.key "' >> /etc/dracut.conf.d/zfskey.conf
+fi
+
+# For ZFS encryption point to the /etc/zfs/zroot.key in the initramfs
+if [ "${DISCENC}" = "ZFSENC" ] ; then
+  zfs change-key -o keylocation=file:///etc/zfs/zroot.key -o keyformat=passphrase ${POOLNAME}/ROOT
+fi
+
+# For LUKS point to the larger 32-byte (zfs enc compatible) /etc/zfs/zroot.rawkey in the initramfs
+if [ "${DISCENC}" = "LUKS" ] ; then
+    echo 'install_items+=" /etc/zfs/zroot.rawkey "' >> /etc/dracut.conf.d/zfskey.conf
+fi
+
+dracut -v -f --regenerate-all
+# generate-zbm only there if we built from scratch, not using downloaded image
+[ -e /usr/bin/generate-zbm ] && generate-zbm --debug
+
+
 # Allow read-only zfs commands with no sudo password
 cat /etc/sudoers.d/zfs | sed -e 's/#//' > /etc/sudoers.d/zfsALLOW
 
