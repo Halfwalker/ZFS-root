@@ -1023,7 +1023,78 @@ for DISK in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
     dd bs=440 count=1 conv=notrunc if=/usr/lib/syslinux/mbr/gptmbr.bin of=/dev/disk/by-id/${zfsdisks[${DISK}]}
 done
 
+
+#
+# Install and configure ZFSBootMenu
+#
+DEBIAN_FRONTEND=noninteractive apt-get --yes install kexec-tools
+apt-get --yes install libconfig-inifiles-perl libsort-versions-perl libboolean-perl fzf mbuffer make curl
+
+# Assign command-line arguments to be used when booting the final kernel
+# For hibernation and resume to work we have to specify which device to resume from
+# Can only reume from ONE device though, so we default to the 1st disk swap partition
+# ZFS native encryption and non-encrypted can use SWAP partition directly
+# LUKS encryption uses the 1st swap_crypt0 device
+if [ ${HIBERNATE} = "y" ] ; then
+    cat <<-END > /etc/dracut.conf.d/resume-from-hibernate.conf
+	add_dracutmodules+=" resume "
+	END
+
+    if [ ${DISCENC} = "LUKS" ] ; then
+        zfs set org.zfsbootmenu:commandline="rw quiet resume=/dev/mapper/swap_crypt0" ${POOLNAME}/ROOT
+        zfs set org.zfsbootmenu:commandline="rw quiet resume=/dev/mapper/swap_crypt0" ${POOLNAME}/ROOT/${SUITE}
+        cat <<-END > /etc/dracut.conf.d/resume-swap-uuid.conf
+		# add_device+=" UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP}) "
+		add_device+=" /dev/mapper/swap_crypt0 "
+		END
     else
+        zfs set org.zfsbootmenu:commandline="rw quiet resume=UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP})" ${POOLNAME}/ROOT
+        zfs set org.zfsbootmenu:commandline="rw quiet resume=UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP})" ${POOLNAME}/ROOT/${SUITE}
+    fi
+else
+    zfs set org.zfsbootmenu:commandline="rw quiet" ${POOLNAME}/ROOT
+    zfs set org.zfsbootmenu:commandline="rw quiet" ${POOLNAME}/ROOT/${SUITE}
+fi
+zfs set canmount=noauto ${POOLNAME}/ROOT
+zfs set canmount=noauto ${POOLNAME}/ROOT/${SUITE}
+
+#
+# Install the ZFSBootMenu package directly
+#
+mkdir -p  /boot/efi/EFI/zfsbootmenu
+curl -L https://get.zfsbootmenu.org/zfsbootmenu.EFI -o /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
+# curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v1.11.0/zfsbootmenu-x86_64-v1.11.0.EFI -o /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
+cp /boot/efi/EFI/refind/icons/os_linux.png /boot/efi/EFI/zfsbootmenu/zfsbootmenu.png
+
+# OR install the git repo and build locally
+
+# rm -rf /tmp/zfsbootmenu && mkdir -p /tmp/zfsbootmenu
+# cd /tmp/zfsbootmenu && curl -L https://github.com/zbm-dev/zfsbootmenu/tarball/master | tar xz --strip=1 && make install
+# PERL_MM_USE_DEFAULT=1 cpan 'YAML::PP'
+
+#
+# Configure ZFSBootMenu
+#
+cat <<-END > /etc/zfsbootmenu/config.yaml
+Global:
+  ManageImages: true
+  BootMountPoint: /boot/efi
+  DracutConfDir: /etc/zfsbootmenu/dracut.conf.d
+Components:
+  ImageDir: /boot/efi/EFI/zfsbootmenu
+  Versions: 3
+  Enabled: true
+  syslinux:
+    Config: /boot/efi/syslinux/syslinux.cfg
+    Enabled: true
+EFI:
+  ImageDir: /boot/efi/EFI/zfsbootmenu
+  Versions: 2
+  Enabled: false
+Kernel:
+  CommandLine: zbm.prefer=${POOLNAME} zbm.import_policy=hostid zbm.set_hostid ro quiet loglevel=0
+END
+
 
 
 
