@@ -1299,22 +1299,22 @@ if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] ; then
 	[keyfile]
 	unmanaged-devices=*,except:type:wifi,except:type:wwan,except:type:ethernet
 	EOF
-    
-    # Enable hibernate in upower and logind if desktop is installed
-    if [ -d /etc/polkit-1/localauthority/50-local.d ] ; then
-        cat > /etc/polkit-1/localauthority/50-local.d/com.ubuntu.enable-hibernate.pkla <<-EOF
-		[Re-enable hibernate by default in upower]
-		Identity=unix-user:*
-		Action=org.freedesktop.upower.hibernate
-		ResultActive=yes
-
-		[Re-enable hibernate by default in logind]
-		Identity=unix-user:*
-		Action=org.freedesktop.login1.hibernate;org.freedesktop.login1.handle-hibernate-key;org.freedesktop.login1;org.freedesktop.login1.hibernate-multiple-sessions;org.freedesktop.login1.hibernate-ignore-inhibit
-		ResultActive=yes
-		EOF
-    fi # Hibernate
 fi # GNOME KDE
+    
+# Enable hibernate in upower and logind if desktop is installed
+if [ -d /etc/polkit-1/localauthority/50-local.d ] ; then
+    cat > /etc/polkit-1/localauthority/50-local.d/com.ubuntu.enable-hibernate.pkla <<-EOF
+	[Re-enable hibernate by default in upower]
+	Identity=unix-user:*
+	Action=org.freedesktop.upower.hibernate
+	ResultActive=yes
+
+	[Re-enable hibernate by default in logind]
+	Identity=unix-user:*
+	Action=org.freedesktop.login1.hibernate;org.freedesktop.login1.handle-hibernate-key;org.freedesktop.login1;org.freedesktop.login1.hibernate-multiple-sessions;org.freedesktop.login1.hibernate-ignore-inhibit
+	ResultActive=yes
+	EOF
+fi # Hibernate
 
 # Install Sound Open Firmware binaries if requested
 if [ "${SOF}" = "y" ]; then
