@@ -278,6 +278,8 @@ fi
 # We check /sys/power/state - if no "disk" in there, then HIBERNATE is disabled
 cat /sys/power/state | fgrep disk > /dev/null
 HIBERNATE_AVAIL=${?}
+# Force Hibernate to n if not available, overriding anything in ZFS-root.conf
+[ ${HIBERNATE_AVAIL} -ne 0 ] && HIBERNATE=n
 
 #
 # Slightly fugly - have to check if ANY of these are not set
@@ -635,10 +637,6 @@ for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
     fi
 done
 
-#_# ###################################
-#_# Create LUKS stuff here
-#_# ###################################
-
 # Create SWAP volume for HIBERNATE, encrypted maybe
 # Just using individual swap partitions - could use mdadm to mirror/raid
 # them up, but meh, why ?
@@ -902,7 +900,6 @@ fi
 
 cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 # Setup inside chroot
-set -x
 
 ln -s /proc/self/mounts /etc/mtab
 apt-get -qq update
