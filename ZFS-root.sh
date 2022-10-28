@@ -594,9 +594,9 @@ for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
     if [ "${HIBERNATE}" = "y" ] ; then
         if [ ${DISCENC} != "NOENC" ] ; then
             # ZFS or LUKS Encrypted - should be partition type 8309 (Linux LUKS)
-            sgdisk -n4:0:+${SIZE_SWAP}M -c4:"SWAP_${disk}" -t4:8300 /dev/disk/by-id/${zfsdisks[${disk}]}
+            sgdisk -n ${PARTITION_SWAP}:0:+${SIZE_SWAP}M -c ${PARTITION_SWAP}:"SWAP_${disk}" -t ${PARTITION_SWAP}:8300 /dev/disk/by-id/${zfsdisks[${disk}]}
         else
-            sgdisk -n4:0:+${SIZE_SWAP}M -c4:"SWAP_${disk}" -t4:8200 /dev/disk/by-id/${zfsdisks[${disk}]}
+            sgdisk -n ${PARTITION_SWAP}:0:+${SIZE_SWAP}M -c ${PARTITION_SWAP}:"SWAP_${disk}" -t ${PARTITION_SWAP}:8200 /dev/disk/by-id/${zfsdisks[${disk}]}
         fi # DISCENC for ZFS or LUKS
     fi # HIBERNATE
     
@@ -609,7 +609,7 @@ for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
         apt-get -qq --no-install-recommends --yes install cryptsetup
     else
     # Unencrypted or ZFS encrypted
-        sgdisk -n5:0:0        -c5:"ZFS_${disk}"  -t5:BF01 /dev/disk/by-id/${zfsdisks[${disk}]}
+        sgdisk -n ${PARTITION_DATA}:0:0 -c ${PARTITION_DATA}:"ZFS_${disk}" -t ${PARTITION_DATA}:BF00 /dev/disk/by-id/${zfsdisks[${disk}]}
     fi # DISCENC for LUKS
 done
 # Refresh partition information
@@ -623,14 +623,12 @@ sleep 5
 # Boot partition (mirror across all disks)
 PARTSBOOT=
 PARTSSWAP=
-PARTSEFI=
 # ZFS partitions to create zpool with
 ZPOOLDISK=
 for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
     PARTSSWAP="/dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} ${PARTSSWAP}"
     PARTSBOOT="/dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_BOOT} ${PARTSBOOT}"
-    PARTSEFI="/dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_EFI} ${PARTSEFI}"
-    if [ ${DISCENC} = "LUKS" ]; then
+    if [ "${DISCENC}" = "LUKS" ]; then
         ZPOOLDISK="/dev/mapper/root_crypt${disk} ${ZPOOLDISK}"
     else
         ZPOOLDISK="/dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} ${ZPOOLDISK}"
