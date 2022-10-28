@@ -945,17 +945,17 @@ echo "America/New_York" > /etc/timezone
 ln -fs /usr/share/zoneinfo/US/Eastern /etc/localtime
 dpkg-reconfigure -f noninteractive tzdata
 
-
+# Make sure the kernel is installed and configured before ZFS
 apt-get -qq --yes --no-install-recommends install software-properties-common debconf-utils
-apt-get -qq --yes --no-install-recommends install linux-generic${HWE}
+apt-get -qq --yes --no-install-recommends install linux-generic${HWE} linux-headers-generic${HWE} linux-image-generic${HWE}
 
 if [ ${ZFSPPA} = "y" ] ; then
     apt-add-repository --yes --update ppa:jonathonf/zfs
-    apt-get -qq --no-install-recommends --yes install libelf-dev zfs-dkms zfs-zed zfsutils-linux zfs-initramfs
-else
-    # Just install current ubuntu ZFS as-is
-    apt-get -qq --yes install zfs-initramfs zfs-zed
 fi
+apt-get -qq --no-install-recommends --yes install libelf-dev zfs-zed zfsutils-linux zfs-initramfs
+
+# jammy/22.04 moved zfs from /sbin/zfs to /usr/sbin/zfs
+ZFSLOCATION=$(which zfs)
 
 if [ "${DISCENC}" != "NOENC" ] ; then
     apt-get -qq --yes install cryptsetup keyutils
@@ -964,7 +964,7 @@ fi
 # Ensure cachefile exists and zfs-import-cache is active
 # https://github.com/zfsonlinux/zfs/issues/8885
 zpool set cachefile=/etc/zfs/zpool.cache ${POOLNAME}
-systemctl enable zfs-import-cache
+systemctl enable zfs.target zfs-import-cache zfs-mount zfs-import.target
 
 
     else
