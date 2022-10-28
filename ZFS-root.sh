@@ -567,7 +567,7 @@ apt-get -qq --no-install-recommends --yes install openssh-server debootstrap gdi
 # Stop all found mdadm arrays - again, just in case.  Sheesh.
 find /dev -iname md* -type b -exec bash -c "umount {} > /dev/null 2>&1 ; mdadm --stop --force {} > /dev/null 2>&1 ; mdadm --remove {} > /dev/null 2>&1" \;
 
-for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
+for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
     zpool labelclear -f /dev/disk/by-id/${zfsdisks[${disk}]}
 
     # Wipe mdadm superblock from all partitions found, even if not md raid partition
@@ -624,7 +624,7 @@ PARTSSWAP=
 PARTSEFI=
 # ZFS partitions to create zpool with
 ZPOOLDISK=
-for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
+for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
     PARTSSWAP="/dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} ${PARTSSWAP}"
     PARTSBOOT="/dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_BOOT} ${PARTSBOOT}"
     PARTSEFI="/dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_EFI} ${PARTSEFI}"
@@ -646,7 +646,7 @@ done
 #       otherwise it's in the kernel keyring
 if [ ${HIBERNATE} = "y" ] ; then
     # Hibernate, so we need a real swap partition(s)
-    for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
+    for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
 
         case ${DISCENC} in
             LUKS)
@@ -681,8 +681,8 @@ fi #HIBERNATE
 # Encrypt root volume maybe
 # NOTE: Need --disable-keyring so we can pull the derived key from the encrypted partition
 #       otherwise it's in the kernel keyring
-if [ ${DISCENC} = "LUKS" ] ; then
-    for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
+if [ "${DISCENC}" = "LUKS" ] ; then
+    for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
         # Encrypted LUKS root
         echo "Encrypting root ZFS ${disk}"
         echo ${PASSPHRASE} | cryptsetup luksFormat --type luks2 -c aes-xts-plain64 -s 512 -h sha256 /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} 
@@ -876,8 +876,8 @@ export PARTITION_SWAP=${PARTITION_SWAP}
 export PARTITION_DATA=${PARTITION_DATA}
 __EOF__
 
-for DISK in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
-    echo "zfsdisks[${DISK}]=${zfsdisks[${DISK}]}" >> ${ZFSBUILD}/root/Setup.sh
+for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
+    echo "zfsdisks[${disk}]=${zfsdisks[${disk}]}" >> ${ZFSBUILD}/root/Setup.sh
 done
 
 # Add SSHPUBKEY and Host keys from ZFS-root.conf if defined
