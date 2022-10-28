@@ -238,7 +238,7 @@ fi
 # Check if raid level already set in ZFS-root.conf
 if [[ ! -v RAIDLEVEL ]] ; then
     #_# DISK="/dev/disk/by-id/${DISK}"
-    if [ ${#zfsdisks[@]} -gt 2 ] ; then
+    if [ ${#zfsdisks[@]} -gt 1 ] ; then
         RAIDLEVEL=$(whiptail --title "ZPOOL raid level" --radiolist "Select ZPOOL raid level" 12 60 5 \
             single "No raid, just single disks as vdevs" OFF \
             mirror "All disks mirrored" OFF \
@@ -730,7 +730,7 @@ case ${DISCENC} in
           -O acltype=posixacl -O canmount=off -O compression=lz4 \
           -O atime=off \
           -O normalization=formD -O relatime=on -O xattr=sa \
-          -O mountpoint=/ -R ${ZFSBUILD} \
+          -O mountpoint=none -R ${ZFSBUILD} \
           ${POOLNAME} ${RAIDLEVEL} ${ZPOOLDISK}
         ;;
 
