@@ -916,14 +916,17 @@ EOFPRE
 
 # Set up locale - must set langlocale variable (defaults to en_US)
 cat > /etc/default/locale << EOFLOCALE
-LC_ALL=en_US.UTF-8
+# LC_ALL=en_US.UTF-8
 LANG=en_US.UTF-8
 LANGUAGE=en_US:en
 EOFLOCALE
+cat > /etc/locale.gen << EOFLOCALEGEN
+en_US.UTF-8 UTF-8
+EOFLOCALEGEN
 cat /etc/default/locale >> /etc/environment
-cat /tmp/selections | debconf-set-selections
 locale-gen --purge "en_US.UTF-8"
-# dpkg-reconfigure locales
+dpkg-reconfigure -f noninteractive locales
+
 echo "America/New_York" > /etc/timezone
 ln -fs /usr/share/zoneinfo/US/Eastern /etc/localtime
 dpkg-reconfigure -f noninteractive tzdata
@@ -947,10 +950,6 @@ fi
 if [ "${DISCENC}" != "NOENC" ] ; then
     apt-get -qq --yes install cryptsetup keyutils
 fi
-
-echo "-------- right after installing zfs -----------------------------------------"
-ls -la /boot
-echo "-----------------------------------------------------------------------------"
 
 # Ensure cachefile exists and zfs-import-cache is active
 # https://github.com/zfsonlinux/zfs/issues/8885
@@ -1347,17 +1346,15 @@ fi # GOOGLE_AUTH
 
 # Add IP address(es) to main tty issue
 ls -1 /sys/class/net | egrep -v "lo|vir|docker" | xargs -I {} echo " {} : \4{{}}" >> /etc/issue
+echo "" >> /etc/issue
 
 # Set apt/dpkg to automagically snap the system datasets on install/remove
 cat > /etc/apt/apt.conf.d/30pre-snap << EOF
 # Snapshot main datasets before installing or removing packages
 # We use a DATE variable to ensure all snaps have SAME date
 
-# zfs set mountpoint=legacy rpool/var/log
-# echo ${POOLNAME}/var/log /var/log zfs nodev,relatime 0 0 >> /etc/fstab
-# 
-# zfs set mountpoint=legacy rpool/var/spool
-# echo ${POOLNAME}/var/spool /var/spool zfs nodev,relatime 0 0 >> /etc/fstab
+ Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; ${ZFSLOCATION} snap \$(${ZFSLOCATION} list -o name | /usr/bin/grep -E 'ROOT/.*$' | sort | head -1)@apt_\${DATE}"; };
+EOF
 
 zfs snapshot ${POOLNAME}/ROOT/${SUITE}@base_install
 umount /boot/efi
@@ -1368,14 +1365,10 @@ __EOF__
 chmod +x ${ZFSBUILD}/root/Setup.sh
 
 # Bind mount virtual filesystem, create Setup.sh, then chroot
-mount --rbind /sys  ${ZFSBUILD}/sys
-mount --make-rslave ${ZFSBUILD}/sys
-mount --bind /dev  ${ZFSBUILD}/dev
 mount -t proc /proc ${ZFSBUILD}/proc
-# Make the mounts rslaves to make umounting later cleaner
-# mount --make-rslave ${ZFSBUILD}/dev
-# mount --make-rslave ${ZFSBUILD}/proc
-# mount --make-rslave ${ZFSBUILD}/sys
+mount -t sysfs sys  ${ZFSBUILD}/sys
+mount -B /dev  ${ZFSBUILD}/dev
+mount -t devpts pts ${ZFSBUILD}/dev/pts
 
 # chroot and set up system
 # chroot ${ZFSBUILD} /bin/bash --login -c /root/Setup.sh
@@ -1384,9 +1377,7 @@ unshare --mount --fork chroot ${ZFSBUILD} /bin/bash --login -c /root/Setup.sh
 # Remove any lingering crash reports
 rm -f ${ZFSBUILD}/var/crash/*
 
-umount -n ${ZFSBUILD}/proc
-umount -n ${ZFSBUILD}/dev
-umount -n -R ${ZFSBUILD}/sys
+umount -n ${ZFSBUILD}/{dev/pts,dev,sys,proc}
 
 # Copy setup log
 cp /root/ZFS-setup.log ${ZFSBUILD}/home/${USERNAME}
