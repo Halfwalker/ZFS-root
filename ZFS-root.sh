@@ -577,17 +577,12 @@ for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
     sgdisk --zap-all /dev/disk/by-id/${zfsdisks[${disk}]}
     sgdisk --clear /dev/disk/by-id/${zfsdisks[${disk}]}
 
-    ## From old ZFS-setup.sh
-    ## sgdisk -n1:2048:+${SIZE_EFI}M -t1:EF00 -c1:"EFI_${DISK}"  /dev/disk/by-id/${DISKS[${DISK}]}
-
     # Legacy (BIOS) booting
-    sgdisk -a1 -n1:24K:+1000K -c1:"GRUB_${disk}" -t1:EF02 /dev/disk/by-id/${zfsdisks[${disk}]}
-    
-    # UEFI booting
-    sgdisk     -n2:1M:+1000M  -c2:"UEFI_${disk}" -t2:EF00 /dev/disk/by-id/${zfsdisks[${disk}]}
-    
-    # boot pool
-    sgdisk     -n3:0:+3000M   -c3:"BOOT_${disk}" -t3:BF01 /dev/disk/by-id/${zfsdisks[${disk}]}
+    sgdisk -a 1                                /dev/disk/by-id/${zfsdisks[${disk}]}     # Set sector alignment to 1MiB
+    sgdisk -n ${PARTITION_BOOT}:1M:+1000M      /dev/disk/by-id/${zfsdisks[${disk}]}     # Create partition 1/BOOT 1M size
+    sgdisk -A ${PARTITION_BOOT}:set:2          /dev/disk/by-id/${zfsdisks[${disk}]}     # Turn legacy boot attribute on
+    sgdisk -c ${PARTITION_BOOT}:"BOOT_${disk}" /dev/disk/by-id/${zfsdisks[${disk}]}     # Set partition name to BOOT_n
+    sgdisk -t ${PARTITION_BOOT}:EF00           /dev/disk/by-id/${zfsdisks[${disk}]}     # Set partition type to EFI
     
     #
     # TODO: figure out partitions for both ZFS and LUKS encryption
@@ -876,11 +871,9 @@ export GNOME=${GNOME}
 export KDE=${KDE}
 export HIBERNATE=${HIBERNATE}
 export SIZE_SWAP=${SIZE_SWAP}
-export PARTITION_GRUB=1
-export PARTITION_EFI=2
-export PARTITION_BOOT=3
-export PARTITION_SWAP=4
-export PARTITION_DATA=5
+export PARTITION_BOOT=${PARTITION_BOOT}
+export PARTITION_SWAP=${PARTITION_SWAP}
+export PARTITION_DATA=${PARTITION_DATA}
 __EOF__
 
 for DISK in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
@@ -909,34 +902,7 @@ set -x
 ln -s /proc/self/mounts /etc/mtab
 apt-get -qq update
 
-# After grub-pc installation
-# grub-pc grub-pc/postrm_purge_boot_grub  boolean false
-# grub-pc grub-pc/chainload_from_menu.lst boolean true
-# grub-pc grub2/linux_cmdline_default     string  quiet splash
-# grub-pc grub2/kfreebsd_cmdline  string
-# grub-pc grub2/update_nvram      boolean true
-# grub-pc grub2/linux_cmdline     string
-# grub-pc grub-pc/hidden_timeout  boolean true
-# grub-pc grub-pc/install_devices multiselect     /dev/disk/by-id/ata-ADATA_SP600_7D4020501003
-# grub-pc grub-pc/install_devices_empty   boolean true
-# grub-pc grub-pc/timeout string  0
-# grub-pc grub2/unsigned_kernels  note
-# grub-pc grub-pc/install_devices_failed  boolean false
-# # /boot/grub/device.map has been regenerated
-# grub-pc grub2/device_map_regenerated    note
-# grub-pc grub-pc/kopt_extracted  boolean false
-# grub-pc grub-pc/install_devices_disks_changed   multiselect
-# grub-pc grub-pc/mixed_legacy_and_grub2  boolean true
-# grub-pc grub2/kfreebsd_cmdline_default  string  quiet splash
-# grub-pc grub2/no_efi_extra_removable    boolean false
-# grub-pc grub-pc/install_devices_failed_upgrade  boolean true
-
 # Preseed a few things
-#_# Do not configure grub during package install
-#_# grub-installer/bootdev                          string
-#_# grub-pc         grub-pc/install_devices_empty   select true
-#_# grub-pc         grub-pc/install_devices         multiselect
-#_# grub-pc         grub-pc/install_devices         select
 cat > /tmp/selections << EOFPRE
 # zfs-dkms license notification
 zfs-dkms        zfs-dkms/note-incompatible-licenses  note
@@ -1032,43 +998,6 @@ if [ "${DISCENC}" = "LUKS" ] ; then
 fi # DISCENC for LUKS crypttab
 
 
-# # Create grub device.map for just install drives - eg.
-# # grub-mkdevicemap -nvv
-# # (hd0)   /dev/disk/by-id/ata-VBOX_HARDDISK_VB7e33e873-e3c9fd91
-# # (hd1)   /dev/disk/by-id/ata-VBOX_HARDDISK_VB3f3328bd-1d7db667
-# # (hd2)   /dev/disk/by-id/ata-VBOX_HARDDISK_VB11f330ab-76c3340a
-# #
-# # We do this manually rather than grub-mkdevicemap to ensure we only use the disks
-# # listed in ZFS-setup.disks.txt, in case there are other disks in the system
-# echo "" > /boot/grub/device.map
-# for DISK in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
-#   echo "(hd${DISK}) /dev/disk/by-id/${zfsdisks[${DISK}]}" >> /boot/grub/device.map
-# done
-# echo "------------------ device.map ------------------------------"
-# cat /boot/grub/device.map
-# echo "------------------ device.map ------------------------------"
-
-# Set up which disks to install grub to
-echo -n "grub-pc  grub-pc/install_devices  multiselect  " >> /tmp/selections
-for disk in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
-    echo -n "  /dev/disk/by-id/${zfsdisks[$disk]}," >> /tmp/selections
-done
-echo " " >> /tmp/selections
-cat /tmp/selections | debconf-set-selections
-
-# Copy default grub config (normally installed with grub-pc, but not with grub-pc-bin
-# So need to install grub2-common here to get it
-# Also installed by grub-efi-amd64-signed below if UEFI is selected
-apt-get -qq --yes install grub2-common
-cp -f /usr/share/grub/default/grub /etc/default/grub
-
-echo "-------- right after installing grub ----------------------------------------"
-ls -la /boot
-echo "-----------------------------------------------------------------------------"
-
-#_#
-#_# TODO: loop through disks to use multiple partitions
-#_#
 # Using a swap partition ?
 if [ ${HIBERNATE} = "y" ] ; then
 
@@ -1077,129 +1006,36 @@ if [ ${HIBERNATE} = "y" ] ; then
     if [ "${DISCENC}" = "LUKS" ] ; then
 
         # LUKS encrypted
-        sed -i "s/GRUB_CMDLINE_LINUX_DEFAULT.*/GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash bootdegraded=true resume=\/dev\/mapper\/swap_crypt0 ${USE_ZSWAP}\"/" /etc/default/grub
-        echo "/dev/mapper/swap_crypt0 none swap discard,sw 0 0" >> /etc/fstab
-        echo "RESUME=/dev/mapper/swap_crypt0" > /etc/initramfs-tools/conf.d/resume
+        for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
+            echo "/dev/mapper/swap_crypt${disk} none swap discard,sw 0 0" >> /etc/fstab
+        done
 
     else
 
         # Not LUKS encrypted
-        sed -i "s/GRUB_CMDLINE_LINUX_DEFAULT.*/GRUB_CMDLINE_LINUX_DEFAULT=\"quiet splash bootdegraded=true resume=UUID=$(blkid -s UUID -o value ${DISK}-part${PARTITION_SWAP}) ${USE_ZSWAP}\"/" /etc/default/grub
-        echo "UUID=$(blkid -s UUID -o value ${DISK}-part${PARTITION_SWAP}) none swap discard,sw 0 0" >> /etc/fstab
-        echo "RESUME=UUID=$(blkid -s UUID -o value ${DISK}-part${PARTITION_SWAP})" > /etc/initramfs-tools/conf.d/resume
+        for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
+            echo "UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP}) none swap discard,sw 0 0" >> /etc/fstab
+        done
 
     fi # DISCENC for LUKS
 
     # If using zswap enable lz4 compresstion
     if [ "ZZ${USE_ZSWAP}" != "ZZ" ]; then
         echo "lz4" >> /etc/modules
-        echo "lz4" >> /etc/initramfs-tools/modules
     fi
 
 else
-    # No swap partition
-    sed -i 's/GRUB_CMDLINE_LINUX_DEFAULT.*/GRUB_CMDLINE_LINUX_DEFAULT="quiet splash bootdegraded=true"/' /etc/default/grub
+    # No swap partition - maybe using a zvol for swap
     if [ ${SIZE_SWAP} -ne 0 ] ; then
         echo "/dev/zvol/${POOLNAME}/swap none swap discard,sw 0 0" >> /etc/fstab
     fi
-    echo "RESUME=none" > /etc/initramfs-tools/conf.d/resume
 fi # HIBERNATE
 
 
-#_#
-#_# TODO: Setup debconf selections to NOT install to disks, use grub-install
-#_#       in loop for each disks.  Install grub-pc-bin instead of grub-pc ?
-#_#
-# Grub for legacy BIOS
-debconf-get-selections > /root/grub-pc-pre-install.txt
-apt-get -qq --yes install grub-pc-bin
-debconf-get-selections > /root/grub-pc-post-install.txt
-
-echo "-------- right after installing grub-pc-bin ---------------------------------"
-ls -la /boot
-echo "-----------------------------------------------------------------------------"
-
-
-#_#
-#_# TODO: Create mdadm mirror for EFI partitions
-#_#
-# Install grub
-if [ "${UEFI}" = "y" ] ; then
-    # Grub for UEFI
-    #
-    # Possibly use this in debconf selections
-    # https://askubuntu.com/questions/955583/preseeding-ubuntu-16-04-for-a-hyper-v-vm-fails-to-install-the-uefi-boot-section
-    # grub-installer/force-efi-extra-removable boolean true
-    #
-    apt-get -qq --yes install dosfstools
-
-    for DISK in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
-        mkdosfs -F 32 -s 1 -n EFI /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_EFI}
-        mkdir /boot/efi
-        echo "# Ensure that /boot is mounted via zfs before trying to mount /boot/efi" >> /etc/fstab
-        echo PARTUUID=$(blkid -s PARTUUID -o value \
-              /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_EFI}) \
-              /boot/efi vfat nofail,x-systemd.device-timeout=1,x-systemd.after=zfs-mount.service 0 1 >> /etc/fstab
-    done
-    mount /boot/efi
-
-#_#
-#_# TODO: Setup debconf selections to NOT install to disks, use grub-install
-#_#       in loop for each disks
-#_# NOTE: grub-install is further down in script - move here ?
-#_#
-    debconf-get-selections > /root/grub-efi-pre-install.txt
-    apt-get -qq install --yes grub-efi-amd64-signed shim-signed
-    debconf-get-selections > /root/grub-efi-post-install.txt
-fi # UEFI
-
-
-# Ensure grub supports ZFS and reset timeouts to 5s
-sed -i "s/GRUB_CMDLINE_LINUX=.*/GRUB_CMDLINE_LINUX=\"net.ifnames=0 biosdevname=0 rootdelay=9 root=ZFS=${POOLNAME}\/ROOT\/${SUITE}_${UUID}\"/" /etc/default/grub
-sed -i 's/GRUB_TIMEOUT_STYLE=hidden/# GRUB_TIMEOUT_STYLE=hidden/' /etc/default/grub
-sed -i 's/GRUB_TIMEOUT=0/GRUB_TIMEOUT=5/' /etc/default/grub
-cat >> /etc/default/grub << EOF
-
-# Ensure both timeouts are 5s
-GRUB_RECOVERFAIL_TIMEOUT=5
-GRUB_RECORDFAIL_TIMEOUT=5
-
-GRUB_GFXPAYLOAD_LINUX="keep"
-GRUB_GFXMODE="800x600x32"
-GRUB_TERMINAL=console
-
-# Sometimes os_prober fails with device busy. Only really needed for multi-OS
-GRUB_DISABLE_OS_PROBER=true
-EOF
-
-
-#_#
-#_# Install grub to each disk in list
-#_#
-echo "-------- installing grub to each disk ---------------------------------------"
-for DISK in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
-    # Install bootloader grub for either UEFI or legacy bios
-    if [ "${UEFI}" = "y" ] ; then
-        grub-install --target=x86_64-efi --efi-directory=/boot/efi \
-          --bootloader-id=ubuntu --recheck --no-floppy /dev/disk/by-id/${zfsdisks[${DISK}]}
-        umount /boot/efi
-    fi # UEFI
-    grub-install --target=i386-pc /dev/disk/by-id/${zfsdisks[${DISK}]}
-done
-
-
-# Grub installation
-# Verify ZFS boot is seen
-echo "${DASHES}"
-echo "Please verify that ZFS shows up below for grub-probe"
-grub-probe /boot
-read -t 5 QUIT
-
-#_#
-#_# Potentially add delay before importing root pool in initramfs
-#_#
+#
+# Potentially add delay before importing root pool in initramfs
+#
 if [ ${DELAY} = "y" ] ; then
-    echo "${DASHES}"
     echo "On systems with lots of disks, enumerating them can sometimes take a long"
     echo "time, which means the root disk(s) may not have been enumerated before"
     echo "ZFS tries to import the root pool. That drops you to an initramfs prompt"
@@ -1215,30 +1051,16 @@ if [ ${DELAY} = "y" ] ; then
 fi
 
 
-
-###  No need to update yet
-###
-###  echo "--------- about to update initrd and grub -----------------------------------"
-###  ls -la /boot
-###  echo "-----------------------------------------------------------------------------"
-###  
-###  # Update initrd
-###  update-initramfs -c -k all
-###  
-###  # Update boot config
-###  update-grub
-
-
 echo "-------- installing basic packages ------------------------------------------"
-#_#
-#_# Install basic packages
-#_#
+#
+# Install basic packages
+#
 apt-get -qq --no-install-recommends --yes install expect most vim-nox rsync whois gdisk \
     openssh-server avahi-daemon libnss-mdns
 
-#_#
-#_# Copy Avahi SSH service file into place
-#_#
+#
+# Copy Avahi SSH service file into place
+#
 cp /usr/share/doc/avahi-daemon/examples/ssh.service /etc/avahi/services
 
 # For ZFSENC we need to set up a script and systemd unit to load the keyfile
