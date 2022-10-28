@@ -1096,6 +1096,111 @@ Kernel:
 END
 
 
+#
+# Set up LUKS unlocking
+#
+if [ "${DISCENC}" = "LUKS" ] ; then
+    for DISK in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
+        echo "root_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) /etc/zfs/zroot.rawkey discard,keyfile-timeout=10s" >> /etc/crypttab
+        if [ ${HIBERNATE} = "y" ] ; then
+            echo "swap_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_SWAP}) /etc/zfs/zroot.rawkey discard,keyfile-timeout=10s" >> /etc/crypttab
+        fi
+    done
+
+    #
+    # Early-stage script for zfsbootmenu - scan for ZFS_ partitions which
+    # should be LUKS encrypted and try to open them all
+    #
+    cat > /usr/local/bin/zfsbootmenu_luks_unlock.sh << 'EOF'
+#!/bin/bash
+
+sources=(
+  /lib/profiling-lib.sh
+  /etc/zfsbootmenu.conf
+  /lib/zfsbootmenu-core.sh
+  /lib/kmsg-log-lib.sh
+  /etc/profile
+)
+
+for src in "${sources[@]}"; do
+  # shellcheck disable=SC1090
+  if ! source "${src}" > /dev/null 2>&1 ; then
+    echo -e "\033[0;31mWARNING: ${src} was not sourced; unable to proceed\033[0m"
+    exit 1
+  fi
+done
+unset src sources
+
+# We only unlock the ZFS partition(s) since the SWAP ones can use the
+# /etc/zfs/zroot.rawkey to unlock once main pool is open
+# ZFS_PARTS=(/dev/disk/by-partlabel/{SWAP_*,ZFS_*})
+ZFS_PARTS=(/dev/disk/by-partlabel/ZFS_*)
+
+echo "Found these partitions for LUKS encryption"
+echo $ZFS_PARTS
+echo ""
+
+# Read passphrase for LUKS encryption into $REPLY
+read -s -p "LUKS encryption passphrase : "
+
+for idx in ${!ZFS_PARTS[@]} ; do
+    # Grab just ZFS_0 or SWAP_0
+    test_luks=$(basename ${ZFS_PARTS[$idx]})
+    # luks is the full path to the disk partition
+    luks=${ZFS_PARTS[$idx]}
+    # Set $dm to root_crypt0 or swap_crypt0 depending on basename
+    [ ${test_luks%_*} = "ZFS" ] && dm=root_crypt${idx}
+    [ ${test_luks%_*} = "SWAP" ] && dm=swap_crypt${idx}
+
+    if ! cryptsetup isLuks ${luks} >/dev/null 2>&1 ; then
+        zwarn "LUKS device ${luks} missing LUKS partition header"
+        exit
+    fi
+
+    if cryptsetup status "${dm}" >/dev/null 2>&1 ; then
+        zinfo "${dm} already active, continuing"
+        continue
+    fi
+
+    header="$( center_string "[CTRL-C] cancel luksOpen attempts" )"
+
+    tput clear
+    colorize red "${header}\n\n"
+
+    # https://fossies.org/linux/cryptsetup/docs/Keyring.txt
+    echo $REPLY | cryptsetup luksOpen ${luks} ${dm}
+    ret=$?
+
+    # successfully entered a passphrase
+    if [ "${ret}" -eq 0 ] ; then
+        zdebug "$(
+            cryptsetup status "${dm}"
+        )"
+        continue
+    fi
+
+    # ctrl-c'd the process
+    if [ "${ret}" -eq 1 ] ; then
+        zdebug "canceled luksOpen attempts via SIGINT"
+        exit
+    fi
+
+    # failed all password attempts
+    if [ "${ret}" -eq 2 ] ; then
+        if timed_prompt -e "emergency shell" \
+            -r "continue unlock attempts" \
+            -p "Continuing in %0.2d seconds" ; then
+            continue
+        else
+            emergency_shell "unable to unlock LUKS partition"
+        fi
+    fi
+done
+EOF
+    chmod +x /usr/local/bin/zfsbootmenu_luks_unlock.sh
+
+    echo 'zfsbootmenu_early_setup+=" /usr/local/bin/zfsbootmenu_luks_unlock.sh "' > /etc/zfsbootmenu/dracut.conf.d/luks_zbm.conf
+fi #DISCENC
 
 
 # Using a swap partition ?
