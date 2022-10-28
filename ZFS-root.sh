@@ -783,12 +783,7 @@ else
     zfs create -o canmount=off -o mountpoint=none -o compression=lz4 -o atime=off ${POOLNAME}/home
 fi
 zfs create -o canmount=on -o mountpoint=/home/${USERNAME} ${POOLNAME}/home/${USERNAME}
-
-###  # Point zfs encryption to right location of keyfile for later
-###  if [ ${DISCENC} = "ZFSENC" ] ; then
-###      zfs set keylocation=file:///boot/pool.key ${POOLNAME}/home
-###      zfs set keylocation=file:///boot/pool.key ${POOLNAME}/home/${USERNAME}
-###  fi
+zfs create -o canmount=on -o mountpoint=/root ${POOLNAME}/home/root
 
 # Show what we got before installing
 echo "---------- $(tput setaf 1)About to debootstrap into ${ZFSBUILD}$(tput sgr0) -----------"
