@@ -105,9 +105,9 @@ PARTITION_DATA=3
 
 # ZFS encryption options
 ZFSENC_ROOT_OPTIONS="-o encryption=aes-256-gcm -o keylocation=prompt -o keyformat=passphrase"
-# NOTE: for keyfile, put key in local /root, then later copy to target /root 
+# NOTE: for keyfile, put key in local /etc/zfs, then later copy to target /etc/zfs
 #       to be used for encrypting /home
-ZFSENC_HOME_OPTIONS="-o encryption=aes-256-gcm -o keylocation=file:///root/pool.key -o keyformat=raw"
+ZFSENC_HOME_OPTIONS="-o encryption=aes-256-gcm -o keylocation=file:///etc/zfs/zroot.rawkey -o keyformat=raw"
 
 # Check for a local apt-cacher-ng system - looking for these hosts
 # aptcacher.local
@@ -557,9 +557,9 @@ fi
 
 # Create an encryption key for non-root datasets (/home).  The root dataset
 # is encrypted with the passphrase above, but other datasets use a key that
-# is stored in /root/pool.key.  This key isn't available unless the root
+# is stored in /etc/zfs/zroot.rawkey.  This key isn't available unless the root
 # dataset is unlocked, so we're still secure.
-dd if=/dev/urandom of=/root/pool.key bs=32 count=1
+dd if=/dev/urandom of=/etc/zfs/zroot.rawkey bs=32 count=1
 
 apt-get -qq --no-install-recommends --yes install openssh-server debootstrap gdisk zfs-initramfs dosfstools mdadm
 
@@ -663,6 +663,8 @@ if [ ${HIBERNATE} = "y" ] ; then
                 fi
                 # Add the derived key to all the other devices
                 echo ${PASSPHRASE} | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} /tmp/key
+                # Add the generated key from /etc/zfs/zroot.rawkey
+                echo ${PASSPHRASE} | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} /etc/zfs/zroot.rawkey
                 ;;
 
             ZFSENC)
@@ -677,6 +679,7 @@ if [ ${HIBERNATE} = "y" ] ; then
         esac
     done
 fi #HIBERNATE
+
 
 # Encrypt root volume maybe
 # NOTE: Need --disable-keyring so we can pull the derived key from the encrypted partition
@@ -698,6 +701,8 @@ if [ "${DISCENC}" = "LUKS" ] ; then
 
         # Add the derived key to all the other devices
         echo ${PASSPHRASE} | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} /tmp/key
+        # Add the generated key from /etc/zfs/zroot.rawkey
+        echo ${PASSPHRASE} | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} /etc/zfs/zroot.rawkey
     done
 fi
 
@@ -769,10 +774,10 @@ zfs create -o canmount=noauto -o mountpoint=/ \
 zpool set bootfs=${POOLNAME}/ROOT/${SUITE} ${POOLNAME}
 zfs mount ${POOLNAME}/ROOT/${SUITE}
 
-if [ ${DISCENC} = "ZFSENC" ] ; then
-    # Making sure we have the non-root pool key used for other datasets (/home)
-    mkdir ${ZFSBUILD}/root
-    cp /root/pool.key ${ZFSBUILD}/root
+if [ ${DISCENC} != "NOENC" ] ; then
+    # Making sure we have the non-root key used for other datasets (/home)
+    mkdir -p ${ZFSBUILD}/etc/zfs
+    cp /etc/zfs/zroot.rawkey ${ZFSBUILD}/etc/zfs
 fi
 
 # zfs create pool/home and main user home dataset
