@@ -1465,6 +1465,11 @@ if [ "${AUTHKEYS}" != "none" ] ; then
   done
 fi
 
+if [[ -v SSHPUBKEY ]] ; then
+    echo "####### ZFS-root.conf configured key #######" >> /home/${USERNAME}/.ssh/authorized_keys 
+    echo "${SSHPUBKEY}" >> /home/${USERNAME}/.ssh/authorized_keys 
+fi
+
 chown -R ${USERNAME}.${USERNAME} /home/${USERNAME}
 
 # Allow read-only zfs commands with no sudo password
