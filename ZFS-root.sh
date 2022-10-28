@@ -133,8 +133,8 @@ if [[ ! -v PROXY ]] ; then
     (( RET )) && PROXY=
 fi # Check if PROXY is set already
 if [ ${PROXY} ]; then
-    export http_proxy=${PROXY}
-    export ftp_proxy=${PROXY}
+    # export http_proxy=${PROXY}
+    # export ftp_proxy=${PROXY}
     # This is for apt-get
     echo "Acquire::http::proxy \"${PROXY}\";" > /etc/apt/apt.conf.d/03proxy
 fi # PROXY
