@@ -967,6 +967,62 @@ zpool set cachefile=/etc/zfs/zpool.cache ${POOLNAME}
 systemctl enable zfs.target zfs-import-cache zfs-mount zfs-import.target
 
 
+# Configure Dracut to load ZFS support
+# Need gcc to get libgcc_s.so for dracut_install to work
+apt-get --yes install dracut-core zfs-dracut bsdmainutils gcc
+cat << END > /etc/dracut.conf.d/100-zol.conf
+nofsck="yes"
+add_dracutmodules+=" zfs "
+omit_dracutmodules+=" btrfs "
+END
+
+# Fix zfs dracut - https://github.com/openzfs/zfs/issues/13398
+# Need gcc to get libgcc_s.so for dracut_install to work
+sed -i '/\*\*/s/\*\*/*\/*/' /usr/lib/dracut/modules.d/90zfs/module-setup.sh
+
+# NOTE: Very important
+#       Do NOT install initramfs-tools next to dracut
+#       They wrestle and knock each other out
+apt-mark hold initramfs-tools
+
+
+#
+# Install rEFInd and syslinux
+#
+mount /boot/efi
+DEBIAN_FRONTEND=noninteractive apt-get --yes install refind
+refind-install
+
+mkdir -p /boot/efi/EFI/zfsbootmenu
+cat <<- END > /boot/efi/EFI/zfsbootmenu/refind_linux.conf
+"Boot to ZFSbootMenu" "zbm.prefer=${POOLNAME} zbm.import_policy=hostid zbm.set_hostid ro quiet loglevel=0"
+END
+
+# If we're running under legacy bios then rEFInd will be installed
+# to /boot/efi/EFI/BOOT - we want it in /boot/efi/EFI/refind
+[ -e /boot/efi/EFI/BOOT ] && mvrefind /boot/efi/EFI/BOOT /boot/efi/EFI/refind
+# Change timout for rEFInd from 20secs to 10secs
+sed -i 's,^timeout .*,timeout 10,' /boot/efi/EFI/refind/refind.conf
+
+# For multiple disks, looks like we need a startup.nsh
+if [ ${#zfsdisks[@]} -ge 1 ] ; then
+    cat <<-'END' > /boot/efi/startup.nsh
+	fs0:
+	EFI\refind\refind_x64.efi
+	END
+fi
+
+# Set up syslinux
+mkdir /boot/efi/syslinux
+apt-get install --yes syslinux syslinux-common extlinux dosfstools
+cp -r /usr/lib/syslinux/modules/bios/* /boot/efi/syslinux
+# Install extlinux
+extlinux --install /boot/efi/syslinux
+# Install the syslinux GPTMBR data
+for DISK in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
+    dd bs=440 count=1 conv=notrunc if=/usr/lib/syslinux/mbr/gptmbr.bin of=/dev/disk/by-id/${zfsdisks[${DISK}]}
+done
+
     else
 
 
