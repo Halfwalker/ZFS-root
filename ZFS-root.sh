@@ -664,8 +664,8 @@ if [ ${HIBERNATE} = "y" ] ; then
                 ;;
 
             ZFSENC)
-                echo "ZFSENC not supported yet"
-                exit 1
+                # ZFS encryption can just use a regular partition
+                mkswap -f /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP}
                 ;;
 
             NOENC)
@@ -751,6 +751,8 @@ if [ ${HIBERNATE} = "n" ] && [ ${SIZE_SWAP} -ne 0 ] ; then
       -o logbias=throughput -o sync=always \
       -o primarycache=metadata -o secondarycache=none \
       -o com.sun:auto-snapshot=false ${POOLNAME}/swap
+    echo "Enabling swap size ${SIZE_SWAP} on /dev/zvol/${POOLNAME}/swap"
+    mkswap -f /dev/zvol/${POOLNAME}/swap
 fi #HIBERNATE
 
 # Main filesystem datasets
@@ -926,10 +928,6 @@ echo "America/New_York" > /etc/timezone
 ln -fs /usr/share/zoneinfo/US/Eastern /etc/localtime
 dpkg-reconfigure -f noninteractive tzdata
 
-if [ ${HIBERNATE} = "n" ] && [ ${SIZE_SWAP} -ne 0 ] ; then
-    echo "Enabling swap size ${SIZE_SWAP} on /dev/zvol/${POOLNAME}/swap"
-    mkswap -f /dev/zvol/${POOLNAME}/swap
-fi
 
 apt-get -qq --yes --no-install-recommends install software-properties-common debconf-utils
 apt-get -qq --yes --no-install-recommends install linux-generic${HWE}
@@ -951,45 +949,9 @@ fi
 zpool set cachefile=/etc/zfs/zpool.cache ${POOLNAME}
 systemctl enable zfs-import-cache
 
-# Set up /etc/crypttab - ugly-ass logic here
-if [ "${DISCENC}" = "LUKS" ] ; then
-    # LUKS Encrypted
-    if [ ${HIBERNATE} = "y" ] ; then
-
-        # We have a LUKS encrypted swap partition, so that has to be unlocked FIRST
-        # THEN we use the derived key we pull from that to unlock the other disks
-        for DISK in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
-            # Set up 1st disk
-            if [ ${DISK} -eq 0 ] ; then
-                # Open 1st disk swap to be source of derived key
-                # echo "swap_crypt0 UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_SWAP}) none luks,discard,initramfs" > /etc/crypttab
-                # echo "root_crypt0 UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) swap_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_derived" >> /etc/crypttab
-                echo "swap_crypt0 UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_SWAP}) swap_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_keyctl" > /etc/crypttab
-                echo "root_crypt0 UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) swap_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_keyctl" >> /etc/crypttab
-            else
-                echo "swap_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_SWAP}) swap_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_keyctl" >> /etc/crypttab
-                echo "root_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) swap_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_keyctl" >> /etc/crypttab
-            fi
-        done
 
     else
 
-        # No Hibernate, so no encrypted swap partition, so use 1st root
-        # encrypted partition as source of derived key
-        for DISK in `seq 0 $(( ${#zfsdisks[@]} - 1))` ; do
-            # Set up 1st disk
-            if [ ${DISK} -eq 0 ] ; then
-                # Open 1st disk root to be source of derived key
-                # echo "root_crypt0 UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) none luks,discard,initramfs" > /etc/crypttab
-                echo "root_crypt0 UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) root_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_keyctl" > /etc/crypttab
-            else
-                # echo "root_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) root_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_derived" >> /etc/crypttab
-                echo "root_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) root_crypt0 luks,discard,initramfs,keyscript=/lib/cryptsetup/scripts/decrypt_keyctl" >> /etc/crypttab
-            fi
-        done
-
-    fi # HIBERNATE
-fi # DISCENC for LUKS crypttab
 
 
 # Using a swap partition ?
