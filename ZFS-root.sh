@@ -33,11 +33,12 @@
 #
 # >>>>>>>>>> NOTE: This will totally overwrite the disk chosen <<<<<<<<<<<<<
 #
-# 1) Boot an Ubuntu live cd to get a shell. Ubuntu desktop is a good choice.
+# 1) Boot an Ubuntu live cd to get a shell. Ubuntu live-server is a good choice.
 # 2) Open a shell (ctrl-t) and become root (sudo -i)
 # 3) Copy this script onto the box somehow - scp from somewhere
 # 4) Make it executable (chmod +x ZFS-root.sh)
 # 5) Run it (./ZFS-root.sh)
+# 6) Add -d to enable set -x debugging (./ZFS-root.sh -d)
 #
 # It will ask a few questions (username, which disk, bionic/focal etc)
 # and then fully install a minimal Ubuntu system. Depending on the choices
@@ -1061,9 +1062,26 @@ zfs set canmount=noauto ${POOLNAME}/ROOT/${SUITE}
 # Install the ZFSBootMenu package directly
 #
 mkdir -p  /boot/efi/EFI/zfsbootmenu
-curl -L https://get.zfsbootmenu.org/zfsbootmenu.EFI -o /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
+# curl -L https://get.zfsbootmenu.org/zfsbootmenu.EFI -o /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
 # curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v1.11.0/zfsbootmenu-x86_64-v1.11.0.EFI -o /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
+curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v2.0.0/zfsbootmenu-release-x86_64-v2.0.0.tar.gz -o /tmp/zfsbootmenu.tar.gz
+tar xvzf /tmp/zfsbootmenu.tar.gz --strip-components=1 -C /boot/efi/EFI/zfsbootmenu
 cp /boot/efi/EFI/refind/icons/os_linux.png /boot/efi/EFI/zfsbootmenu/zfsbootmenu.png
+
+cat > /boot/efi/syslinux/syslinux.cfg << EOF
+UI menu.c32
+PROMPT 0
+
+MENU TITLE Boot Menu
+TIMEOUT 50
+DEFAULT ZFSBootMenu-2.0.0_1
+
+LABEL ZFSBootMenu-2.0.0_1
+MENU LABEL ZFSBootMenu 2.0.0_1
+KERNEL /EFI/zfsbootmenu/vmlinuz-bootmenu
+INITRD /EFI/zfsbootmenu/initramfs-bootmenu.img
+APPEND zbm.prefer=test zbm.import_policy=hostid zbm.set_hostid ro quiet loglevel=0
+EOF
 
 # OR install the git repo and build locally
 
