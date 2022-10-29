@@ -409,15 +409,13 @@ case ${SUITE} in
         # Install HWE packages - set to blank or to "-hwe-22.04"
         # Gets tacked on to various packages below
         [ "${HWE}" = "y" ] && HWE="-hwe-${SUITE_NUM}" || HWE=
-        # Specific zpool features available in focal
+        # Specific zpool features available in jammy
         # Depends on what suite this script is running under
         case ${SCRIPT_SUITE} in
             bionic | focal | jammy)
-                SUITE_BOOT_POOL="-o feature@userobj_accounting=disabled"
                 SUITE_ROOT_POOL="-O dnodesize=auto"
                 ;;
             xenial)
-                SUITE_BOOT_POOL=""
                 SUITE_ROOT_POOL=""
                 ;;
         esac
@@ -433,11 +431,9 @@ case ${SUITE} in
         # Depends on what suite this script is running under
         case ${SCRIPT_SUITE} in
             bionic | focal | jammy)
-                SUITE_BOOT_POOL="-o feature@userobj_accounting=disabled"
                 SUITE_ROOT_POOL="-O dnodesize=auto"
                 ;;
             xenial)
-                SUITE_BOOT_POOL=""
                 SUITE_ROOT_POOL=""
                 ;;
         esac
@@ -453,11 +449,9 @@ case ${SUITE} in
         # Depends on what suite this script is running under
         case ${SCRIPT_SUITE} in
             bionic | focal | jammy)
-                SUITE_BOOT_POOL="-o feature@userobj_accounting=disabled"
                 SUITE_ROOT_POOL="-O dnodesize=legacy"
                 ;;
             xenial)
-                SUITE_BOOT_POOL=""
                 SUITE_ROOT_POOL=""
                 ;;
         esac
@@ -474,11 +468,9 @@ case ${SUITE} in
         # Depends on what suite this script is running under
         case ${SCRIPT_SUITE} in
             bionic | focal)
-                SUITE_BOOT_POOL="-o feature@userobj_accounting=enabled"
                 SUITE_ROOT_POOL="-O dnodesize=auto"
                 ;;
             xenial)
-                SUITE_BOOT_POOL=""
                 SUITE_ROOT_POOL=""
                 ;;
         esac
