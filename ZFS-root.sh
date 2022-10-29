@@ -33,11 +33,12 @@
 #
 # >>>>>>>>>> NOTE: This will totally overwrite the disk chosen <<<<<<<<<<<<<
 #
-# 1) Boot an Ubuntu live cd to get a shell. Ubuntu desktop is a good choice.
+# 1) Boot an Ubuntu live cd to get a shell. Ubuntu live-server is a good choice.
 # 2) Open a shell (ctrl-t) and become root (sudo -i)
 # 3) Copy this script onto the box somehow - scp from somewhere
 # 4) Make it executable (chmod +x ZFS-root.sh)
 # 5) Run it (./ZFS-root.sh)
+# 6) Add -d to enable set -x debugging (./ZFS-root.sh -d)
 #
 # It will ask a few questions (username, which disk, bionic/focal etc)
 # and then fully install a minimal Ubuntu system. Depending on the choices
@@ -747,12 +748,11 @@ esac
 if [ ${HIBERNATE} = "n" ] && [ ${SIZE_SWAP} -ne 0 ] ; then
     # No Hibernate, so just use a zfs volume for swap
     echo "Creating swap zfs dataset size ${SIZE_SWAP}M"
-    zfs create -V ${SIZE_SWAP}M -b $(getconf PAGESIZE) -o compression=zle \
+    # zfs create -V ${SIZE_SWAP}M -b $(getconf PAGESIZE) -o compression=zle \
+    zfs create -V ${SIZE_SWAP}M -o compression=zle \
       -o logbias=throughput -o sync=always \
       -o primarycache=metadata -o secondarycache=none \
       -o com.sun:auto-snapshot=false ${POOLNAME}/swap
-    echo "Enabling swap size ${SIZE_SWAP} on /dev/zvol/${POOLNAME}/swap"
-    mkswap -f /dev/zvol/${POOLNAME}/swap
 fi #HIBERNATE
 
 # Main filesystem datasets
@@ -1062,9 +1062,26 @@ zfs set canmount=noauto ${POOLNAME}/ROOT/${SUITE}
 # Install the ZFSBootMenu package directly
 #
 mkdir -p  /boot/efi/EFI/zfsbootmenu
-curl -L https://get.zfsbootmenu.org/zfsbootmenu.EFI -o /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
+# curl -L https://get.zfsbootmenu.org/zfsbootmenu.EFI -o /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
 # curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v1.11.0/zfsbootmenu-x86_64-v1.11.0.EFI -o /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
+curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v2.0.0/zfsbootmenu-release-x86_64-v2.0.0.tar.gz -o /tmp/zfsbootmenu.tar.gz
+tar xvzf /tmp/zfsbootmenu.tar.gz --strip-components=1 -C /boot/efi/EFI/zfsbootmenu
 cp /boot/efi/EFI/refind/icons/os_linux.png /boot/efi/EFI/zfsbootmenu/zfsbootmenu.png
+
+cat > /boot/efi/syslinux/syslinux.cfg << EOF
+UI menu.c32
+PROMPT 0
+
+MENU TITLE Boot Menu
+TIMEOUT 50
+DEFAULT ZFSBootMenu-2.0.0_1
+
+LABEL ZFSBootMenu-2.0.0_1
+MENU LABEL ZFSBootMenu 2.0.0_1
+KERNEL /EFI/zfsbootmenu/vmlinuz-bootmenu
+INITRD /EFI/zfsbootmenu/initramfs-bootmenu.img
+APPEND zbm.prefer=test zbm.import_policy=hostid zbm.set_hostid ro quiet loglevel=0
+EOF
 
 # OR install the git repo and build locally
 
@@ -1231,6 +1248,8 @@ if [ ${HIBERNATE} = "y" ] ; then
 
 else
     # No swap partition - maybe using a zvol for swap
+    echo "Enabling swap size ${SIZE_SWAP} on /dev/zvol/${POOLNAME}/swap"
+    mkswap -f /dev/zvol/${POOLNAME}/swap
     if [ ${SIZE_SWAP} -ne 0 ] ; then
         echo "/dev/zvol/${POOLNAME}/swap none swap discard,sw 0 0" >> /etc/fstab
     fi
@@ -1261,7 +1280,7 @@ echo "-------- installing basic packages ---------------------------------------
 # Install basic packages
 #
 apt-get -qq --no-install-recommends --yes install expect most vim-nox rsync whois gdisk \
-    openssh-server avahi-daemon libnss-mdns
+    openssh-server avahi-daemon libnss-mdns unzip
 
 #
 # Copy Avahi SSH service file into place
@@ -1511,6 +1530,30 @@ fi
 if [ "${DISCENC}" = "LUKS" ] ; then
     echo 'install_items+=" /etc/zfs/zroot.rawkey "' >> /etc/dracut.conf.d/zfskey.conf
 fi
+
+# Download and install memtest86
+# EFI version is latest v10, syslinux version is v4
+rm -rf /tmp/memtest86 && mkdir -p /tmp/memtest86/mnt
+mkdir -p /boot/efi/EFI/tools/memtest86
+curl -L https://www.memtest86.com/downloads/memtest86-usb.zip -o /tmp/memtest86/memtest86-usb.zip
+curl -L https://www.memtest86.com/downloads/memtest86-4.3.7-iso.zip -o /tmp/memtest86/memtest86-iso.zip
+# For EFI
+   unzip -d /tmp/memtest86 /tmp/memtest86/memtest86-usb.zip memtest86-usb.img
+   losetup -P /dev/loop33 /tmp/memtest86/memtest86-usb.img
+   mount -o loop /dev/loop33p1 /tmp/memtest86/mnt
+   cp /tmp/memtest86/mnt/EFI/BOOT/BOOTX64.efi /boot/efi/EFI/tools/memtest86/memtest86.efi
+   umount /tmp/memtest86/mnt
+   losetup -d /dev/loop33
+# For Syslinux
+   unzip -d /tmp/memtest86 /tmp/memtest86/memtest86-iso.zip Memtest86-4.3.7.iso
+   mount -o loop /tmp/memtest86/Memtest86-4.3.7.iso /tmp/memtest86/mnt
+   cp /tmp/memtest86/mnt/isolinux/memtest /boot/efi/EFI/tools/memtest86/memtest86.syslinux
+   umount /tmp/memtest86/mnt
+   cat >> /boot/efi/syslinux/syslinux.cfg <<-EOF
+	
+	LABEL Memtest86+
+	KERNEL /EFI/tools/memtest86/memtest86.syslinux
+	EOF
 
 dracut -v -f --regenerate-all
 # generate-zbm only there if we built from scratch, not using downloaded image
