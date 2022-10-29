@@ -370,7 +370,7 @@ fi
 # defined here, then will be calculated to accomodate memory size (plus fudge factor).
 if [[ ! -v SIZE_SWAP ]] ; then
     MEMTOTAL=$(cat /proc/meminfo | fgrep MemTotal | tr -s ' ' | cut -d' ' -f2)
-    SIZE_SWAP=$(( (${MEMTOTAL} + 1024) / 1024 ))
+    SIZE_SWAP=$(( (${MEMTOTAL} + 20480) / 1024 ))
     SIZE_SWAP=$(whiptail --inputbox "If HIBERNATE enabled then this will be a disk partition otherwise it will be a regular ZFS dataset. If LUKS enabled then the partition will be encrypted.\nIf SWAP size not set here (left blank), then it will be calculated to accomodate memory size. Set to zero (0) to disable swap.\n\nSize of swap space in megabytes (default is calculated value)\nSet to zero (0) to disable swap" \
         --title "SWAP size" 15 70 $(echo $SIZE_SWAP) 3>&1 1>&2 2>&3)
     RET=${?}
@@ -587,7 +587,7 @@ for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
     if [ "${HIBERNATE}" = "y" ] ; then
         if [ ${DISCENC} != "NOENC" ] ; then
             # ZFS or LUKS Encrypted - should be partition type 8309 (Linux LUKS)
-            sgdisk -n ${PARTITION_SWAP}:0:+${SIZE_SWAP}M -c ${PARTITION_SWAP}:"SWAP_${disk}" -t ${PARTITION_SWAP}:8300 /dev/disk/by-id/${zfsdisks[${disk}]}
+            sgdisk -n ${PARTITION_SWAP}:0:+${SIZE_SWAP}M -c ${PARTITION_SWAP}:"SWAP_${disk}" -t ${PARTITION_SWAP}:8309 /dev/disk/by-id/${zfsdisks[${disk}]}
         else
             sgdisk -n ${PARTITION_SWAP}:0:+${SIZE_SWAP}M -c ${PARTITION_SWAP}:"SWAP_${disk}" -t ${PARTITION_SWAP}:8200 /dev/disk/by-id/${zfsdisks[${disk}]}
         fi # DISCENC for ZFS or LUKS
