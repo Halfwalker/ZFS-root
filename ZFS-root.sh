@@ -1280,7 +1280,7 @@ echo "-------- installing basic packages ---------------------------------------
 # Install basic packages
 #
 apt-get -qq --no-install-recommends --yes install expect most vim-nox rsync whois gdisk \
-    openssh-server avahi-daemon libnss-mdns
+    openssh-server avahi-daemon libnss-mdns unzip
 
 #
 # Copy Avahi SSH service file into place
@@ -1530,6 +1530,30 @@ fi
 if [ "${DISCENC}" = "LUKS" ] ; then
     echo 'install_items+=" /etc/zfs/zroot.rawkey "' >> /etc/dracut.conf.d/zfskey.conf
 fi
+
+# Download and install memtest86
+# EFI version is latest v10, syslinux version is v4
+rm -rf /tmp/memtest86 && mkdir -p /tmp/memtest86/mnt
+mkdir -p /boot/efi/EFI/tools/memtest86
+curl -L https://www.memtest86.com/downloads/memtest86-usb.zip -o /tmp/memtest86/memtest86-usb.zip
+curl -L https://www.memtest86.com/downloads/memtest86-4.3.7-iso.zip -o /tmp/memtest86/memtest86-iso.zip
+# For EFI
+   unzip -d /tmp/memtest86 /tmp/memtest86/memtest86-usb.zip memtest86-usb.img
+   losetup -P /dev/loop33 /tmp/memtest86/memtest86-usb.img
+   mount -o loop /dev/loop33p1 /tmp/memtest86/mnt
+   cp /tmp/memtest86/mnt/EFI/BOOT/BOOTX64.efi /boot/efi/EFI/tools/memtest86/memtest86.efi
+   umount /tmp/memtest86/mnt
+   losetup -d /dev/loop33
+# For Syslinux
+   unzip -d /tmp/memtest86 /tmp/memtest86/memtest86-iso.zip Memtest86-4.3.7.iso
+   mount -o loop /tmp/memtest86/Memtest86-4.3.7.iso /tmp/memtest86/mnt
+   cp /tmp/memtest86/mnt/isolinux/memtest /boot/efi/EFI/tools/memtest86/memtest86.syslinux
+   umount /tmp/memtest86/mnt
+   cat >> /boot/efi/syslinux/syslinux.cfg <<-EOF
+	
+	LABEL Memtest86+
+	KERNEL /EFI/tools/memtest86/memtest86.syslinux
+	EOF
 
 dracut -v -f --regenerate-all
 # generate-zbm only there if we built from scratch, not using downloaded image
