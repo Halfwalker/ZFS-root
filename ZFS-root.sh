@@ -747,12 +747,11 @@ esac
 if [ ${HIBERNATE} = "n" ] && [ ${SIZE_SWAP} -ne 0 ] ; then
     # No Hibernate, so just use a zfs volume for swap
     echo "Creating swap zfs dataset size ${SIZE_SWAP}M"
-    zfs create -V ${SIZE_SWAP}M -b $(getconf PAGESIZE) -o compression=zle \
+    # zfs create -V ${SIZE_SWAP}M -b $(getconf PAGESIZE) -o compression=zle \
+    zfs create -V ${SIZE_SWAP}M -o compression=zle \
       -o logbias=throughput -o sync=always \
       -o primarycache=metadata -o secondarycache=none \
       -o com.sun:auto-snapshot=false ${POOLNAME}/swap
-    echo "Enabling swap size ${SIZE_SWAP} on /dev/zvol/${POOLNAME}/swap"
-    mkswap -f /dev/zvol/${POOLNAME}/swap
 fi #HIBERNATE
 
 # Main filesystem datasets
@@ -1231,6 +1230,8 @@ if [ ${HIBERNATE} = "y" ] ; then
 
 else
     # No swap partition - maybe using a zvol for swap
+    echo "Enabling swap size ${SIZE_SWAP} on /dev/zvol/${POOLNAME}/swap"
+    mkswap -f /dev/zvol/${POOLNAME}/swap
     if [ ${SIZE_SWAP} -ne 0 ] ; then
         echo "/dev/zvol/${POOLNAME}/swap none swap discard,sw 0 0" >> /etc/fstab
     fi
