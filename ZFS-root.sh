@@ -1054,32 +1054,34 @@ zfs set canmount=noauto ${POOLNAME}/ROOT/${SUITE}
 # Install the ZFSBootMenu package directly
 #
 mkdir -p  /boot/efi/EFI/zfsbootmenu
+
+## Using the zfsbootmenu image directly
 # curl -L https://get.zfsbootmenu.org/zfsbootmenu.EFI -o /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
 # curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v1.11.0/zfsbootmenu-x86_64-v1.11.0.EFI -o /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
-curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v2.0.0/zfsbootmenu-release-x86_64-v2.0.0.tar.gz -o /tmp/zfsbootmenu.tar.gz
-tar xvzf /tmp/zfsbootmenu.tar.gz --strip-components=1 -C /boot/efi/EFI/zfsbootmenu
-cp /boot/efi/EFI/refind/icons/os_linux.png /boot/efi/EFI/zfsbootmenu/zfsbootmenu.png
+##  curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v2.0.0/zfsbootmenu-release-x86_64-v2.0.0.tar.gz -o /tmp/zfsbootmenu.tar.gz
+##  tar xvzf /tmp/zfsbootmenu.tar.gz --strip-components=1 -C /boot/efi/EFI/zfsbootmenu
+##  cp /boot/efi/EFI/refind/icons/os_linux.png /boot/efi/EFI/zfsbootmenu/zfsbootmenu.png
 
-cat > /boot/efi/syslinux/syslinux.cfg << EOF
-UI menu.c32
-PROMPT 0
-
-MENU TITLE Boot Menu
-TIMEOUT 50
-DEFAULT ZFSBootMenu-2.0.0_1
-
-LABEL ZFSBootMenu-2.0.0_1
-MENU LABEL ZFSBootMenu 2.0.0_1
-KERNEL /EFI/zfsbootmenu/vmlinuz-bootmenu
-INITRD /EFI/zfsbootmenu/initramfs-bootmenu.img
-APPEND zbm.prefer=test zbm.import_policy=hostid zbm.set_hostid ro quiet loglevel=0
-EOF
+##  cat > /boot/efi/syslinux/syslinux.cfg << EOF
+##  UI menu.c32
+##  PROMPT 0
+##  
+##  MENU TITLE Boot Menu
+##  TIMEOUT 50
+##  DEFAULT ZFSBootMenu-2.0.0_1
+##  
+##  LABEL ZFSBootMenu-2.0.0_1
+##  MENU LABEL ZFSBootMenu 2.0.0_1
+##  KERNEL /EFI/zfsbootmenu/vmlinuz-bootmenu
+##  INITRD /EFI/zfsbootmenu/initramfs-bootmenu.img
+##  APPEND zbm.prefer=test zbm.import_policy=hostid zbm.set_hostid ro quiet loglevel=0
+##  EOF
 
 # OR install the git repo and build locally
 
-# rm -rf /tmp/zfsbootmenu && mkdir -p /tmp/zfsbootmenu
-# cd /tmp/zfsbootmenu && curl -L https://github.com/zbm-dev/zfsbootmenu/tarball/master | tar xz --strip=1 && make install
-# PERL_MM_USE_DEFAULT=1 cpan 'YAML::PP'
+rm -rf /tmp/zfsbootmenu && mkdir -p /tmp/zfsbootmenu
+cd /tmp/zfsbootmenu && curl -L https://github.com/zbm-dev/zfsbootmenu/tarball/master | tar xz --strip=1 && make install
+PERL_MM_USE_DEFAULT=1 cpan 'YAML::PP'
 
 #
 # Configure ZFSBootMenu
