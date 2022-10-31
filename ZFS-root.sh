@@ -3,8 +3,6 @@
 # LUKS
 # https://fossies.org/linux/cryptsetup/docs/Keyring.txt
 
-# TODO: Set up EFI mirror partitions
-# TODO: Finish dropbear setup
 # https://hamy.io/post/0009/how-to-install-luks-encrypted-ubuntu-18.04.x-server-and-enable-remote-unlocking/#gsc.tab=0
 # https://www.arminpech.de/2019/12/23/debian-unlock-luks-root-partition-remotely-by-ssh-using-dropbear/
 
@@ -67,15 +65,6 @@
 # NOTE: If installing under KVM, then the SCSI disk driver must be used,
 #       not the virtio one. Otherwise the disks will not be linked into the
 #       /dev/disk/by-id/ directory.
-
-# >>>>>>>>>> ISSUES <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
-# Multi-disk booting with LUKS
-# One disk must be chosen to be unlocked - all the others use a derived key
-# from that to unlock without extra prompts for passphrase.  Problem is that
-# one disk is hard-coded in /etc/crypttab.  If THAT disk goes bad or is missing
-# then unlocking fails.  Need a way to try other disks in order.
-
-# https://github.com/saveriomiroddi/zfs-installer
 
 # Return codes from whiptail
 # 0   OK in menu
@@ -750,7 +739,7 @@ fi #HIBERNATE
 # Main filesystem datasets
 
 echo "Creating main zfs datasets"
-# Container for root filesystems
+# Container for root filesystems - possibly zfs native encrypted
 if [ ${DISCENC} = "ZFSENC" ] ; then
     echo "${PASSPHRASE}" | zfs create -o canmount=off -o mountpoint=none ${ZFSENC_ROOT_OPTIONS} ${POOLNAME}/ROOT
 else
@@ -770,7 +759,7 @@ if [ ${DISCENC} != "NOENC" ] ; then
     cp /etc/zfs/zroot.rawkey ${ZFSBUILD}/etc/zfs
 fi
 
-# zfs create pool/home and main user home dataset
+# zfs create pool/home and main user home dataset - possibly zfs native encrypted
 if [ ${DISCENC} = "ZFSENC" ] ; then
     echo "${PASSPHRASE}" | zfs create -o canmount=off -o mountpoint=none -o compression=lz4 -o atime=off ${ZFSENC_HOME_OPTIONS} ${POOLNAME}/home
 else
