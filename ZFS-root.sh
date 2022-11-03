@@ -1102,7 +1102,7 @@ EFI:
   Versions: 2
   Enabled: false
 Kernel:
-  CommandLine: zbm.prefer=${POOLNAME} zbm.import_policy=hostid zbm.set_hostid ro quiet loglevel=0
+  CommandLine: zbm.prefer=${POOLNAME} ro quiet loglevel=0
 END
 
 # Create pre and post hooks dirs and syslinux snippets dir
