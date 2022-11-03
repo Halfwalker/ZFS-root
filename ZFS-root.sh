@@ -930,6 +930,12 @@ dpkg-reconfigure -f noninteractive tzdata
 apt-get -qq --yes --no-install-recommends install software-properties-common debconf-utils
 apt-get -qq --yes --no-install-recommends install linux-generic${HWE} linux-headers-generic${HWE} linux-image-generic${HWE}
 
+#
+# The "old" kernel links mess up zfsbootmenu generation, so remove them
+# Don't need them for an initial install anyway
+#
+rm /boot/vmlinuz.old /boot/initrd.img.old
+
 if [ ${ZFSPPA} = "y" ] ; then
     apt-add-repository --yes --update ppa:jonathonf/zfs
 fi
@@ -995,7 +1001,7 @@ fi
 
 # Set up syslinux
 mkdir /boot/efi/syslinux
-apt-get install --yes syslinux syslinux-common extlinux dosfstools
+apt-get install --yes syslinux syslinux-common extlinux dosfstools unzip
 cp -r /usr/lib/syslinux/modules/bios/* /boot/efi/syslinux
 # Install extlinux
 extlinux --install /boot/efi/syslinux
@@ -1080,6 +1086,10 @@ Global:
   ManageImages: true
   BootMountPoint: /boot/efi
   DracutConfDir: /etc/zfsbootmenu/dracut.conf.d
+  PreHooksDir: /etc/zfsbootmenu/generate-zbm.pre.d
+  PostHooksDir: /etc/zfsbootmenu/generate-zbm.post.d
+  InitCPIO: false
+  InitCPIOConfig: /etc/zfsbootmenu/mkinitcpio.conf
 Components:
   ImageDir: /boot/efi/EFI/zfsbootmenu
   Versions: 3
@@ -1095,6 +1105,57 @@ Kernel:
   CommandLine: zbm.prefer=${POOLNAME} zbm.import_policy=hostid zbm.set_hostid ro quiet loglevel=0
 END
 
+# Create pre and post hooks dirs and syslinux snippets dir
+mkdir -p /etc/zfsbootmenu/generate-zbm.pre.d
+mkdir -p /etc/zfsbootmenu/generate-zbm.post.d
+mkdir /boot/efi/snippets
+
+# Copy syslinux-update.sh script and modify to suit
+# This makes generate-zbm create a valid syslinux.cfg that can
+# also include memtest86 snippet
+cp /tmp/zfsbootmenu/contrib/syslinux-update.sh /etc/zfsbootmenu/generate-zbm.post.d
+chmod +x /etc/zfsbootmenu/generate-zbm.post.d/syslinux-update.sh
+sed -i '
+  s/^SYSLINUX_ROOT.*/SYSLINUX_ROOT="\/boot\/efi"/
+  s/^KERNEL_PATH.*/KERNEL_PATH="EFI\/zfsbootmenu"/
+  s/^SYSLINUX_CONFD.*/SYSLINUX_CONFD="\/boot\/efi\/snippets"/
+  s/^cp .*/cp "\${SYSLINUX_CFG}" "\${SYSLINUX_ROOT}\/syslinux\/syslinux.cfg"/
+ ' /etc/zfsbootmenu/generate-zbm.post.d/syslinux-update.sh
+
+# Header for syslinux.cfg
+cat > /boot/efi/snippets/01_header << EOF
+UI menu.c32
+PROMPT 0
+
+MENU TITLE Boot Menu
+TIMEOUT 50
+EOF
+
+# Download and install memtest86
+# EFI version is latest v10, syslinux version is v4
+rm -rf /tmp/memtest86 && mkdir -p /tmp/memtest86/mnt
+mkdir -p /boot/efi/EFI/tools/memtest86
+curl -L https://www.memtest86.com/downloads/memtest86-usb.zip -o /tmp/memtest86/memtest86-usb.zip
+curl -L https://www.memtest86.com/downloads/memtest86-4.3.7-iso.zip -o /tmp/memtest86/memtest86-iso.zip
+# For EFI
+   unzip -d /tmp/memtest86 /tmp/memtest86/memtest86-usb.zip memtest86-usb.img
+   losetup -P /dev/loop33 /tmp/memtest86/memtest86-usb.img
+   mount -o loop /dev/loop33p1 /tmp/memtest86/mnt
+   cp /tmp/memtest86/mnt/EFI/BOOT/BOOTX64.efi /boot/efi/EFI/tools/memtest86/memtest86.efi
+   umount /tmp/memtest86/mnt
+   losetup -d /dev/loop33
+# For Syslinux
+   unzip -d /tmp/memtest86 /tmp/memtest86/memtest86-iso.zip Memtest86-4.3.7.iso
+   mount -o loop /tmp/memtest86/Memtest86-4.3.7.iso /tmp/memtest86/mnt
+   cp /tmp/memtest86/mnt/isolinux/memtest /boot/efi/EFI/tools/memtest86/memtest86.syslinux
+   umount /tmp/memtest86/mnt
+
+# Syslinux entry for memtest86+
+cat > /boot/efi/snippets/05_memtest86 << EOF
+
+LABEL Memtest86+
+KERNEL /EFI/tools/memtest86/memtest86.syslinux
+EOF
 
 #
 # Set up LUKS unlocking
@@ -1263,7 +1324,7 @@ echo "-------- installing basic packages ---------------------------------------
 # Install basic packages
 #
 apt-get -qq --no-install-recommends --yes install expect most vim-nox rsync whois gdisk \
-    openssh-server avahi-daemon libnss-mdns unzip
+    openssh-server avahi-daemon libnss-mdns
 
 #
 # Copy Avahi SSH service file into place
@@ -1513,30 +1574,6 @@ fi
 if [ "${DISCENC}" = "LUKS" ] ; then
     echo 'install_items+=" /etc/zfs/zroot.rawkey "' >> /etc/dracut.conf.d/zfskey.conf
 fi
-
-# Download and install memtest86
-# EFI version is latest v10, syslinux version is v4
-rm -rf /tmp/memtest86 && mkdir -p /tmp/memtest86/mnt
-mkdir -p /boot/efi/EFI/tools/memtest86
-curl -L https://www.memtest86.com/downloads/memtest86-usb.zip -o /tmp/memtest86/memtest86-usb.zip
-curl -L https://www.memtest86.com/downloads/memtest86-4.3.7-iso.zip -o /tmp/memtest86/memtest86-iso.zip
-# For EFI
-   unzip -d /tmp/memtest86 /tmp/memtest86/memtest86-usb.zip memtest86-usb.img
-   losetup -P /dev/loop33 /tmp/memtest86/memtest86-usb.img
-   mount -o loop /dev/loop33p1 /tmp/memtest86/mnt
-   cp /tmp/memtest86/mnt/EFI/BOOT/BOOTX64.efi /boot/efi/EFI/tools/memtest86/memtest86.efi
-   umount /tmp/memtest86/mnt
-   losetup -d /dev/loop33
-# For Syslinux
-   unzip -d /tmp/memtest86 /tmp/memtest86/memtest86-iso.zip Memtest86-4.3.7.iso
-   mount -o loop /tmp/memtest86/Memtest86-4.3.7.iso /tmp/memtest86/mnt
-   cp /tmp/memtest86/mnt/isolinux/memtest /boot/efi/EFI/tools/memtest86/memtest86.syslinux
-   umount /tmp/memtest86/mnt
-   cat >> /boot/efi/syslinux/syslinux.cfg <<-EOF
-	
-	LABEL Memtest86+
-	KERNEL /EFI/tools/memtest86/memtest86.syslinux
-	EOF
 
 dracut -v -f --regenerate-all
 # generate-zbm only there if we built from scratch, not using downloaded image
