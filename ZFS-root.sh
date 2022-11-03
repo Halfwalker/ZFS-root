@@ -360,10 +360,15 @@ fi
 if [[ ! -v SIZE_SWAP ]] ; then
     MEMTOTAL=$(cat /proc/meminfo | fgrep MemTotal | tr -s ' ' | cut -d' ' -f2)
     SIZE_SWAP=$(( (${MEMTOTAL} + 20480) / 1024 ))
-    SIZE_SWAP=$(whiptail --inputbox "If HIBERNATE enabled then this will be a disk partition otherwise it will be a regular ZFS dataset. If LUKS enabled then the partition will be encrypted.\nIf SWAP size not set here (left blank), then it will be calculated to accomodate memory size. Set to zero (0) to disable swap.\n\nSize of swap space in megabytes (default is calculated value)\nSet to zero (0) to disable swap" \
+    # We MUST have a swap partition of at least ram size if HIBERNATE is enabled
+    # So don't even prompt the user for a size. Her own silly fault if it's
+    # enabled but she doesn't want a swap partition
+    if [ ${HIBERNATE} = "n" ] ; then
+        SIZE_SWAP=$(whiptail --inputbox "If HIBERNATE enabled then this will be a disk partition otherwise it will be a regular ZFS dataset. If LUKS enabled then the partition will be encrypted.\nIf SWAP size not set here (left blank), then it will be calculated to accomodate memory size. Set to zero (0) to disable swap.\n\nSize of swap space in megabytes (default is calculated value)\nSet to zero (0) to disable swap" \
         --title "SWAP size" 15 70 $(echo $SIZE_SWAP) 3>&1 1>&2 2>&3)
-    RET=${?}
-    [[ ${RET} = 1 ]] && exit 1
+        RET=${?}
+        [[ ${RET} = 1 ]] && exit 1
+    fi
 fi # Check for Swap size in ZFS-root.conf
 
 # Use zswap compressed page cache in front of swap ? https://wiki.archlinux.org/index.php/Zswap
