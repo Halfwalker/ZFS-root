@@ -500,9 +500,9 @@ exec > >(tee -a "/root/ZFS-setup.log") 2>&1
 [ "$1" = "-d" ] && set -x
 
 # Pre-OK the zfs-dkms licenses notification
-cat > /tmp/selections << EOFPRE
-# zfs-dkms license notification
-zfs-dkms        zfs-dkms/note-incompatible-licenses  note
+cat > /tmp/selections <<-EOFPRE
+	# zfs-dkms license notification
+	zfs-dkms        zfs-dkms/note-incompatible-licenses  note
 EOFPRE
 cat /tmp/selections | debconf-set-selections
 
@@ -814,18 +814,18 @@ fi # PROXY
 
 # Set up networking for netplan
 # renderer: networkd is for text mode only, use NetworkManager for gnome
-cat > ${ZFSBUILD}/etc/netplan/01_netcfg.yaml << __EOF__
-network:
-  version: 2
-  renderer: networkd
-  ethernets:
-    alleths:
-      match:
-        name: e*
-      dhcp4: true
-      dhcp6: true
-      optional: true
-__EOF__
+cat > ${ZFSBUILD}/etc/netplan/01_netcfg.yaml <<-EOF
+	network:
+	  version: 2
+	  renderer: networkd
+	  ethernets:
+	    alleths:
+	      match:
+	        name: e*
+	      dhcp4: true
+	      dhcp6: true
+	      optional: true
+EOF
 
 # Google Authenticator config - put to /root to be moved to /home/${USERNAME} in setup.sh
 if [ ${GOOGLE} = "y" ] ; then
@@ -833,15 +833,15 @@ if [ ${GOOGLE} = "y" ] ; then
 fi
 
 # sources
-cat > ${ZFSBUILD}/etc/apt/sources.list << EOF
-deb http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse
-deb-src http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse
-
-deb http://security.ubuntu.com/ubuntu ${SUITE}-security main multiverse
-deb-src http://security.ubuntu.com/ubuntu ${SUITE}-security main multiverse
-
-deb http://archive.ubuntu.com/ubuntu ${SUITE}-updates main multiverse
-deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-updates main multiverse
+cat > ${ZFSBUILD}/etc/apt/sources.list <<-EOF
+	deb http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse
+	deb-src http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse
+	
+	deb http://security.ubuntu.com/ubuntu ${SUITE}-security main multiverse
+	deb-src http://security.ubuntu.com/ubuntu ${SUITE}-security main multiverse
+	
+	deb http://archive.ubuntu.com/ubuntu ${SUITE}-updates main multiverse
+	deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-updates main multiverse
 EOF
 
 # We put universe into its own .list file so ansible apt_repository will match 
@@ -850,32 +850,32 @@ echo "deb http://archive.ubuntu.com/ubuntu ${SUITE}-updates universe" >> ${ZFSBU
 echo "deb http://security.ubuntu.com/ubuntu ${SUITE}-security universe" >> ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu_universe.list
 
 echo "Creating Setup.sh in new system for chroot"
-cat > ${ZFSBUILD}/root/Setup.sh << __EOF__
-#!/bin/bash
-
-export BOOTDEVRAW=${BOOTDEVRAW}
-export DELAY=${DELAY}
-export SUITE=${SUITE}
-export POOLNAME=${POOLNAME}
-export PASSPHRASE=${PASSPHRASE}
-export USERNAME=${USERNAME}
-export UPASSWORD="${UPASSWORD}"
-export UCOMMENT="${UCOMMENT}"
-export DISCENC=${DISCENC}
-export AUTHKEYS=${AUTHKEYS}
-export ZFSPPA=${ZFSPPA}
-export GOOGLE=${GOOGLE}
-export SOF=${SOF}
-export PROXY=${PROXY}
-export HWE=${HWE}
-export GNOME=${GNOME}
-export KDE=${KDE}
-export HIBERNATE=${HIBERNATE}
-export SIZE_SWAP=${SIZE_SWAP}
-export PARTITION_BOOT=${PARTITION_BOOT}
-export PARTITION_SWAP=${PARTITION_SWAP}
-export PARTITION_DATA=${PARTITION_DATA}
-__EOF__
+cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
+	#!/bin/bash
+	
+	export BOOTDEVRAW=${BOOTDEVRAW}
+	export DELAY=${DELAY}
+	export SUITE=${SUITE}
+	export POOLNAME=${POOLNAME}
+	export PASSPHRASE=${PASSPHRASE}
+	export USERNAME=${USERNAME}
+	export UPASSWORD="${UPASSWORD}"
+	export UCOMMENT="${UCOMMENT}"
+	export DISCENC=${DISCENC}
+	export AUTHKEYS=${AUTHKEYS}
+	export ZFSPPA=${ZFSPPA}
+	export GOOGLE=${GOOGLE}
+	export SOF=${SOF}
+	export PROXY=${PROXY}
+	export HWE=${HWE}
+	export GNOME=${GNOME}
+	export KDE=${KDE}
+	export HIBERNATE=${HIBERNATE}
+	export SIZE_SWAP=${SIZE_SWAP}
+	export PARTITION_BOOT=${PARTITION_BOOT}
+	export PARTITION_SWAP=${PARTITION_SWAP}
+	export PARTITION_DATA=${PARTITION_DATA}
+EOF
 
 for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
     echo "zfsdisks[${disk}]=${zfsdisks[${disk}]}" >> ${ZFSBUILD}/root/Setup.sh
@@ -1177,92 +1177,92 @@ if [ "${DISCENC}" = "LUKS" ] ; then
     # Early-stage script for zfsbootmenu - scan for ZFS_ partitions which
     # should be LUKS encrypted and try to open them all
     #
-    cat > /usr/local/bin/zfsbootmenu_luks_unlock.sh << 'EOF'
-#!/bin/bash
-
-sources=(
-  /lib/profiling-lib.sh
-  /etc/zfsbootmenu.conf
-  /lib/zfsbootmenu-core.sh
-  /lib/kmsg-log-lib.sh
-  /etc/profile
-)
-
-for src in "${sources[@]}"; do
-  # shellcheck disable=SC1090
-  if ! source "${src}" > /dev/null 2>&1 ; then
-    echo -e "\033[0;31mWARNING: ${src} was not sourced; unable to proceed\033[0m"
-    exit 1
-  fi
-done
-unset src sources
-
-# We only unlock the ZFS partition(s) since the SWAP ones can use the
-# /etc/zfs/zroot.rawkey to unlock once main pool is open
-# ZFS_PARTS=(/dev/disk/by-partlabel/{SWAP_*,ZFS_*})
-ZFS_PARTS=(/dev/disk/by-partlabel/ZFS_*)
-
-echo "Found these partitions for LUKS encryption"
-echo $ZFS_PARTS
-echo ""
-
-# Read passphrase for LUKS encryption into $REPLY
-read -s -p "LUKS encryption passphrase : "
-
-for idx in ${!ZFS_PARTS[@]} ; do
-    # Grab just ZFS_0 or SWAP_0
-    test_luks=$(basename ${ZFS_PARTS[$idx]})
-    # luks is the full path to the disk partition
-    luks=${ZFS_PARTS[$idx]}
-    # Set $dm to root_crypt0 or swap_crypt0 depending on basename
-    [ ${test_luks%_*} = "ZFS" ] && dm=root_crypt${idx}
-    [ ${test_luks%_*} = "SWAP" ] && dm=swap_crypt${idx}
-
-    if ! cryptsetup isLuks ${luks} >/dev/null 2>&1 ; then
-        zwarn "LUKS device ${luks} missing LUKS partition header"
-        exit
-    fi
-
-    if cryptsetup status "${dm}" >/dev/null 2>&1 ; then
-        zinfo "${dm} already active, continuing"
-        continue
-    fi
-
-    header="$( center_string "[CTRL-C] cancel luksOpen attempts" )"
-
-    tput clear
-    colorize red "${header}\n\n"
-
-    # https://fossies.org/linux/cryptsetup/docs/Keyring.txt
-    echo $REPLY | cryptsetup luksOpen ${luks} ${dm}
-    ret=$?
-
-    # successfully entered a passphrase
-    if [ "${ret}" -eq 0 ] ; then
-        zdebug "$(
-            cryptsetup status "${dm}"
-        )"
-        continue
-    fi
-
-    # ctrl-c'd the process
-    if [ "${ret}" -eq 1 ] ; then
-        zdebug "canceled luksOpen attempts via SIGINT"
-        exit
-    fi
-
-    # failed all password attempts
-    if [ "${ret}" -eq 2 ] ; then
-        if timed_prompt -e "emergency shell" \
-            -r "continue unlock attempts" \
-            -p "Continuing in %0.2d seconds" ; then
-            continue
-        else
-            emergency_shell "unable to unlock LUKS partition"
-        fi
-    fi
-done
-EOF
+    cat > /usr/local/bin/zfsbootmenu_luks_unlock.sh <<-'EOF'
+	#!/bin/bash
+	
+	sources=(
+	  /lib/profiling-lib.sh
+	  /etc/zfsbootmenu.conf
+	  /lib/zfsbootmenu-core.sh
+	  /lib/kmsg-log-lib.sh
+	  /etc/profile
+	)
+	
+	for src in "${sources[@]}"; do
+	  # shellcheck disable=SC1090
+	  if ! source "${src}" > /dev/null 2>&1 ; then
+	    echo -e "\033[0;31mWARNING: ${src} was not sourced; unable to proceed\033[0m"
+	    exit 1
+	  fi
+	done
+	unset src sources
+	
+	# We only unlock the ZFS partition(s) since the SWAP ones can use the
+	# /etc/zfs/zroot.rawkey to unlock once main pool is open
+	# ZFS_PARTS=(/dev/disk/by-partlabel/{SWAP_*,ZFS_*})
+	ZFS_PARTS=(/dev/disk/by-partlabel/ZFS_*)
+	
+	echo "Found these partitions for LUKS encryption"
+	echo $ZFS_PARTS
+	echo ""
+	
+	# Read passphrase for LUKS encryption into $REPLY
+	read -s -p "LUKS encryption passphrase : "
+	
+	for idx in ${!ZFS_PARTS[@]} ; do
+	    # Grab just ZFS_0 or SWAP_0
+	    test_luks=$(basename ${ZFS_PARTS[$idx]})
+	    # luks is the full path to the disk partition
+	    luks=${ZFS_PARTS[$idx]}
+	    # Set $dm to root_crypt0 or swap_crypt0 depending on basename
+	    [ ${test_luks%_*} = "ZFS" ] && dm=root_crypt${idx}
+	    [ ${test_luks%_*} = "SWAP" ] && dm=swap_crypt${idx}
+	
+	    if ! cryptsetup isLuks ${luks} >/dev/null 2>&1 ; then
+	        zwarn "LUKS device ${luks} missing LUKS partition header"
+	        exit
+	    fi
+	
+	    if cryptsetup status "${dm}" >/dev/null 2>&1 ; then
+	        zinfo "${dm} already active, continuing"
+	        continue
+	    fi
+	
+	    header="$( center_string "[CTRL-C] cancel luksOpen attempts" )"
+	
+	    tput clear
+	    colorize red "${header}\n\n"
+	
+	    # https://fossies.org/linux/cryptsetup/docs/Keyring.txt
+	    echo $REPLY | cryptsetup luksOpen ${luks} ${dm}
+	    ret=$?
+	
+	    # successfully entered a passphrase
+	    if [ "${ret}" -eq 0 ] ; then
+	        zdebug "$(
+	            cryptsetup status "${dm}"
+	        )"
+	        continue
+	    fi
+	
+	    # ctrl-c'd the process
+	    if [ "${ret}" -eq 1 ] ; then
+	        zdebug "canceled luksOpen attempts via SIGINT"
+	        exit
+	    fi
+	
+	    # failed all password attempts
+	    if [ "${ret}" -eq 2 ] ; then
+	        if timed_prompt -e "emergency shell" \
+	            -r "continue unlock attempts" \
+	            -p "Continuing in %0.2d seconds" ; then
+	            continue
+	        else
+	            emergency_shell "unable to unlock LUKS partition"
+	        fi
+	    fi
+	done
+	EOF
     chmod +x /usr/local/bin/zfsbootmenu_luks_unlock.sh
 
     echo 'zfsbootmenu_early_setup+=" /usr/local/bin/zfsbootmenu_luks_unlock.sh "' > /etc/zfsbootmenu/dracut.conf.d/luks_zbm.conf
@@ -1338,90 +1338,90 @@ cp /usr/share/doc/avahi-daemon/examples/ssh.service /etc/avahi/services
 
 # For ZFSENC we need to set up a script and systemd unit to load the keyfile
 if [ ${DISCENC} = "ZFSENC" ] ; then
-  cat > /usr/local/bin/zfs-multi-mount.sh << 'EOF'
-#!/usr/bin/env bash
-
-PATH=/usr/bin:/sbin:/bin
-
-help() {
-    echo "Usage: $(basename "$0") [OPTION]... [SOURCE_POOL/DATASET]..."
-    echo
-    echo " -s, --systemd        use when within systemd context"
-    echo " -n, --no-mount       only load keys, do not mount datasets"
-    echo " -h, --help           show this help"
-    exit 0
-}
-
-for arg in "$@"; do
-  case $arg in
-  -s | --systemd)
-    systemd=1
-    shift
-    ;;
-  -n | --no-mount)
-    no_mount=1
-    shift
-    ;;
-  -h | --help) help ;;
-  -?*)
-    die "Invalid option '$1' Try '$(basename "$0") --help' for more information." ;;
-  esac
-done
-
-datasets=("$@")
-[ ${#datasets[@]} -eq 0 ] && mapfile -t datasets < <(zfs list -H -o name)
-attempt=0
-attempt_limit=3
-
-function ask_password {
-  if [ -v systemd ]; then
-    key=$(systemd-ask-password "Enter $dataset passphrase:" --no-tty) # While booting.
-  else
-    read -srp "Enter $dataset passphrase: " key ; echo # Other places.
-  fi
-}
-
-function load_key {
-  ! zfs list -H -o name | grep -qx "$dataset" && echo "ERROR: Dataset '$dataset' does not exist." && return 1
-  [[ $attempt == "$attempt_limit" ]] && echo "No more attempts left." && exit 1
-  keystatus=$(zfs get keystatus "$1" -H -o value)
-  echo "Testing $dataset status $keystatus"
-  [[ $keystatus != "unavailable" ]] && return 0
-  # Get the keylocation
-  key=$(zfs get keylocation "$1" -H -o value)
-  if [ $key != "prompt" ] ; then
-    if zfs load-key "$1" ; then
-      return 0
-    else
-      echo "Keyfile location invalid"
-      exit 1
-    fi
-  fi
-
-  if [ ! -v key ]; then
-    ((attempt++))
-    ask_password
-  fi
-  if ! echo "$key" | zfs load-key "$1"; then
-    unset key
-    load_key "$1"
-  fi
-  attempt=0
-  return 0
-}
-
-for dataset in "${datasets[@]}"; do
-  ! load_key "$dataset" && exit 1
-
-  # Mounting as non-root user on Linux is not possible,
-  # see https://github.com/openzfs/zfs/issues/10648.
-  [ ! -v no_mount ] && sudo zfs mount "$dataset" && echo "Dataset '$dataset' has been mounted."
-done
-
-unset key
-
-exit 0
-EOF
+    cat > /usr/local/bin/zfs-multi-mount.sh <<-'EOF'
+	#!/usr/bin/env bash
+	
+	PATH=/usr/bin:/sbin:/bin
+	
+	help() {
+	    echo "Usage: $(basename "$0") [OPTION]... [SOURCE_POOL/DATASET]..."
+	    echo
+	    echo " -s, --systemd        use when within systemd context"
+	    echo " -n, --no-mount       only load keys, do not mount datasets"
+	    echo " -h, --help           show this help"
+	    exit 0
+	}
+	
+	for arg in "$@"; do
+	  case $arg in
+	  -s | --systemd)
+	    systemd=1
+	    shift
+	    ;;
+	  -n | --no-mount)
+	    no_mount=1
+	    shift
+	    ;;
+	  -h | --help) help ;;
+	  -?*)
+	    die "Invalid option '$1' Try '$(basename "$0") --help' for more information." ;;
+	  esac
+	done
+	
+	datasets=("$@")
+	[ ${#datasets[@]} -eq 0 ] && mapfile -t datasets < <(zfs list -H -o name)
+	attempt=0
+	attempt_limit=3
+	
+	function ask_password {
+	  if [ -v systemd ]; then
+	    key=$(systemd-ask-password "Enter $dataset passphrase:" --no-tty) # While booting.
+	  else
+	    read -srp "Enter $dataset passphrase: " key ; echo # Other places.
+	  fi
+	}
+	
+	function load_key {
+	  ! zfs list -H -o name | grep -qx "$dataset" && echo "ERROR: Dataset '$dataset' does not exist." && return 1
+	  [[ $attempt == "$attempt_limit" ]] && echo "No more attempts left." && exit 1
+	  keystatus=$(zfs get keystatus "$1" -H -o value)
+	  echo "Testing $dataset status $keystatus"
+	  [[ $keystatus != "unavailable" ]] && return 0
+	  # Get the keylocation
+	  key=$(zfs get keylocation "$1" -H -o value)
+	  if [ $key != "prompt" ] ; then
+	    if zfs load-key "$1" ; then
+	      return 0
+	    else
+	      echo "Keyfile location invalid"
+	      exit 1
+	    fi
+	  fi
+	
+	  if [ ! -v key ]; then
+	    ((attempt++))
+	    ask_password
+	  fi
+	  if ! echo "$key" | zfs load-key "$1"; then
+	    unset key
+	    load_key "$1"
+	  fi
+	  attempt=0
+	  return 0
+	}
+	
+	for dataset in "${datasets[@]}"; do
+	  ! load_key "$dataset" && exit 1
+	
+	  # Mounting as non-root user on Linux is not possible,
+	  # see https://github.com/openzfs/zfs/issues/10648.
+	  [ ! -v no_mount ] && sudo zfs mount "$dataset" && echo "Dataset '$dataset' has been mounted."
+	done
+	
+	unset key
+	
+	exit 0
+	EOF
   chmod 755 /usr/local/bin/zfs-multi-mount.sh
 
   cat > /etc/systemd/system/zfs-load-key.service << 'EOF'
@@ -1449,16 +1449,16 @@ fi # if ZFSENC
 
 # Set hostkeys if defined via ZFS-root.conf
 if [[ -v HOST_ECDSA_KEY ]] ; then
-	echo "${HOST_ECDSA_KEY}" > /etc/ssh/ssh_host_ecdsa_key
-	echo "${HOST_ECDSA_KEY_PUB}" > /etc/ssh/ssh_host_ecdsa_key.pub
-	chmod 600 /etc/ssh/ssh_host_ecdsa_key
-	chmod 644 /etc/ssh/ssh_host_ecdsa_key.pub
+    echo "${HOST_ECDSA_KEY}" > /etc/ssh/ssh_host_ecdsa_key
+    echo "${HOST_ECDSA_KEY_PUB}" > /etc/ssh/ssh_host_ecdsa_key.pub
+    chmod 600 /etc/ssh/ssh_host_ecdsa_key
+    chmod 644 /etc/ssh/ssh_host_ecdsa_key.pub
 fi
 if [[ -v HOST_RSA_KEY ]] ; then
-	echo "${HOST_RSA_KEY}" > /etc/ssh/ssh_host_rsa_key
-	echo "${HOST_RSA_KEY_PUB}" > /etc/ssh/ssh_host_rsa_key.pub
-	chmod 600 /etc/ssh/ssh_host_rsa_key
-	chmod 644 /etc/ssh/ssh_host_rsa_key.pub
+    echo "${HOST_RSA_KEY}" > /etc/ssh/ssh_host_rsa_key
+    echo "${HOST_RSA_KEY_PUB}" > /etc/ssh/ssh_host_rsa_key.pub
+    chmod 600 /etc/ssh/ssh_host_rsa_key
+    chmod 644 /etc/ssh/ssh_host_rsa_key.pub
 fi
 
 # Setup system groups
@@ -1482,36 +1482,31 @@ PS1="${debian_chroot:+($debian_chroot)}\[\$(tput setaf 2)\]\u@\[\$(tput bold)\]\
 PROMPT_COMMAND="history -a; history -c; history -r; \${PROMPT_COMMAND}"
 EOF
 
-cat >> /etc/skel/.bashrc << EOF
-
-PS1="${debian_chroot:+($debian_chroot)}\[\$(tput setaf 2)\]\u@\[\$(tput bold)\]\[\$(tput setaf 5)\]\h\[\$(tput sgr0)\]\[\$(tput setaf 7)\]:\[\$(tput bold)\]\[\$(tput setaf 4)\]\w\[\$(tput setaf 7)\]\\$ \[\$(tput sgr0)\]"
-
-# https://unix.stackexchange.com/questions/99325/automatically-save-bash-command-history-in-screen-session
-PROMPT_COMMAND="history -a; history -c; history -r; \${PROMPT_COMMAND}"
+cat >> /etc/skel/.bashrc <<-EOF
+	
+	PS1="${debian_chroot:+($debian_chroot)}\[\$(tput setaf 2)\]\u@\[\$(tput bold)\]\[\$(tput setaf 5)\]\h\[\$(tput sgr0)\]\[\$(tput setaf 7)\]:\[\$(tput bold)\]\[\$(tput setaf 4)\]\w\[\$(tput setaf 7)\]\\$ \[\$(tput sgr0)\]"
+	
+	# https://unix.stackexchange.com/questions/99325/automatically-save-bash-command-history-in-screen-session
+	PROMPT_COMMAND="history -a; history -c; history -r; \${PROMPT_COMMAND}"
 EOF
 
-cat >> /etc/skel/.bash_aliases << EOF
-alias ls='ls --color=auto'
-alias l='ls -la'
-alias lt='ls -lat | head -25'
+cat >> /etc/skel/.bash_aliases <<-EOF
+	alias ls='ls --color=auto'
+	alias l='ls -la'
+	alias lt='ls -lat | head -25'
 EOF
+cp /etc/skel/.bash_aliases /root
 
-cat >> /root/.bashrc << "EOF"
-# PS1='\[\033[01;37m\]\[\033[01;41m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]$ '
-PS1='\[\033[01;37m\]\[\033[01;41m\]\u@\[\033[00m\]\[$(tput bold)\]\[$(tput setaf 5)\]\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]$ '
-
-# https://unix.stackexchange.com/questions/99325/automatically-save-bash-command-history-in-screen-session
-PROMPT_COMMAND="history -a; history -c; history -r; ${PROMPT_COMMAND}"
-HISTSIZE=5000
-export LC_ALL=en_US.UTF-8
-export LANG=en_US.UTF-8
-export LANGUAGE=en_US.UTF-8
-EOF
-
-cat >> /root/.bash_aliases << EOF
-alias ls='ls --color=auto'
-alias l='ls -la'
-alias lt='ls -lat | head -25'
+cat >> /root/.bashrc <<-"EOF"
+	# PS1='\[\033[01;37m\]\[\033[01;41m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]$ '
+	PS1='\[\033[01;37m\]\[\033[01;41m\]\u@\[\033[00m\]\[$(tput bold)\]\[$(tput setaf 5)\]\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]$ '
+	
+	# https://unix.stackexchange.com/questions/99325/automatically-save-bash-command-history-in-screen-session
+	PROMPT_COMMAND="history -a; history -c; history -r; ${PROMPT_COMMAND}"
+	HISTSIZE=5000
+	export LC_ALL=en_US.UTF-8
+	export LANG=en_US.UTF-8
+	export LANGUAGE=en_US.UTF-8
 EOF
 
 
@@ -1612,7 +1607,7 @@ fi # KDE
     
 if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] ; then
     # Ensure networking is handled by NetworkManager
-    sed -i 's/networkd/NetworkManager/' /etc/netplain/01_netcfg.yaml
+    sed -i 's/networkd/NetworkManager/' /etc/netplan/01_netcfg.yaml
 
     # NOTE: Using <<-EOF so it wills strip leading TAB chars
     #       MUST be TAB chars, not spaces
@@ -1670,11 +1665,11 @@ ls -1 /sys/class/net | egrep -v "lo|vir|docker" | xargs -I {} echo " {} : \4{{}}
 echo "" >> /etc/issue
 
 # Set apt/dpkg to automagically snap the system datasets on install/remove
-cat > /etc/apt/apt.conf.d/30pre-snap << EOF
-# Snapshot main datasets before installing or removing packages
-# We use a DATE variable to ensure all snaps have SAME date
-
- Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; ${ZFSLOCATION} snap \$(${ZFSLOCATION} list -o name | /usr/bin/grep -E 'ROOT/.*$' | sort | head -1)@apt_\${DATE}"; };
+cat > /etc/apt/apt.conf.d/30pre-snap <<-EOF
+	# Snapshot main datasets before installing or removing packages
+	# We use a DATE variable to ensure all snaps have SAME date
+	
+	 Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; ${ZFSLOCATION} snap \$(${ZFSLOCATION} list -o name | /usr/bin/grep -E 'ROOT/.*$' | sort | head -1)@apt_\${DATE}"; };
 EOF
 
 zfs snapshot ${POOLNAME}/ROOT/${SUITE}@base_install
