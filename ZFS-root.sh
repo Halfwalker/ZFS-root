@@ -567,11 +567,11 @@ for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
     sgdisk --clear /dev/disk/by-id/${zfsdisks[${disk}]}
 
     # Legacy (BIOS) booting
-    sgdisk -a 1                                /dev/disk/by-id/${zfsdisks[${disk}]}     # Set sector alignment to 1MiB
-    sgdisk -n ${PARTITION_BOOT}:1M:+1000M      /dev/disk/by-id/${zfsdisks[${disk}]}     # Create partition 1/BOOT 1M size
-    sgdisk -A ${PARTITION_BOOT}:set:2          /dev/disk/by-id/${zfsdisks[${disk}]}     # Turn legacy boot attribute on
-    sgdisk -c ${PARTITION_BOOT}:"BOOT_${disk}" /dev/disk/by-id/${zfsdisks[${disk}]}     # Set partition name to BOOT_n
-    sgdisk -t ${PARTITION_BOOT}:EF00           /dev/disk/by-id/${zfsdisks[${disk}]}     # Set partition type to EFI
+    sgdisk -a 1                                     /dev/disk/by-id/${zfsdisks[${disk}]}     # Set sector alignment to 1MiB
+    sgdisk -n ${PARTITION_BOOT}:1M:+1000M           /dev/disk/by-id/${zfsdisks[${disk}]}     # Create partition 1/BOOT 1M size
+    sgdisk -A ${PARTITION_BOOT}:set:2               /dev/disk/by-id/${zfsdisks[${disk}]}     # Turn legacy boot attribute on
+    sgdisk -c ${PARTITION_BOOT}:"BOOT_EFI_${disk}"  /dev/disk/by-id/${zfsdisks[${disk}]}     # Set partition name to BOOT_EFI_n
+    sgdisk -t ${PARTITION_BOOT}:EF00                /dev/disk/by-id/${zfsdisks[${disk}]}     # Set partition type to EFI
     
     #
     # TODO: figure out partitions for both ZFS and LUKS encryption
@@ -794,11 +794,11 @@ if [ ${#zfsdisks[@]} -eq 1 ] ; then
     BOOTDEVRAW=${PARTSBOOT}
 else
     apt-get -qq --no-install-recommends --yes install mdadm
-    BOOTDEVRAW="/dev/md/${HOSTNAME}:efi"
+    BOOTDEVRAW="/dev/md/BOOT_EFI"
 	echo y | mdadm --create ${BOOTDEVRAW} --metadata=1.0 --force --level=mirror --raid-devices=${#zfsdisks[@]} --homehost=${HOSTNAME} --name=efi  --assume-clean ${PARTSBOOT}
 fi
 
-mkfs.vfat -v -F 32 -s 1 -n "${HOSTNAME^^}_EFI" ${BOOTDEVRAW} > /dev/null
+mkfs.vfat -v -F 32 -s 1 -n "BOOT_EFI" ${BOOTDEVRAW} > /dev/null
 echo "UUID=$(blkid -s UUID -o value ${BOOTDEVRAW}) \
       /boot/efi vfat nofail,x-systemd.device-timeout=1,x-systemd.after=zfs-mount.service 0 1" >> ${ZFSBUILD}/etc/fstab
 mkdir ${ZFSBUILD}/boot/efi
