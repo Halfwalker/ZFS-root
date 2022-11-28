@@ -728,19 +728,6 @@ case ${DISCENC} in
         ;;
 esac
 
-# If no HIBERNATE partition (not laptop, no resume etc) then just create
-# a zvol for swap.  Could not create this in the block above for swap because
-# the root pool didn't exist yet.
-if [ ${HIBERNATE} = "n" ] && [ ${SIZE_SWAP} -ne 0 ] ; then
-    # No Hibernate, so just use a zfs volume for swap
-    echo "Creating swap zfs dataset size ${SIZE_SWAP}M"
-    # zfs create -V ${SIZE_SWAP}M -b $(getconf PAGESIZE) -o compression=zle \
-    zfs create -V ${SIZE_SWAP}M -o compression=zle \
-      -o logbias=throughput -o sync=always \
-      -o primarycache=metadata -o secondarycache=none \
-      -o com.sun:auto-snapshot=false ${POOLNAME}/swap
-fi #HIBERNATE
-
 # Main filesystem datasets
 
 echo "Creating main zfs datasets"
@@ -772,6 +759,19 @@ else
 fi
 zfs create -o canmount=on -o mountpoint=/home/${USERNAME} ${POOLNAME}/home/${USERNAME}
 zfs create -o canmount=on -o mountpoint=/root ${POOLNAME}/home/root
+
+# If no HIBERNATE partition (not laptop, no resume etc) then just create
+# a zvol for swap.  Could not create this in the block above for swap because
+# the root pool didn't exist yet.
+if [ ${HIBERNATE} = "n" ] && [ ${SIZE_SWAP} -ne 0 ] ; then
+    # No Hibernate, so just use a zfs volume for swap
+    echo "Creating swap zfs dataset size ${SIZE_SWAP}M"
+    # zfs create -V ${SIZE_SWAP}M -b $(getconf PAGESIZE) -o compression=zle \
+    zfs create -V ${SIZE_SWAP}M -o compression=zle \
+      -o logbias=throughput -o sync=always \
+      -o primarycache=metadata -o secondarycache=none \
+      -o com.sun:auto-snapshot=false ${POOLNAME}/swap
+fi #HIBERNATE
 
 # Show what we got before installing
 echo "---------- $(tput setaf 1)About to debootstrap into ${ZFSBUILD}$(tput sgr0) -----------"
