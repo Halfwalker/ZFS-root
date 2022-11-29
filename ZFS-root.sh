@@ -181,8 +181,8 @@ fi # Check if POOLNAME already set
 
 # Set main disk here - be sure to include the FULL path
 # Get list of disks, ask user which one to install to
-# Ignore cdrom etc.
-readarray -t disks < <(ls -l /dev/disk/by-id | egrep -v '(CDROM|CDRW|-ROM|CDDVD|-part|md-|dm-|wwn-)' | sort -t '/' -k3 | tr -s " " | cut -d' ' -f9 | sed '/^$/d')
+# Ignore cdrom etc.  Limit disk name length to avoid menu uglyness
+readarray -t disks < <(ls -l /dev/disk/by-id | egrep -v '(CDROM|CDRW|-ROM|CDDVD|-part|md-|dm-|wwn-)' | sort -t '/' -k3 | tr -s " " | cut -d' ' -f9 | cut -c -48 | sed '/^$/d')
 
 # If no disks available (kvm needs to use scsi, not virtio) then error out
 if [ ${#disks[@]} -eq 0 ] ; then
