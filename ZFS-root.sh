@@ -849,6 +849,9 @@ echo "deb http://archive.ubuntu.com/ubuntu ${SUITE} universe" > ${ZFSBUILD}/etc/
 echo "deb http://archive.ubuntu.com/ubuntu ${SUITE}-updates universe" >> ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu_universe.list
 echo "deb http://security.ubuntu.com/ubuntu ${SUITE}-security universe" >> ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu_universe.list
 
+# Copy Datto logo for rEFInd
+cp datto.png ${ZFSBUILD}/root/datto.png
+
 echo "Creating Setup.sh in new system for chroot"
 cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
 	#!/bin/bash
@@ -996,6 +999,8 @@ END
 [ -e /boot/efi/EFI/BOOT ] && mvrefind /boot/efi/EFI/BOOT /boot/efi/EFI/refind
 # Change timout for rEFInd from 20secs to 10secs
 sed -i 's,^timeout .*,timeout 10,' /boot/efi/EFI/refind/refind.conf
+sed -i 's,^#banner hostname.bmp,banner datto.png,' /boot/efi/EFI/refind/refind.conf
+cp /root/datto.png /boot/efi/EFI/refind/
 
 # For multiple disks, looks like we need a startup.nsh
 if [ ${#zfsdisks[@]} -ge 1 ] ; then
