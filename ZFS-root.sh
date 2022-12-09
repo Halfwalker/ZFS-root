@@ -975,7 +975,8 @@ sed -i '/\*\*/s/\*\*/*\/*/' /usr/lib/dracut/modules.d/90zfs/module-setup.sh
 # NOTE: Very important
 #       Do NOT install initramfs-tools next to dracut
 #       They wrestle and knock each other out
-apt-mark hold initramfs-tools
+#       Same with grub - fighting rEFInd
+apt-mark hold initramfs-tools grub-efi-amd64 grub-efi-amd64-signed grub-efi-amd64-bin grub-common grub2-common lilo
 
 
 #
