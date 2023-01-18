@@ -281,7 +281,7 @@ if [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]] || [[ ! -v HIBERNATE
         whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 18 83 7 \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
             HWE "Install Hardware Enablement kernel" OFF \
-            ZFSPPA "Update to latest ZFS 2.1 from PPA" OFF \
+            ZFSPPA "Update to latest ZFS 2.1 from PPA" ON \
             DELAY "Add delay before importing root pool - for many-disk systems" OFF \
             SOF "Install Sound Open Firmware binaries (for some laptops)" OFF \
             GNOME "Install full Ubuntu Gnome desktop" OFF \
@@ -291,7 +291,7 @@ if [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]] || [[ ! -v HIBERNATE
         whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 19 83 8 \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
             HWE "Install Hardware Enablement kernel" OFF \
-            ZFSPPA "Update to latest ZFS 2.1 from PPA" OFF \
+            ZFSPPA "Update to latest ZFS 2.1 from PPA" ON \
             HIBERNATE "Enable swap partition for hibernation" OFF \
             DELAY "Add delay before importing root pool - for many-disk systems" OFF \
             SOF "Install Sound Open Firmware binaries (for some laptops)" OFF \
@@ -413,6 +413,11 @@ case ${SUITE} in
                 SUITE_ROOT_POOL=""
                 ;;
         esac
+        # If ZFSPPA is off (not using latest zfs) must set dnodesize=legacy
+        # otherwise cannot set bootfs property on pool
+        if [ "${ZFSPPA}" = "n" ] ; then
+            SUITE_ROOT_POOL="-O dnodesize=legacy"
+        fi
         ;;
     focal)
         SUITE_NUM="20.04"
@@ -431,6 +436,11 @@ case ${SUITE} in
                 SUITE_ROOT_POOL=""
                 ;;
         esac
+        # If ZFSPPA is off (not using latest zfs) must set dnodesize=legacy
+        # otherwise cannot set bootfs property on pool
+        if [ "${ZFSPPA}" = "n" ] ; then
+            SUITE_ROOT_POOL="-O dnodesize=legacy"
+        fi
         ;;
     bionic)
         SUITE_NUM="18.04"
@@ -468,6 +478,11 @@ case ${SUITE} in
                 SUITE_ROOT_POOL=""
                 ;;
         esac
+        # If ZFSPPA is off (not using latest zfs) must set dnodesize=legacy
+        # otherwise cannot set bootfs property on pool
+        if [ "${ZFSPPA}" = "n" ] ; then
+            SUITE_ROOT_POOL="-O dnodesize=legacy"
+        fi
         ;;
 esac
 
