@@ -1107,7 +1107,7 @@ Components:
   Enabled: true
   syslinux:
     Config: /boot/efi/syslinux/syslinux.cfg
-    Enabled: true
+    Enabled: false
 EFI:
   ImageDir: /boot/efi/EFI/zfsbootmenu
   Versions: 2
