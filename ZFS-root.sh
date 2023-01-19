@@ -312,6 +312,13 @@ if [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]] || [[ ! -v HIBERNATE
     done
 fi # Check ALL options from ZFS-root.conf
 
+# See if we need to install Nvidia drivers, notify if so
+if [ ${GNOME} = "y" ] || [ ${KDE} = "y" ] ; then
+    if [ $(lspci | fgrep -i nvidia | wc -l) -gt 0 ]
+        whiptail --title "Nvidia drivers needed" --msgbox "Gnome or KDE was selected, and Nvidia graphics HW was detected on this system\n\nThe ppa:graphics-drivers/ppa repo will be installed in order to get the latest video driver" 12 70
+    fi
+fi
+
 # Show google authenticator info - file in /root/google_auth.txt is like
 # AGNGG2UOIDJXDJNZ
 # "RATE_LIMIT 3 30
@@ -1636,6 +1643,13 @@ if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] ; then
 	[keyfile]
 	unmanaged-devices=*,except:type:wifi,except:type:wwan,except:type:ethernet
 	EOF
+
+    # Check for Nvidia graphics - if so, install from the ppa:graphics-drivers/ppa
+    if [ $(lspci | fgrep -i nvidia | wc -l) -gt 0 ]
+        apt-add-repository --yes --update ppa:graphics-drivers/ppa
+        NVIDIA_LATEST=$(apt-cache search nvidia-driver- | cut -d ' ' -f1 | grep -e "nvidia-driver-...$" | cut -d'-' -f3 | sort | tail -1)
+        apt-get -qq --yes install nvidia-driver-${NVIDIA_LATEST}
+    fi
 fi # GNOME KDE
     
 # Enable hibernate in upower and logind if desktop is installed
