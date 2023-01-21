@@ -1677,15 +1677,21 @@ if [ -d /etc/polkit-1/localauthority/50-local.d ] ; then
 fi # Hibernate
 
 # Install Sound Open Firmware binaries if requested
+# Ugh - need to hard-code for now - repo is a bit of a mess with installs
 if [ "${SOF}" = "y" ]; then
     # Ensure we have the tools we need
     apt-get -qq --yes install rsync git
-    git clone https://github.com/thesofproject/sof-bin.git /usr/local/share/sof-project
-    cd /usr/local/share/sof-project
-    LATEST=$(ls -dC1 v* | tail -1)
-    LATESTBASE=$(basename $LATEST .x)
-    LATESTFILE=$(ls -C1 ${LATEST}/${LATESTBASE}-rc* | tail -1)
-    ./install.sh $LATESTFILE
+    # git clone https://github.com/thesofproject/sof-bin.git /usr/local/share/sof-project
+    # cd /usr/local/share/sof-project
+    # LATEST=$(ls -dC1 v* | tail -1)
+    # LATESTBASE=$(basename $LATEST .x)
+    # LATESTFILE=$(ls -C1 ${LATEST}/${LATESTBASE}* | tail -1)
+    # ./install.sh $LATESTFILE
+
+    wget -O /tmp/sof-bin-v2.2.4.tar.gz https://github.com/thesofproject/sof-bin/releases/download/v2.2.4/sof-bin-v2.2.4.tar.gz
+    tar -C /usr/local/share/ -xf /tmp/sof-bin-v2.2.4.tar.gz
+    cd /usr/local/share/sof-bin-v2.2.4
+    ./install.sh v2.2.4
 fi # Sound Open Firmware
 
 # Configure google authenticator if we have a config
