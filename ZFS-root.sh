@@ -997,6 +997,13 @@ END
 # Need gcc to get libgcc_s.so for dracut_install to work
 sed -i '/\*\*/s/\*\*/*\/*/' /usr/lib/dracut/modules.d/90zfs/module-setup.sh
 
+# Fix zfs bootfs systemd services
+# https://github.com/openzfs/zfs/pull/13585/files
+# /usr/lib/dracut/modules.d/90zfs/zfs-rollback-bootfs.service
+# /usr/lib/dracut/modules.d/90zfs/zfs-snapshot-bootfs.service
+sed -i 's/BOOTFS" SNAPNAME/BOOTFS"; SNAPNAME/' /usr/lib/dracut/modules.d/90zfs/zfs-snapshot-bootfs.service
+sed -i 's/BOOTFS" SNAPNAME/BOOTFS"; SNAPNAME/' /usr/lib/dracut/modules.d/90zfs/zfs-rollback-bootfs.service
+
 # NOTE: Very important
 #       Do NOT install initramfs-tools next to dracut
 #       They wrestle and knock each other out
