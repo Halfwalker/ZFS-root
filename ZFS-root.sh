@@ -1659,6 +1659,16 @@ if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] ; then
         NVIDIA_LATEST=$(apt-cache search nvidia-driver- | cut -d ' ' -f1 | grep -e "nvidia-driver-...$" | cut -d'-' -f3 | sort | tail -1)
         apt-get -qq --yes install nvidia-driver-${NVIDIA_LATEST}
     fi
+
+    # Install DisplayLink drivers
+    # http://www.synaptics.com/products/displaylink-graphics/downloads/ubuntu
+    apt-get -qq --yes install cpp-12 dctrl-tools fakeroot gcc-12 libasan8 libfakeroot libgcc-12-dev libtsan2 libdrm-dev libpciaccess-dev dkms
+    wget -O /tmp/DisplayLink-5.6.1.zip http://www.synaptics.com/sites/default/files/exe_files/2022-08/DisplayLink%20USB%20Graphics%20Software%20for%20Ubuntu5.6.1-EXE.zip
+    mkdir /usr/local/share/DisplayLink-5.6.1
+    cd /usr/local/share/DisplayLink-5.6.1
+    unzip /tmp/DisplayLink-5.6.1.zip
+    ./displaylink-driver-5.6.1-59.184.run --accept --noprogress --nox11 
+
 fi # GNOME KDE
     
 # Enable hibernate in upower and logind if desktop is installed
