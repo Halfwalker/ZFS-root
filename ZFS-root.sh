@@ -314,7 +314,7 @@ fi # Check ALL options from ZFS-root.conf
 
 # See if we need to install Nvidia drivers, notify if so
 if [ ${GNOME} = "y" ] || [ ${KDE} = "y" ] ; then
-    if [ $(lspci | fgrep -i nvidia | wc -l) -gt 0 ]
+    if [ $(lspci | fgrep -i nvidia | wc -l) -gt 0 ] ; then
         whiptail --title "Nvidia drivers needed" --msgbox "Gnome or KDE was selected, and Nvidia graphics HW was detected on this system\n\nThe ppa:graphics-drivers/ppa repo will be installed in order to get the latest video driver" 12 70
     fi
 fi
