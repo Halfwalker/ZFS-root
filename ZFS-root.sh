@@ -871,8 +871,9 @@ echo "deb http://archive.ubuntu.com/ubuntu ${SUITE} universe" > ${ZFSBUILD}/etc/
 echo "deb http://archive.ubuntu.com/ubuntu ${SUITE}-updates universe" >> ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu_universe.list
 echo "deb http://security.ubuntu.com/ubuntu ${SUITE}-security universe" >> ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu_universe.list
 
-# Copy Datto logo for rEFInd
-cp datto.png ${ZFSBUILD}/root/datto.png
+# Copy logo for rEFInd
+[ -e logo.jpg ] && cp logo.png ${ZFSBUILD}/root/logo.jpg
+[ -e logo.png ] && cp logo.png ${ZFSBUILD}/root/logo.png
 
 echo "Creating Setup.sh in new system for chroot"
 cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
@@ -1028,8 +1029,13 @@ END
 [ -e /boot/efi/EFI/BOOT ] && mvrefind /boot/efi/EFI/BOOT /boot/efi/EFI/refind
 # Change timout for rEFInd from 20secs to 10secs
 sed -i 's,^timeout .*,timeout 10,' /boot/efi/EFI/refind/refind.conf
-sed -i 's,^#banner hostname.bmp,banner datto.png,' /boot/efi/EFI/refind/refind.conf
-cp /root/datto.png /boot/efi/EFI/refind/
+# Add a banner/logo for rEFInd if present
+if [ -e /root/logo.png ] || [ -e logo.jpg ] ; then
+    sed -i 's,^#banner_scale,banner_scale,' /boot/efi/EFI/refind/refind.conf
+    [ -e /root/logo.jpg ] && sed -i 's,^#banner hostname.bmp,banner logo.jpg,' /boot/efi/EFI/refind/refind.conf
+    [ -e /root/logo.png ] && sed -i 's,^#banner hostname.bmp,banner logo.png,' /boot/efi/EFI/refind/refind.conf
+    cp /root/logo.{png,jpg} /boot/efi/EFI/refind/
+fi
 
 # For multiple disks, looks like we need a startup.nsh
 if [ ${#zfsdisks[@]} -ge 1 ] ; then
