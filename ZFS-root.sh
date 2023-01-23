@@ -1016,7 +1016,7 @@ apt-mark hold initramfs-tools grub-efi-amd64 grub-efi-amd64-signed grub-efi-amd6
 #
 mount /boot/efi
 DEBIAN_FRONTEND=noninteractive apt-get --yes install refind
-refind-install
+refind-install --yes
 
 mkdir -p /boot/efi/EFI/zfsbootmenu
 cat <<- END > /boot/efi/EFI/zfsbootmenu/refind_linux.conf
