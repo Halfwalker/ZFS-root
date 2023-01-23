@@ -874,6 +874,7 @@ echo "deb http://security.ubuntu.com/ubuntu ${SUITE}-security universe" >> ${ZFS
 # Copy logo for rEFInd
 [ -e logo.jpg ] && cp logo.png ${ZFSBUILD}/root/logo.jpg
 [ -e logo.png ] && cp logo.png ${ZFSBUILD}/root/logo.png
+[ -e os_linux.png ] && cp os_linux.png ${ZFSBUILD}/root/os_linux.png
 
 echo "Creating Setup.sh in new system for chroot"
 cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
@@ -1035,6 +1036,7 @@ if [ -e /root/logo.png ] || [ -e logo.jpg ] ; then
     [ -e /root/logo.jpg ] && sed -i 's,^#banner hostname.bmp,banner logo.jpg,' /boot/efi/EFI/refind/refind.conf
     [ -e /root/logo.png ] && sed -i 's,^#banner hostname.bmp,banner logo.png,' /boot/efi/EFI/refind/refind.conf
     cp /root/logo.{png,jpg} /boot/efi/EFI/refind/
+    cp /root/os_linux.png /boot/efi/EFI/refind/icons
 fi
 
 # For multiple disks, looks like we need a startup.nsh
