@@ -872,6 +872,7 @@ echo "deb http://archive.ubuntu.com/ubuntu ${SUITE}-updates universe" >> ${ZFSBU
 echo "deb http://security.ubuntu.com/ubuntu ${SUITE}-security universe" >> ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu_universe.list
 
 # Copy logo for rEFInd
+[ -e logo_sm.jpg ] && cp logo.png ${ZFSBUILD}/root/logo_sm.jpg
 [ -e logo.jpg ] && cp logo.png ${ZFSBUILD}/root/logo.jpg
 [ -e logo.png ] && cp logo.png ${ZFSBUILD}/root/logo.png
 [ -e os_linux.png ] && cp os_linux.png ${ZFSBUILD}/root/os_linux.png
@@ -1058,6 +1059,9 @@ for DISK in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
     dd bs=440 count=1 conv=notrunc if=/usr/lib/syslinux/mbr/gptmbr.bin of=/dev/disk/by-id/${zfsdisks[${DISK}]}
 done
 
+# Copy logo for syslinux if there
+[ -e /root/logo_sm.jpg ] && cp /root/logo_sm.jpg /boot/efi/syslinux
+
 
 #
 # Install and configure ZFSBootMenu
@@ -1106,9 +1110,10 @@ mkdir -p  /boot/efi/EFI/zfsbootmenu
 ##  cp /boot/efi/EFI/refind/icons/os_linux.png /boot/efi/EFI/zfsbootmenu/zfsbootmenu.png
 
 ##  cat > /boot/efi/syslinux/syslinux.cfg << EOF
-##  UI menu.c32
+##  UI vesamenu.c32
 ##  PROMPT 0
 ##  
+##  MENU BACKGROUND logo_sm.jpg
 ##  MENU TITLE Boot Menu
 ##  TIMEOUT 50
 ##  DEFAULT ZFSBootMenu-2.0.0_1
@@ -1172,9 +1177,10 @@ sed -i '
 
 # Header for syslinux.cfg
 cat > /boot/efi/snippets/01_header << EOF
-UI menu.c32
+UI vesamenu.c32
 PROMPT 0
 
+MENU BACKGROUND logo_sm.jpg
 MENU TITLE Boot Menu
 TIMEOUT 50
 EOF
