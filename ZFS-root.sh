@@ -1660,7 +1660,7 @@ if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] ; then
 	EOF
 
     # Check for Nvidia graphics - if so, install from the ppa:graphics-drivers/ppa
-    if [ $(lspci | fgrep -i nvidia | wc -l) -gt 0 ]
+    if [ $(lspci | fgrep -i nvidia | wc -l) -gt 0 ] ; then
         apt-add-repository --yes --update ppa:graphics-drivers/ppa
         NVIDIA_LATEST=$(apt-cache search nvidia-driver- | cut -d ' ' -f1 | grep -e "nvidia-driver-...$" | cut -d'-' -f3 | sort | tail -1)
         apt-get -qq --yes install nvidia-driver-${NVIDIA_LATEST}
