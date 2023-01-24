@@ -815,7 +815,14 @@ zfs create -o com.sun:auto-snapshot=false -o mountpoint=/var/lib/docker ${POOLNA
 if [ ${#zfsdisks[@]} -eq 1 ] ; then
     BOOTDEVRAW=${PARTSBOOT}
 else
-    apt-get -qq --no-install-recommends --yes install mdadm
+    # Unmount any mdadm disks that might have been automounted
+    # Stop all found mdadm arrays - again, just in case.  Sheesh.
+    find /dev -iname md* -type b -exec bash -c "umount {} > /dev/null 2>&1 ; mdadm --stop --force {} > /dev/null 2>&1 ; mdadm --remove {} > /dev/null 2>&1" \;
+
+    for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
+        # Wipe mdadm superblock from all partitions found, even if not md raid partition
+        mdadm --zero-superblock --force /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_BOOT} > /dev/null 2>&1
+    done
     BOOTDEVRAW="/dev/md/BOOT_EFI"
 	echo y | mdadm --create ${BOOTDEVRAW} --metadata=1.0 --force --level=mirror --raid-devices=${#zfsdisks[@]} --homehost=${HOSTNAME} --name=efi  --assume-clean ${PARTSBOOT}
 fi
@@ -872,7 +879,7 @@ echo "deb http://archive.ubuntu.com/ubuntu ${SUITE}-updates universe" >> ${ZFSBU
 echo "deb http://security.ubuntu.com/ubuntu ${SUITE}-security universe" >> ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu_universe.list
 
 # Copy logo for rEFInd
-[ -e logo_sm.jpg ] && cp logo.png ${ZFSBUILD}/root/logo_sm.jpg
+[ -e logo_sm.jpg ] && cp logo_sm.jpg ${ZFSBUILD}/root/logo_sm.jpg
 [ -e logo.jpg ] && cp logo.jpg ${ZFSBUILD}/root/logo.jpg
 [ -e logo.png ] && cp logo.png ${ZFSBUILD}/root/logo.png
 [ -e os_linux.png ] && cp os_linux.png ${ZFSBUILD}/root/os_linux.png
