@@ -582,7 +582,7 @@ for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
     zpool labelclear -f /dev/disk/by-id/${zfsdisks[${disk}]}
 
     # Wipe mdadm superblock from all partitions found, even if not md raid partition
-    mdadm --zero-superblock --force /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} > /dev/null 2>&1
+    mdadm --zero-superblock --force /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_BOOT} > /dev/null 2>&1
  
     wipefs --all --force /dev/disk/by-id/${zfsdisks[${disk}]}
     sgdisk --zap-all /dev/disk/by-id/${zfsdisks[${disk}]}
