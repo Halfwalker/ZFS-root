@@ -873,7 +873,7 @@ echo "deb http://security.ubuntu.com/ubuntu ${SUITE}-security universe" >> ${ZFS
 
 # Copy logo for rEFInd
 [ -e logo_sm.jpg ] && cp logo.png ${ZFSBUILD}/root/logo_sm.jpg
-[ -e logo.jpg ] && cp logo.png ${ZFSBUILD}/root/logo.jpg
+[ -e logo.jpg ] && cp logo.jpg ${ZFSBUILD}/root/logo.jpg
 [ -e logo.png ] && cp logo.png ${ZFSBUILD}/root/logo.png
 [ -e os_linux.png ] && cp os_linux.png ${ZFSBUILD}/root/os_linux.png
 
