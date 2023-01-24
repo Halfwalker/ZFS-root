@@ -1039,7 +1039,7 @@ END
 # Change timout for rEFInd from 20secs to 10secs
 sed -i 's,^timeout .*,timeout 10,' /boot/efi/EFI/refind/refind.conf
 # Add a banner/logo for rEFInd if present
-if [ -e /root/logo.png ] || [ -e logo.jpg ] ; then
+if [ -e /root/logo.png ] || [ -e /root/logo.jpg ] ; then
     sed -i 's,^#banner_scale,banner_scale,' /boot/efi/EFI/refind/refind.conf
     [ -e /root/logo.jpg ] && sed -i 's,^#banner hostname.bmp,banner logo.jpg,' /boot/efi/EFI/refind/refind.conf
     [ -e /root/logo.png ] && sed -i 's,^#banner hostname.bmp,banner logo.png,' /boot/efi/EFI/refind/refind.conf
