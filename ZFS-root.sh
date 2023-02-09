@@ -168,7 +168,7 @@ if [[ ! -v MYHOSTNAME ]] ; then
     fi
 fi # Check if MYHOSTNAME already set
 
-if [[ ! -v MYHOSTNAME ]] ; then
+if [[ ! -v POOLNAME ]] ; then
     POOLNAME=${MYHOSTNAME}
     POOLNAME=$(whiptail --inputbox "Enter poolname to use for main system - defaults to hostname" --title "ZFS main poolname" 8 70 $(echo $POOLNAME) 3>&1 1>&2 2>&3)
     RET=${?}
@@ -551,7 +551,7 @@ if [ ${ZFSPPA} = "y" ] ; then
     apt-add-repository --yes --update ppa:jonathonf/zfs
 fi
 # NOW, install ZFS, perhaps from ppa above
-apt-get -qq --no-install-recommends --yes install libelf-dev zfs-zed zfsutils-linux zfs-initramfs
+apt-get -qq --no-install-recommends --yes install libelf-dev zfs-zed zfsutils-linux
 # Logic for restarting ZFS
 #   If livecd package version != currently running module, OR
 #   If ppa requested

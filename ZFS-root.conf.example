@@ -24,7 +24,7 @@ AUTHKEYS=
 #
 # System name, main zfs pool name, boot pool name
 #
-HOSTNAME="test"
+MYHOSTNAME="test"
 POOLNAME="test"
 
 #
