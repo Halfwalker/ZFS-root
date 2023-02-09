@@ -64,6 +64,7 @@ DELAY=n
 SOF=n
 GNOME=n
 KDE=n
+XFCE=n
 
 #
 # Below are additional options that can be set that do NOT have a menu process
