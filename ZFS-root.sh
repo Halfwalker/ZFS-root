@@ -278,7 +278,7 @@ if [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]] || [[ ! -v HIBERNATE
     # Hibernate can only resume from a single disk, and currently not available for ZFS encryption
     if [ "${DISCENC}" == "ZFSENC" ] || [ ${#zfsdisks[@]} -gt 1 ] || [ ${HIBERNATE_AVAIL} -ne 0 ] ; then
         # Set basic options for install - ZFSENC so no Hibernate available (yet)
-        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 18 83 7 \
+        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 19 83 8 \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
             HWE "Install Hardware Enablement kernel" OFF \
             ZFSPPA "Update to latest ZFS 2.1 from PPA" ON \
@@ -289,7 +289,7 @@ if [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]] || [[ ! -v HIBERNATE
             KDE "Install full Ubuntu KDE Plasma desktop" OFF 2>"${TMPFILE}"
     else
         # Set basic options for install - ZFSENC so no Hibernate available (yet)
-        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 19 83 8 \
+        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 20 83 9 \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
             HWE "Install Hardware Enablement kernel" OFF \
             ZFSPPA "Update to latest ZFS 2.1 from PPA" ON \
