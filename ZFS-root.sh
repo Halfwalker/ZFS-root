@@ -1136,7 +1136,11 @@ mkdir -p  /boot/efi/EFI/zfsbootmenu
 
 rm -rf /tmp/zfsbootmenu && mkdir -p /tmp/zfsbootmenu
 cd /tmp/zfsbootmenu && curl -L https://github.com/zbm-dev/zfsbootmenu/tarball/master | tar xz --strip=1 && make install
-PERL_MM_USE_DEFAULT=1 cpan 'YAML::PP'
+
+# This seems to fail sometimes - gets killed during install
+# PERL_MM_USE_DEFAULT=1 cpan 'YAML::PP'
+# So try the ubuntu package
+apt-get -qq --yes --no-install-recommends install libyaml-pp-perl
 
 #
 # Configure ZFSBootMenu
