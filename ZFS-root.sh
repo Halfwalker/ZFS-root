@@ -934,6 +934,8 @@ fi
 cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 # Setup inside chroot
 
+[ "$1" = "-d" ] && set -x
+
 ln -s /proc/self/mounts /etc/mtab
 apt-get -qq update
 
@@ -1773,15 +1775,17 @@ mount -t devpts pts ${ZFSBUILD}/dev/pts
 
 # chroot and set up system
 # chroot ${ZFSBUILD} /bin/bash --login -c /root/Setup.sh
-unshare --mount --fork chroot ${ZFSBUILD} /bin/bash --login -c /root/Setup.sh
+unshare --mount --fork chroot ${ZFSBUILD} /bin/bash --login -c /root/Setup.sh $1
 
 # Remove any lingering crash reports
 rm -f ${ZFSBUILD}/var/crash/*
 
 umount -n ${ZFSBUILD}/{dev/pts,dev,sys,proc}
 
-# Copy setup log
+# Copy setup log to built system
+# Copy created Setup.sh to live CD (in case of error easier to see what line it failed on)
 cp /root/ZFS-setup.log ${ZFSBUILD}/home/${USERNAME}
+cp ${ZFSBUILD}/root/Setup.sh /root/Setup.sh
 
 # umount to be ready for export
 zfs umount -a
