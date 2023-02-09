@@ -572,7 +572,7 @@ fi
 # dataset is unlocked, so we're still secure.
 dd if=/dev/urandom of=/etc/zfs/zroot.rawkey bs=32 count=1
 
-apt-get -qq --no-install-recommends --yes install openssh-server debootstrap gdisk zfs-initramfs dosfstools mdadm
+apt-get -qq --no-install-recommends --yes install openssh-server debootstrap gdisk dosfstools mdadm
 
 # Unmount any mdadm disks that might have been automounted
 # Stop all found mdadm arrays - again, just in case.  Sheesh.
@@ -979,7 +979,7 @@ rm /boot/vmlinuz.old /boot/initrd.img.old
 if [ ${ZFSPPA} = "y" ] ; then
     apt-add-repository --yes --update ppa:jonathonf/zfs
 fi
-apt-get -qq --no-install-recommends --yes install libelf-dev zfs-zed zfsutils-linux zfs-initramfs
+apt-get -qq --no-install-recommends --yes install libelf-dev zfs-zed zfsutils-linux
 
 # jammy/22.04 moved zfs from /sbin/zfs to /usr/sbin/zfs
 ZFSLOCATION=$(which zfs)
@@ -1018,7 +1018,7 @@ sed -i 's/BOOTFS" SNAPNAME/BOOTFS"; SNAPNAME/' /usr/lib/dracut/modules.d/90zfs/z
 #       Do NOT install initramfs-tools next to dracut
 #       They wrestle and knock each other out
 #       Same with grub - fighting rEFInd
-apt-mark hold initramfs-tools grub-efi-amd64 grub-efi-amd64-signed grub-efi-amd64-bin grub-common grub2-common lilo
+apt-mark hold zfs-initramfs initramfs-tools grub-efi-amd64 grub-efi-amd64-signed grub-efi-amd64-bin grub-common grub2-common lilo
 
 
 #
