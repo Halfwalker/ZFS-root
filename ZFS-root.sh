@@ -285,6 +285,7 @@ if [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]] || [[ ! -v HIBERNATE
             DELAY "Add delay before importing root pool - for many-disk systems" OFF \
             SOF "Install Sound Open Firmware binaries (for some laptops)" OFF \
             GNOME "Install full Ubuntu Gnome desktop" OFF \
+            XFCE "Install full xfce4 desktop with goodies" OFF \
             KDE "Install full Ubuntu KDE Plasma desktop" OFF 2>"${TMPFILE}"
     else
         # Set basic options for install - ZFSENC so no Hibernate available (yet)
@@ -296,6 +297,7 @@ if [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]] || [[ ! -v HIBERNATE
             DELAY "Add delay before importing root pool - for many-disk systems" OFF \
             SOF "Install Sound Open Firmware binaries (for some laptops)" OFF \
             GNOME "Install full Ubuntu Gnome desktop" OFF \
+            XFCE "Install full xfce4 desktop with goodies" OFF \
             KDE "Install full Ubuntu KDE Plasma desktop" OFF 2>"${TMPFILE}"
     fi
     RET=${?}
@@ -307,7 +309,7 @@ if [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]] || [[ ! -v HIBERNATE
     done < "${TMPFILE}"
 
     # Any options not enabled in the basic options menu we now set to 'n'
-    for option in GNOME KDE HWE HIBERNATE ZFSPPA DELAY SOF GOOGLE; do
+    for option in GNOME XFCE KDE HWE HIBERNATE ZFSPPA DELAY SOF GOOGLE; do
         [ ${!option} ] || eval "${option}"='n'
     done
 fi # Check ALL options from ZFS-root.conf
@@ -507,6 +509,7 @@ whiptail --title "Summary of install options" --msgbox "These are the options we
     ZFS ver   = $(echo $ZFSPPA)  : Update to latest ZFS 2.1 via PPA\n \
     GOOGLE    = $(echo $GOOGLE)  : Install google authenticator\n \
     GNOME     = $(echo $GNOME)  : Install full Ubuntu Gnome desktop\n \
+    XFCE      = $(echo $XFCE)  : Install full Ubuntu XFCE4 desktop\n \
     KDE       = $(echo $KDE)  : Install full Ubuntu KDE Plasma desktop\n \
     SOF       = $(echo $SOF)  : Install Sound Open Firmware binaries\n \
     HIBERNATE = $(echo $HIBERNATE)  : Enable SWAP disk partition for hibernation\n \
@@ -904,6 +907,7 @@ cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
 	export PROXY=${PROXY}
 	export HWE=${HWE}
 	export GNOME=${GNOME}
+	export XFCE=${XFCE}
 	export KDE=${KDE}
 	export HIBERNATE=${HIBERNATE}
 	export SIZE_SWAP=${SIZE_SWAP}
@@ -1668,6 +1672,11 @@ fi # GNOME
 if [ "${KDE}" = "y" ] ; then
     apt-get -qq --yes install kde-full
 fi # KDE
+    
+# Install main ubuntu xfce4 desktop
+if [ "${XFCE}" = "y" ] ; then
+    apt-get -qq --yes install xfce4 xfce4-goodies
+fi # XFCE
     
 if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] ; then
     # Ensure networking is handled by NetworkManager
