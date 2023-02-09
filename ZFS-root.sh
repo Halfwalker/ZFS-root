@@ -157,19 +157,19 @@ if [[ ! -v UPASSWORD ]]; then
 fi # Check if UPASSWORD already set
 
 # Hostname - cancel or blank name will exit
-if [[ ! -v HOSTNAME ]] ; then
-    HOSTNAME=test
-    HOSTNAME=$(whiptail --inputbox "Enter hostname to be used for new system. This name may also be used for the main ZFS poolname." --title "Hostname for new system." 8 70 $(echo $HOSTNAME) 3>&1 1>&2 2>&3)
+if [[ ! -v MYHOSTNAME ]] ; then
+    MYHOSTNAME=test
+    MYHOSTNAME=$(whiptail --inputbox "Enter hostname to be used for new system. This name may also be used for the main ZFS poolname." --title "Hostname for new system." 8 70 $(echo $MYHOSTNAME) 3>&1 1>&2 2>&3)
     RET=${?}
-    (( RET )) && HOSTNAME=
-    if [ ! ${HOSTNAME} ]; then
+    (( RET )) && MYHOSTNAME=
+    if [ ! ${MYHOSTNAME} ]; then
         echo "Must have a hostname" 
         exit 1
     fi
-fi # Check if HOSTNAME already set
+fi # Check if MYHOSTNAME already set
 
-if [[ ! -v HOSTNAME ]] ; then
-    POOLNAME=${HOSTNAME}
+if [[ ! -v MYHOSTNAME ]] ; then
+    POOLNAME=${MYHOSTNAME}
     POOLNAME=$(whiptail --inputbox "Enter poolname to use for main system - defaults to hostname" --title "ZFS main poolname" 8 70 $(echo $POOLNAME) 3>&1 1>&2 2>&3)
     RET=${?}
     (( RET )) && POOLNAME=
@@ -333,7 +333,7 @@ fi
 if [ ${GOOGLE} = "y" ] ; then
     apt-get -qq --no-install-recommends --yes install python3-qrcode libpam-google-authenticator qrencode
     # Generate a google auth config
-    google-authenticator --time-based --disallow-reuse --label=${HOSTNAME} --qr-mode=UTF8 --rate-limit=3 --rate-time=30 --secret=/tmp/google_auth.txt --window-size=3 --force --quiet
+    google-authenticator --time-based --disallow-reuse --label=${MYHOSTNAME} --qr-mode=UTF8 --rate-limit=3 --rate-time=30 --secret=/tmp/google_auth.txt --window-size=3 --force --quiet
     # Grab secret to build otpauth line below
     GOOGLE_SECRET=$(head -1 /tmp/google_auth.txt)
 
@@ -341,7 +341,7 @@ if [ ${GOOGLE} = "y" ] ; then
     # is inverted and Authy can't read it
     # Set issuer to Ubuntu so we get a nice Ubuntu logo for the Authy secret
     export NEWT_COLORS='white,black'
-    whiptail --title "Google Authenticator QR code and config" --msgbox "Config for ${USERNAME} is in /home/${USERNAME}/.google_authenticator\n\nBe sure to save the 5 emergency codes below\n\n$(cat /tmp/google_auth.txt)\n\nQR Code for use with OTP application (Authy etc.)\notpauth://totp/${HOSTNAME}.local:${USERNAME}?secret=${GOOGLE_SECRET}&Issuer=Ubuntu\n\n$(qrencode -m 3 -t UTF8 otpauth://totp/${HOSTNAME}.local:${USERNAME}?secret=${GOOGLE_SECRET}&issuer=Ubuntu)" 45 83
+    whiptail --title "Google Authenticator QR code and config" --msgbox "Config for ${USERNAME} is in /home/${USERNAME}/.google_authenticator\n\nBe sure to save the 5 emergency codes below\n\n$(cat /tmp/google_auth.txt)\n\nQR Code for use with OTP application (Authy etc.)\notpauth://totp/${MYHOSTNAME}.local:${USERNAME}?secret=${GOOGLE_SECRET}&Issuer=Ubuntu\n\n$(qrencode -m 3 -t UTF8 otpauth://totp/${MYHOSTNAME}.local:${USERNAME}?secret=${GOOGLE_SECRET}&issuer=Ubuntu)" 45 83
     RET=${?}
     [[ ${RET} = 1 ]] && exit 1
     export NEWT_COLORS="none"
@@ -500,7 +500,7 @@ whiptail --title "Summary of install options" --msgbox "These are the options we
     Disk $(for disk in $(seq 0 $(( ${#zfsdisks[@]}-1)) ) ; do \
       if [ ${disk} -ne 0 ] ; then echo -n "          " ; fi ; echo ${zfsdisks[${disk}]} ; done)\n \
     Raid $([ ${RAIDLEVEL} ] && echo ${RAIDLEVEL} || echo vdevs)\n \
-    Hostname $(echo $HOSTNAME)\n \
+    Hostname $(echo $MYHOSTNAME)\n \
     Poolname $(echo $POOLNAME)\n \
     User $(echo $USERNAME $UCOMMENT)\n\n \
     DELAY     = $(echo $DELAY)  : Enable delay before importing zpool\n \
@@ -824,7 +824,7 @@ else
         mdadm --zero-superblock --force /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_BOOT} > /dev/null 2>&1
     done
     BOOTDEVRAW="/dev/md/BOOT_EFI"
-	echo y | mdadm --create ${BOOTDEVRAW} --metadata=1.0 --force --level=mirror --raid-devices=${#zfsdisks[@]} --homehost=${HOSTNAME} --name=efi  --assume-clean ${PARTSBOOT}
+	echo y | mdadm --create ${BOOTDEVRAW} --metadata=1.0 --force --level=mirror --raid-devices=${#zfsdisks[@]} --homehost=${MYHOSTNAME} --name=efi  --assume-clean ${PARTSBOOT}
 fi
 
 mkfs.vfat -v -F 32 -s 1 -n "BOOT_EFI" ${BOOTDEVRAW} > /dev/null
@@ -833,8 +833,8 @@ echo "UUID=$(blkid -s UUID -o value ${BOOTDEVRAW}) \
 mkdir ${ZFSBUILD}/boot/efi
 
 
-echo ${HOSTNAME} > ${ZFSBUILD}/etc/hostname
-echo "127.0.1.1  ${HOSTNAME}" >> ${ZFSBUILD}/etc/hosts
+echo ${MYHOSTNAME} > ${ZFSBUILD}/etc/hostname
+echo "127.0.1.1  ${MYHOSTNAME}" >> ${ZFSBUILD}/etc/hosts
 
 if [ ${PROXY} ]; then
     # This is for apt-get
