@@ -274,31 +274,33 @@ HIBERNATE_AVAIL=${?}
 #
 # Slightly fugly - have to check if ANY of these are not set
 #
-if [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]] || [[ ! -v HIBERNATE ]] || [[ ! -v DELAY ]] || [[ ! -v SOF ]] || [[ ! -v GNOME ]] || [[ ! -v KDE ]] ; then
+if [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]] || [[ ! -v HIBERNATE ]] || [[ ! -v DELAY ]] || [[ ! -v SOF ]] || [[ ! -v GNOME ]] || [[ ! -v KDE ]] || [[ ! -v NEON ]] || [[ ! -v XFCE ]] ; then
     # Hibernate can only resume from a single disk, and currently not available for ZFS encryption
     if [ "${DISCENC}" == "ZFSENC" ] || [ ${#zfsdisks[@]} -gt 1 ] || [ ${HIBERNATE_AVAIL} -ne 0 ] ; then
         # Set basic options for install - ZFSENC so no Hibernate available (yet)
-        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 19 83 8 \
+        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 20 83 9 \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
             HWE "Install Hardware Enablement kernel" OFF \
             ZFSPPA "Update to latest ZFS 2.1 from PPA" ON \
             DELAY "Add delay before importing root pool - for many-disk systems" OFF \
             SOF "Install Sound Open Firmware binaries (for some laptops)" OFF \
-            GNOME "Install full Ubuntu Gnome desktop" OFF \
-            XFCE "Install full xfce4 desktop with goodies" OFF \
-            KDE "Install full Ubuntu KDE Plasma desktop" OFF 2>"${TMPFILE}"
+            GNOME "Install Ubuntu Gnome desktop" OFF \
+            XFCE "Install Ubuntu xfce4 desktop with goodies" OFF \
+            KDE "Install Ubuntu KDE Plasma desktop" OFF \
+            NEON "Install Neon KDE Plasma desktop" OFF 2>"${TMPFILE}"
     else
         # Set basic options for install - ZFSENC so no Hibernate available (yet)
-        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 20 83 9 \
+        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 21 83 10 \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
             HWE "Install Hardware Enablement kernel" OFF \
             ZFSPPA "Update to latest ZFS 2.1 from PPA" ON \
             HIBERNATE "Enable swap partition for hibernation" OFF \
             DELAY "Add delay before importing root pool - for many-disk systems" OFF \
             SOF "Install Sound Open Firmware binaries (for some laptops)" OFF \
-            GNOME "Install full Ubuntu Gnome desktop" OFF \
-            XFCE "Install full xfce4 desktop with goodies" OFF \
-            KDE "Install full Ubuntu KDE Plasma desktop" OFF 2>"${TMPFILE}"
+            GNOME "Install Ubuntu Gnome desktop" OFF \
+            XFCE "Install Ubuntu xfce4 desktop with goodies" OFF \
+            KDE "Install Ubuntu KDE Plasma desktop" OFF \
+            NEON "Install Neon KDE Plasma desktop" OFF 2>"${TMPFILE}"
     fi
     RET=${?}
     [[ ${RET} = 1 ]] && exit 1
@@ -309,7 +311,7 @@ if [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]] || [[ ! -v HIBERNATE
     done < "${TMPFILE}"
 
     # Any options not enabled in the basic options menu we now set to 'n'
-    for option in GNOME XFCE KDE HWE HIBERNATE ZFSPPA DELAY SOF GOOGLE; do
+    for option in GNOME XFCE NEON KDE HWE HIBERNATE ZFSPPA DELAY SOF GOOGLE; do
         [ ${!option} ] || eval "${option}"='n'
     done
 fi # Check ALL options from ZFS-root.conf
@@ -508,9 +510,10 @@ whiptail --title "Summary of install options" --msgbox "These are the options we
     DELAY     = $(echo $DELAY)  : Enable delay before importing zpool\n \
     ZFS ver   = $(echo $ZFSPPA)  : Update to latest ZFS 2.1 via PPA\n \
     GOOGLE    = $(echo $GOOGLE)  : Install google authenticator\n \
-    GNOME     = $(echo $GNOME)  : Install full Ubuntu Gnome desktop\n \
-    XFCE      = $(echo $XFCE)  : Install full Ubuntu XFCE4 desktop\n \
-    KDE       = $(echo $KDE)  : Install full Ubuntu KDE Plasma desktop\n \
+    GNOME     = $(echo $GNOME)  : Install Ubuntu Gnome desktop\n \
+    XFCE      = $(echo $XFCE)  : Install Ubuntu XFCE4 desktop\n \
+    KDE       = $(echo $KDE)  : Install Ubuntu KDE Plasma desktop\n \
+    NEON      = $(echo $NEON)  : Install Neon KDE Plasma desktop\n \
     SOF       = $(echo $SOF)  : Install Sound Open Firmware binaries\n \
     HIBERNATE = $(echo $HIBERNATE)  : Enable SWAP disk partition for hibernation\n \
     DISCENC   = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
@@ -908,6 +911,7 @@ cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
 	export HWE=${HWE}
 	export GNOME=${GNOME}
 	export XFCE=${XFCE}
+	export NEON=${NEON}
 	export KDE=${KDE}
 	export HIBERNATE=${HIBERNATE}
 	export SIZE_SWAP=${SIZE_SWAP}
@@ -1656,29 +1660,65 @@ if [ "${GNOME}" = "y" ] ; then
     # NOTE: 18.04 has an xserver-xorg-hwe-18.04 package, 20.04 does NOT
     case ${SUITE} in 
         focal | jammy)
-            apt-get -qq --yes install ubuntu-desktop
+            apt-get -qq --yes install ubuntu-desktop vulkan-tools
             ;;
         bionic)
-            apt-get -qq --yes install ubuntu-desktop xserver-xorg${HWE}
+            apt-get -qq --yes install ubuntu-desktop xserver-xorg${HWE} vulkan-tools
             ;;
         *)
             # Default to not specifying hwe xorg just in case
-            apt-get -qq --yes install ubuntu-desktop
+            apt-get -qq --yes install ubuntu-desktop vulkan-tools
             ;;
     esac
 fi # GNOME
 
 # Install main ubuntu kde desktop
 if [ "${KDE}" = "y" ] ; then
-    apt-get -qq --yes install kde-full
+    apt-get -qq --yes install kde-full vulkan-tools
 fi # KDE
     
 # Install main ubuntu xfce4 desktop
 if [ "${XFCE}" = "y" ] ; then
-    apt-get -qq --yes install xfce4 xfce4-goodies
+    apt-get -qq --yes install xfce4 xfce4-goodies vulkan-tools
 fi # XFCE
     
-if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] ; then
+# Install main Neon KDE desktop
+if [ "${NEON}" = "y" ] ; then
+    # Ensure the keyrings dir exists - it should, but be sure
+    mkdir -p /usr/share/keyrings
+    wget -qO /usr/share/keyrings/neon.key 'https://archive.neon.kde.org/public.key'
+    cat > /etc/apt/sources.list.d/neon.list <<-EOF
+	deb [signed-by=/usr/share/keyrings/neon.key] http://archive.neon.kde.org/user/ ${SUITE} main
+	deb-src [signed-by=/usr/share/keyrings/neon.key] http://archive.neon.kde.org/user/ ${SUITE} main
+	EOF
+
+    # Pin base-files to not install the Neon version
+    # This prevents the install identifying as Neon, and stops problems with programs that this confuses
+    # eg the Docker install script
+    cat > /etc/apt/preferences.d/99block-neon <<-EOF
+	Package: base-files
+	Pin: origin archive.neon.kde.org
+	Pin-Priority: 1
+	EOF
+
+    # Use real firefox, not that snap crap
+    apt-add-repository --yes --update ppa:mozillateam/ppa
+    cat > /etc/apt/preferences.d/99mozillateam <<-EOF
+	Package: firefox
+	Pin: origin ppa.launchpadcontent.net
+	Pin-Priority: 700
+	EOF
+
+    # neon desktop includes encfs, which prompts that it's not secure,
+    # requiring someone to hit <enter> - this should bypass that
+    echo "encfs  encfs/security-information  error" > /tmp/neon.debconf
+    cat /tmp/neon.debconf | debconf-set-selections
+
+    apt-get -qq update
+    apt-get -qq --yes install neon-desktop firefox vulkan-tools packagekit-tools
+fi # NEON
+
+if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] || [ "${NEON}" = "y" ] || [ "${XFCE}" = "y" ] ; then
     # Ensure networking is handled by NetworkManager
     sed -i 's/networkd/NetworkManager/' /etc/netplan/01_netcfg.yaml
 
@@ -1710,7 +1750,7 @@ if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] ; then
     unzip /tmp/DisplayLink-5.6.1.zip
     ./displaylink-driver-5.6.1-59.184.run --accept --noprogress --nox11 
 
-fi # GNOME KDE
+fi # GNOME KDE NEON XFCE
     
 # Enable hibernate in upower and logind if desktop is installed
 if [ -d /etc/polkit-1/localauthority/50-local.d ] ; then
