@@ -1802,8 +1802,35 @@ fi # GOOGLE_AUTH
 
 
 # Add IP address(es) to main tty issue
-ls -1 /sys/class/net | egrep -v "lo|vir|docker" | xargs -I {} echo " {} : \4{{}}" >> /etc/issue
+cat > /etc/systemd/system/showip.service <<- EOF
+[Unit]
+Description=Add IP address(es) to /etc/issue
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/showip.sh
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat > /usr/local/bin/showip.sh <<- EOF
+#!/bin/bash
+
+# Creates a normal /etc/issue file but populates the bottom with a list
+# of all network interfaces found. The /4{} gets filled in with IPv4 addresses
+# as they are obtained, so the splash screen is always live with correct info
+# Exclude lo, virtual and docker interfaces - they're just messy
+
+echo -e "$(lsb_release -d -s) \\\n \l\n" > /etc/issue
+echo "$(ls -1 /sys/class/net | egrep -v 'lo|vir|docker' | xargs -I {} echo '   {} : \4{{}}')" >> /etc/issue
 echo "" >> /etc/issue
+EOF
+
+chmod +x /usr/local/bin/showip.sh
+systemctl enable showip.service
 
 # Set apt/dpkg to automagically snap the system datasets on install/remove
 cat > /etc/apt/apt.conf.d/30pre-snap <<-EOF
