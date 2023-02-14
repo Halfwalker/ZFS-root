@@ -1736,19 +1736,22 @@ if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] || [ "${NEON}" = "y" ] || [ "${XFC
         apt-get -qq --yes install nvidia-driver-${NVIDIA_LATEST}
     fi
 
-    # Install DisplayLink drivers
-    # http://www.synaptics.com/products/displaylink-graphics/downloads/ubuntu
-    # We need the kernel headers for RUNNING kernel to install displaylink stuff
-    # Running kernel from livecd - kernel installed here is likely newer
-    # As of this writing, livecd is 5.15.0-43, while latest is 5.15.0-60
-    apt-get -qq --yes install cpp-12 dctrl-tools fakeroot gcc-12 libasan8 libfakeroot libgcc-12-dev libtsan2 libdrm-dev libpciaccess-dev dkms linux-headers-$(uname -r) build-essential
-    # Install HWE variant if it exists - OK to fail
-    apt-get -qq --yes install linux-headers-$(uname -r)${HWE}
-    wget -O /tmp/DisplayLink-5.6.1.zip http://www.synaptics.com/sites/default/files/exe_files/2022-08/DisplayLink%20USB%20Graphics%20Software%20for%20Ubuntu5.6.1-EXE.zip
-    mkdir /usr/local/share/DisplayLink-5.6.1
-    cd /usr/local/share/DisplayLink-5.6.1
-    unzip /tmp/DisplayLink-5.6.1.zip
-    ./displaylink-driver-5.6.1-59.184.run --accept --noprogress --nox11 
+    ####
+    #### Install seems to bork when done under livecd
+    ####
+    ####  # Install DisplayLink drivers
+    ####  # http://www.synaptics.com/products/displaylink-graphics/downloads/ubuntu
+    ####  # We need the kernel headers for RUNNING kernel to install displaylink stuff
+    ####  # Running kernel from livecd - kernel installed here is likely newer
+    ####  # As of this writing, livecd is 5.15.0-43, while latest is 5.15.0-60
+    ####  apt-get -qq --yes install cpp-12 dctrl-tools fakeroot gcc-12 libasan8 libfakeroot libgcc-12-dev libtsan2 libdrm-dev libpciaccess-dev dkms linux-headers-$(uname -r) build-essential
+    ####  # Install HWE variant if it exists - OK to fail
+    ####  apt-get -qq --yes install linux-headers-$(uname -r)${HWE}
+    ####  wget -O /tmp/DisplayLink-5.6.1.zip http://www.synaptics.com/sites/default/files/exe_files/2022-08/DisplayLink%20USB%20Graphics%20Software%20for%20Ubuntu5.6.1-EXE.zip
+    ####  mkdir /usr/local/share/DisplayLink-5.6.1
+    ####  cd /usr/local/share/DisplayLink-5.6.1
+    ####  unzip /tmp/DisplayLink-5.6.1.zip
+    ####  ./displaylink-driver-5.6.1-59.184.run --accept --noprogress --nox11 
 
 fi # GNOME KDE NEON XFCE
     
