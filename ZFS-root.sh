@@ -1501,7 +1501,12 @@ DefaultDependencies=no
 Before=zfs-mount.service
 Before=systemd-user-sessions.service
 After=zfs-import.target
-OnFailure=emergency.target
+### With emergency.target if the key cannot be loaded then boot will stop
+### This can happen when datasets have different keys, and one or more datasets
+### do not have the keys available (backups from remote systems etc.)
+### If this system does not have unknown keys, then OnFailure may be enabled
+### to ensure a proper stop when missing keys.
+# OnFailure=emergency.target
 
 [Service]
 Type=oneshot
