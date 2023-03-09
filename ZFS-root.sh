@@ -1716,7 +1716,10 @@ if [ "${NEON}" = "y" ] ; then
 
     # neon desktop includes encfs, which prompts that it's not secure,
     # requiring someone to hit <enter> - this should bypass that
-    echo "encfs  encfs/security-information  error" > /tmp/neon.debconf
+    cat > /tmp/neon.debconf <<-EOF
+	encfs  encfs/security-information boolean true
+	encfs  encfs/security-information seen true
+	EOF
     cat /tmp/neon.debconf | debconf-set-selections
 
     apt-get -qq update
