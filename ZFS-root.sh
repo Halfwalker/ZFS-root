@@ -1629,8 +1629,9 @@ if [ "${DISCENC}" != "NOENC" ] ; then
 
   mkdir -p /etc/cmdline.d
   # With rd.neednet=1 it will fail to boot if no network available
-  # echo 'ip=dhcp rd.neednet=1' > /etc/cmdline.d/dracut-network.conf
-  echo 'ip=dhcp' > /etc/cmdline.d/dracut-network.conf
+  # And now rd.neednet=1 actually enables the network, without interface
+  # doesn't come up
+  echo 'ip=dhcp rd.neednet=1' > /etc/cmdline.d/dracut-network.conf
 
   echo 'add_dracutmodules+=" crypt-ssh "'                      >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
   echo 'install_items+=" /etc/cmdline.d/dracut-network.conf "' >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
