@@ -1716,9 +1716,13 @@ if [ "${NEON}" = "y" ] ; then
 
     # neon desktop includes encfs, which prompts that it's not secure,
     # requiring someone to hit <enter> - this should bypass that
+    # Also, pre-select the sddm display manager login
     cat > /tmp/neon.debconf <<-EOF
 	encfs  encfs/security-information boolean true
 	encfs  encfs/security-information seen true
+    gdm3   shared/default-x-display-manager select sddm
+    sddm   shared/default-x-display-manager select sddm
+    kdm    shared/default-x-display-manager select sddm
 	EOF
     cat /tmp/neon.debconf | debconf-set-selections
 
