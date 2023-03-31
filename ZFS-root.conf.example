@@ -56,6 +56,7 @@ PASSPHRASE="password"
 # See script for descriptions
 # Be sure to set ALL vars here to y or n, otherwise script will prompt for them
 #
+RESCUE=n
 GOOGLE=n
 HWE=y
 ZFSPPA=y

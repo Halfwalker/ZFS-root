@@ -274,11 +274,12 @@ HIBERNATE_AVAIL=${?}
 #
 # Slightly fugly - have to check if ANY of these are not set
 #
-if [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]] || [[ ! -v HIBERNATE ]] || [[ ! -v DELAY ]] || [[ ! -v SOF ]] || [[ ! -v GNOME ]] || [[ ! -v KDE ]] || [[ ! -v NEON ]] || [[ ! -v XFCE ]] ; then
+if [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]] || [[ ! -v HIBERNATE ]] || [[ ! -v DELAY ]] || [[ ! -v SOF ]] || [[ ! -v GNOME ]] || [[ ! -v KDE ]] || [[ ! -v NEON ]] || [[ ! -v XFCE ]] ; then
     # Hibernate can only resume from a single disk, and currently not available for ZFS encryption
     if [ "${DISCENC}" == "ZFSENC" ] || [ ${#zfsdisks[@]} -gt 1 ] || [ ${HIBERNATE_AVAIL} -ne 0 ] ; then
         # Set basic options for install - ZFSENC so no Hibernate available (yet)
-        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 20 83 9 \
+        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 21 83 10 \
+            RESCUE "Create rescue dataset by cloning initial install" OFF \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
             HWE "Install Hardware Enablement kernel" OFF \
             ZFSPPA "Update to latest ZFS 2.1 from PPA" ON \
@@ -290,7 +291,8 @@ if [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]] || [[ ! -v HIBERNATE
             NEON "Install Neon KDE Plasma desktop" OFF 2>"${TMPFILE}"
     else
         # Set basic options for install - ZFSENC so no Hibernate available (yet)
-        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 21 83 10 \
+        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 22 83 11 \
+            RESCUE "Create rescue dataset by cloning initial install" OFF \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
             HWE "Install Hardware Enablement kernel" OFF \
             ZFSPPA "Update to latest ZFS 2.1 from PPA" ON \
@@ -311,7 +313,7 @@ if [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]] || [[ ! -v HIBERNATE
     done < "${TMPFILE}"
 
     # Any options not enabled in the basic options menu we now set to 'n'
-    for option in GNOME XFCE NEON KDE HWE HIBERNATE ZFSPPA DELAY SOF GOOGLE; do
+    for option in RESCUE GNOME XFCE NEON KDE HWE HIBERNATE ZFSPPA DELAY SOF GOOGLE; do
         [ ${!option} ] || eval "${option}"='n'
     done
 fi # Check ALL options from ZFS-root.conf
@@ -497,7 +499,7 @@ case ${SUITE} in
         ;;
 esac
 
-box_height=$(( ${#zfsdisks[@]} + 24 ))
+box_height=$(( ${#zfsdisks[@]} + 25 ))
 whiptail --title "Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
     Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
     $(echo $SUITE $SUITE_NUM) $([ ${HWE} ] && echo WITH || echo without) $(echo hwe kernel ${HWE})\n \
@@ -507,6 +509,7 @@ whiptail --title "Summary of install options" --msgbox "These are the options we
     Hostname $(echo $MYHOSTNAME)\n \
     Poolname $(echo $POOLNAME)\n \
     User $(echo $USERNAME $UCOMMENT)\n\n \
+    RESCUE    = $(echo $RESCUE) : Create rescue dataset by cloning install\n \
     DELAY     = $(echo $DELAY)  : Enable delay before importing zpool\n \
     ZFS ver   = $(echo $ZFSPPA)  : Update to latest ZFS 2.1 via PPA\n \
     GOOGLE    = $(echo $GOOGLE)  : Install google authenticator\n \
@@ -894,6 +897,7 @@ echo "Creating Setup.sh in new system for chroot"
 cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
 	#!/bin/bash
 	
+    export RESCUE=${RESCUE}
 	export BOOTDEVRAW=${BOOTDEVRAW}
 	export DELAY=${DELAY}
 	export SUITE=${SUITE}
@@ -1858,6 +1862,17 @@ cat > /etc/apt/apt.conf.d/30pre-snap <<-EOF
 EOF
 
 zfs snapshot ${POOLNAME}/ROOT/${SUITE}@base_install
+
+# Optionally create a clone of the new system as a rescue dataset.
+# This wlil show up in zfsbootmenu as a bootable dataset just in
+# case the main dataset gets corrupted during an update or something.
+# As the system is upgraded, the clone should periodically be replaced
+# with a clone of a newer snapshot.
+if [ "${RESCUE}" = "y" ]; then
+    zfs clone ${POOLNAME}/ROOT/${SUITE}@base_install ${POOLNAME}/ROOT/${SUITE}_rescue
+    zfs set canmount=noauto ${POOLNAME}/ROOT/${SUITE}_rescue
+    zfs set mountpoint=/ ${POOLNAME}/ROOT/${SUITE}_rescue
+fi
 umount /boot/efi
 
 # End of Setup.sh
