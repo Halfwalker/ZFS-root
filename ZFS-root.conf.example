@@ -48,8 +48,18 @@ SIZE_SWAP=300
 # Disk encryption and passphrase if ZFSENC or LUKS
 # NOENC, ZFSENC, LUKS
 #
+# If Disk encryption is enabled with ZFSENC or LUKS, then also decide
+# on enabling Dropbear for remote unlocking.
+# NOTE: Trap for young players ...
+#       Dropbear expects to see the network when the system boots.
+#       If it's NOT there (eg. laptop with docking station unplugged)
+#       then it might sit waiting until timout for the network to show up.
+#       RTNETLINK answers: File exists will appear and it will just sit ...
+# So, do not enable Dropbear for laptops
+#
 DISCENC="NOENC"
 PASSPHRASE="password"
+DROPBEAR=n
 
 #
 # Basic options for install

@@ -263,6 +263,18 @@ if [ "${DISCENC}" != "NOENC" ] ; then
         done
         PASSPHRASE="$PW1"
     fi # If PASSPHRASE not already set in ZFS-root.conf
+
+    # retcode 0 = YES, 1 = NO
+    if [[ ! -v DROPBEAR ]] ; then
+        DROPBEAR=$(whiptail --title "Enable Dropbear ?" --yesno "Should Dropbear be enabled for remote unlocking of encrypted disks ?" 8 60 \
+        3>&1 1>&2 2>&3)
+        RET=${?}
+        [[ ${RET} = 0 ]] && DROPBEAR=y
+        [[ ${RET} = 1 ]] && DROPBEAR=n
+    fi
+else
+    # Default Dropbear to NO
+    DROPBEAR=n
 fi
 
 # We check /sys/power/state - if no "disk" in there, then HIBERNATE is disabled
@@ -499,7 +511,7 @@ case ${SUITE} in
         ;;
 esac
 
-box_height=$(( ${#zfsdisks[@]} + 25 ))
+box_height=$(( ${#zfsdisks[@]} + 26 ))
 whiptail --title "Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
     Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
     $(echo $SUITE $SUITE_NUM) $([ ${HWE} ] && echo WITH || echo without) $(echo hwe kernel ${HWE})\n \
@@ -520,6 +532,7 @@ whiptail --title "Summary of install options" --msgbox "These are the options we
     SOF       = $(echo $SOF)  : Install Sound Open Firmware binaries\n \
     HIBERNATE = $(echo $HIBERNATE)  : Enable SWAP disk partition for hibernation\n \
     DISCENC   = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
+    DROPBEAR  = $(echo ${DROPBEAR}  : Enable Dropbear unlocking of encrypted disks\n \
     Swap size = $(echo $SIZE_SWAP)M $([ ${SIZE_SWAP} -eq 0 ] && echo ': DISABLED')\n" \
     ${box_height} 70
 RET=${?}
@@ -936,6 +949,7 @@ cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
 	export UPASSWORD="${UPASSWORD}"
 	export UCOMMENT="${UCOMMENT}"
 	export DISCENC=${DISCENC}
+	export DROPBEAR=${DROPBEAR}
 	export AUTHKEYS=${AUTHKEYS}
 	export ZFSPPA=${ZFSPPA}
 	export GOOGLE=${GOOGLE}
@@ -1647,8 +1661,9 @@ chown -R ${USERNAME}.${USERNAME} /home/${USERNAME}
 #
 # Set up Dropbear - after user is created with .ssh/authorized_keys
 # so those keys can be used in the initramfs
+# DROPBEAR can only be y if DISCENC is not NOENC (so encryption enabled)
 #
-if [ "${DISCENC}" != "NOENC" ] ; then
+if [ "${DROPBEAR}" = "y" ] ; then
   echo "------------------------------------------------------------"
   echo " Installing dropbear for remote unlocking"
   echo "------------------------------------------------------------"
