@@ -509,7 +509,7 @@ whiptail --title "Summary of install options" --msgbox "These are the options we
     Hostname $(echo $MYHOSTNAME)\n \
     Poolname $(echo $POOLNAME)\n \
     User $(echo $USERNAME $UCOMMENT)\n\n \
-    RESCUE    = $(echo $RESCUE) : Create rescue dataset by cloning install\n \
+    RESCUE    = $(echo $RESCUE)  : Create rescue dataset by cloning install\n \
     DELAY     = $(echo $DELAY)  : Enable delay before importing zpool\n \
     ZFS ver   = $(echo $ZFSPPA)  : Update to latest ZFS 2.1 via PPA\n \
     GOOGLE    = $(echo $GOOGLE)  : Install google authenticator\n \
@@ -852,17 +852,46 @@ fi # PROXY
 
 # Set up networking for netplan
 # renderer: networkd is for text mode only, use NetworkManager for gnome
+# We create a bridge here with all found ethernet interfaces as slaves
+# Makes it easier to set up multipass or LXD later
+# NOTE: tabs as first char to handle indented heredoc
 cat > ${ZFSBUILD}/etc/netplan/01_netcfg.yaml <<-EOF
 	network:
 	  version: 2
 	  renderer: networkd
 	  ethernets:
 	    alleths:
+	      optional: true
 	      match:
 	        name: e*
 	      dhcp4: true
-	      dhcp6: true
-	      optional: true
+	      dhcp6: true 
+	      # === With the bridge config below, set dhcp to false
+	      # dhcp4: false
+	      # dhcp6: false
+	
+	# bridges:
+	#   br0:
+	#     interfaces: [alleths]
+	#     # === Example static IP address
+	#     # addresses: [192.168.2.8/24]
+	#     dhcp4: yes
+	#     dhcp6: yes
+	#     # === Only need routes: or gateway4: if NOT using DHCP
+	#     # === gateway4 is deprecated, use routes instead
+	#     # gateway4: 192.168.2.4
+	#     # === For focal/20.04 or jammy/22.04 and above
+	#     # routes:
+	#     #   - to: default
+	#     #     via: 192.168.2.4
+	#     #     metric: 100
+	#     #     on-link: true
+	#     mtu: 1500
+	#     nameservers:
+	#       addresses: [127.0.0.53, 8.8.8.8, 8.8.4.4]
+	#     parameters:
+	#       stp: false
+	#       forward-delay: 4
 EOF
 
 # Google Authenticator config - put to /root to be moved to /home/${USERNAME} in setup.sh
