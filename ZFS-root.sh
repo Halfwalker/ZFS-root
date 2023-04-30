@@ -1428,7 +1428,7 @@ fi # HIBERNATE
 #
 if [ ${DELAY} = "y" ] ; then
     echo "On systems with lots of disks, enumerating them can sometimes take a long"
-    echo "time, which means the root disk(s) may not have been enumerated before"
+    echo "time, which means the root disks may not have been enumerated before"
     echo "ZFS tries to import the root pool. That drops you to an initramfs prompt"
     echo "where you have to 'zfs import -N <root_pool> ; exit'"
     echo "So we set a delay in the initramfs to wait 25s before importing"
