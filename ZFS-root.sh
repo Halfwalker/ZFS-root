@@ -532,7 +532,7 @@ whiptail --title "Summary of install options" --msgbox "These are the options we
     SOF       = $(echo $SOF)  : Install Sound Open Firmware binaries\n \
     HIBERNATE = $(echo $HIBERNATE)  : Enable SWAP disk partition for hibernation\n \
     DISCENC   = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
-    DROPBEAR  = $(echo ${DROPBEAR}  : Enable Dropbear unlocking of encrypted disks\n \
+    DROPBEAR  = $(echo $DROPBEAR)  : Enable Dropbear unlocking of encrypted disks\n \
     Swap size = $(echo $SIZE_SWAP)M $([ ${SIZE_SWAP} -eq 0 ] && echo ': DISABLED')\n" \
     ${box_height} 70
 RET=${?}
