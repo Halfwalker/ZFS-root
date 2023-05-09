@@ -1135,7 +1135,7 @@ done
 # Install and configure ZFSBootMenu
 #
 DEBIAN_FRONTEND=noninteractive apt-get --yes install kexec-tools
-apt-get --yes install libconfig-inifiles-perl libsort-versions-perl libboolean-perl fzf mbuffer make curl
+apt-get --yes install libconfig-inifiles-perl libsort-versions-perl libboolean-perl fzf mbuffer make curl bsdextrautils
 
 # Assign command-line arguments to be used when booting the final kernel
 # For hibernation and resume to work we have to specify which device to resume from
