@@ -34,6 +34,23 @@ Number  Start (sector)    End (sector)  Size       Code  Name
 
 *initramfs-tools* is NOT used, and is in fact disabled via `apt-mark hold initramfs-tools`.  Instead *dracut* is used for managing the initramfs.
 
+### Sample SSH config for Dropbear
+
+If using Dropbear for remote unlocking of an encrypted system, a sample `~/.ssh/config` entry could look like this
+
+```
+Host unlock-foobox
+    Hostname foorbox.example.com
+    User root
+    Port 222
+    IdentityFile ~/.ssh/unlock_luks
+    HostKeyAlgorithms ssh-rsa
+    RequestTTY yes
+    RemoteCommand zfsbootmenu
+```
+
+This will run the `zfsbootmenu` command upon login automagically.  NOTE: one problem is that the ssh session remains after unlocking - need a clean way to ensure it exits after the unlock is finished
+
 ## Configuration
 
 The *ZFS-root.sh* script will prompt for all details it needs.  In addition, you can pre-seed those details via a *ZFS-root.conf* file, and an example is provided.  There are several extra config items that can only be set via a *ZFS-root.conf* file and not the menu questions.

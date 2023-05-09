@@ -6,6 +6,9 @@
 # https://hamy.io/post/0009/how-to-install-luks-encrypted-ubuntu-18.04.x-server-and-enable-remote-unlocking/#gsc.tab=0
 # https://www.arminpech.de/2019/12/23/debian-unlock-luks-root-partition-remotely-by-ssh-using-dropbear/
 
+# Single script to setup zfsbootmenu root-on-zfs with dracut and dropbear
+# https://github.com/Sithuk/ubuntu-server-zfsbootmenu/blob/main/ubuntu_server_encrypted_root_zfs.sh
+
 # >>>>>>>>>> ZFS native encryption <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 # https://arstechnica.com/gadgets/2021/06/a-quick-start-guide-to-openzfs-native-encryption/
 # https://talldanestale.dk/2020/04/06/zfs-and-homedir-encryption/
