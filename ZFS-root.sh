@@ -1682,9 +1682,15 @@ if [ "${DROPBEAR}" = "y" ] ; then
 
   mkdir -p /etc/cmdline.d
   # With rd.neednet=1 it will fail to boot if no network available
-  # And now rd.neednet=1 actually enables the network, without interface
-  # doesn't come up
-  echo 'ip=dhcp rd.neednet=1' > /etc/cmdline.d/dracut-network.conf
+  # This can be a problem with laptops and docking stations, if the dock
+  # is not connected (no ethernet) it can fail to boot. Yay dracut.
+  # Network really only needed for Dropbear/ssh access unlocking, so disable
+  # if no Dropbear ...
+  if [ "${DROPBEAR}" = "y" ] ; then
+    echo 'ip=dhcp rd.neednet=1' > /etc/cmdline.d/dracut-network.conf
+  else
+    echo 'ip=dhcp rd.neednet=0' > /etc/cmdline.d/dracut-network.conf
+  fi
 
   echo 'add_dracutmodules+=" crypt-ssh "'                      >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
   echo 'install_items+=" /etc/cmdline.d/dracut-network.conf "' >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
