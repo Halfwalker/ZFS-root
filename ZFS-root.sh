@@ -1196,7 +1196,8 @@ mkdir -p  /boot/efi/EFI/zfsbootmenu
 # OR install the git repo and build locally
 
 rm -rf /tmp/zfsbootmenu && mkdir -p /tmp/zfsbootmenu
-cd /tmp/zfsbootmenu && curl -L https://github.com/zbm-dev/zfsbootmenu/tarball/master | tar xz --strip=1 && make install
+# Get latest tagged release, sure to work. Base git repo may be in flux
+cd /tmp/zfsbootmenu && curl -L https://get.zfsbootmenu.org/source | tar xz --strip=1 && make install
 
 # This seems to fail sometimes - gets killed during install
 # PERL_MM_USE_DEFAULT=1 cpan 'YAML::PP'
