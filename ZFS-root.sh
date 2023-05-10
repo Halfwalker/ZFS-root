@@ -1091,7 +1091,7 @@ refind-install --yes
 
 mkdir -p /boot/efi/EFI/zfsbootmenu
 cat <<- END > /boot/efi/EFI/zfsbootmenu/refind_linux.conf
-"Boot to ZFSbootMenu" "zbm.prefer=${POOLNAME} zbm.import_policy=hostid zbm.set_hostid ro quiet loglevel=0"
+"Boot to ZFSbootMenu" "zbm.prefer=${POOLNAME} ro quiet loglevel=0"
 END
 
 # If we're running under legacy bios then rEFInd will be installed
@@ -1190,7 +1190,7 @@ mkdir -p  /boot/efi/EFI/zfsbootmenu
 ##  MENU LABEL ZFSBootMenu 2.0.0_1
 ##  KERNEL /EFI/zfsbootmenu/vmlinuz-bootmenu
 ##  INITRD /EFI/zfsbootmenu/initramfs-bootmenu.img
-##  APPEND zbm.prefer=test zbm.import_policy=hostid zbm.set_hostid ro quiet loglevel=0
+##  APPEND zbm.prefer=test ro quiet loglevel=0
 ##  EOF
 
 # OR install the git repo and build locally
