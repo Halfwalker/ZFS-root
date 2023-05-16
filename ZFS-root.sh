@@ -1727,6 +1727,74 @@ dracut -v -f --regenerate-all
 # Allow read-only zfs commands with no sudo password
 cat /etc/sudoers.d/zfs | sed -e 's/#//' > /etc/sudoers.d/zfsALLOW
 
+# Configure google authenticator if we have a config
+if [ "${GOOGLE}" = "y" ]; then
+    apt-get -qq --no-install-recommends --yes install python3-qrcode qrencode libpam-google-authenticator
+    cp /root/google_auth.txt /home/${USERNAME}/.google_authenticator
+    chmod 400 /home/${USERNAME}/.google_authenticator
+    chown ${USERNAME}.${USERNAME} /home/${USERNAME}/.google_authenticator
+
+    # Set pam to use google authenticator for ssh
+    echo "auth required pam_google_authenticator.so" >> /etc/pam.d/sshd
+    sed -i "s/^ChallengeResponseAuthentication.*/ChallengeResponseAuthentication yes/" /etc/ssh/sshd_config
+
+    # Enable this to force use of token always, even with SSH key
+    # sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/" /etc/ssh/sshd_config
+fi # GOOGLE_AUTH
+
+
+# Add IP address(es) to main tty issue
+cat > /etc/systemd/system/showip.service <<- EOF
+[Unit]
+Description=Add IP address(es) to /etc/issue
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/showip.sh
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+cat > /usr/local/bin/showip.sh <<- EOF
+#!/bin/bash
+
+# Creates a normal /etc/issue file but populates the bottom with a list
+# of all network interfaces found. The /4{} gets filled in with IPv4 addresses
+# as they are obtained, so the splash screen is always live with correct info
+# Exclude lo, virtual and docker interfaces - they're just messy
+
+echo -e "$(lsb_release -d -s) \\\n \l\n" > /etc/issue
+echo "$(ls -1 /sys/class/net | egrep -v 'lo|vir|docker|tap|veth|br-' | xargs -I {} echo '   {} : \4{{}}')" >> /etc/issue
+echo "" >> /etc/issue
+EOF
+
+chmod +x /usr/local/bin/showip.sh
+systemctl enable showip.service
+
+# Set apt/dpkg to automagically snap the system datasets on install/remove
+cat > /etc/apt/apt.conf.d/30pre-snap <<-EOF
+	# Snapshot main datasets before installing or removing packages
+	# We use a DATE variable to ensure all snaps have SAME date
+	
+	 Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; ${ZFSLOCATION} snap \$(${ZFSLOCATION} list -o name | /usr/bin/grep -E 'ROOT/.*$' | sort | head -1)@apt_\${DATE}"; };
+EOF
+
+zfs snapshot ${POOLNAME}/ROOT/${SUITE}@base_install
+
+# Optionally create a clone of the new system as a rescue dataset.
+# This wlil show up in zfsbootmenu as a bootable dataset just in
+# case the main dataset gets corrupted during an update or something.
+# As the system is upgraded, the clone should periodically be replaced
+# with a clone of a newer snapshot.
+if [ "${RESCUE}" = "y" ]; then
+    zfs clone ${POOLNAME}/ROOT/${SUITE}@base_install ${POOLNAME}/ROOT/${SUITE}_rescue_base
+    zfs set canmount=noauto ${POOLNAME}/ROOT/${SUITE}_rescue_base
+    zfs set mountpoint=/ ${POOLNAME}/ROOT/${SUITE}_rescue_base
+fi
+
 # Install main ubuntu gnome desktop, plus maybe HWE packages
 if [ "${GNOME}" = "y" ] ; then
     # NOTE: 18.04 has an xserver-xorg-hwe-18.04 package, 20.04 does NOT
@@ -1867,73 +1935,22 @@ if [ "${SOF}" = "y" ]; then
     ./install.sh v2.2.4
 fi # Sound Open Firmware
 
-# Configure google authenticator if we have a config
-if [ "${GOOGLE}" = "y" ]; then
-    apt-get -qq --no-install-recommends --yes install python3-qrcode qrencode libpam-google-authenticator
-    cp /root/google_auth.txt /home/${USERNAME}/.google_authenticator
-    chmod 400 /home/${USERNAME}/.google_authenticator
-    chown ${USERNAME}.${USERNAME} /home/${USERNAME}/.google_authenticator
-
-    # Set pam to use google authenticator for ssh
-    echo "auth required pam_google_authenticator.so" >> /etc/pam.d/sshd
-    sed -i "s/^ChallengeResponseAuthentication.*/ChallengeResponseAuthentication yes/" /etc/ssh/sshd_config
-
-    # Enable this to force use of token always, even with SSH key
-    # sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/" /etc/ssh/sshd_config
-fi # GOOGLE_AUTH
-
-
-# Add IP address(es) to main tty issue
-cat > /etc/systemd/system/showip.service <<- EOF
-[Unit]
-Description=Add IP address(es) to /etc/issue
-After=network-online.target
-
-[Service]
-Type=oneshot
-ExecStart=/usr/local/bin/showip.sh
-RemainAfterExit=true
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-cat > /usr/local/bin/showip.sh <<- EOF
-#!/bin/bash
-
-# Creates a normal /etc/issue file but populates the bottom with a list
-# of all network interfaces found. The /4{} gets filled in with IPv4 addresses
-# as they are obtained, so the splash screen is always live with correct info
-# Exclude lo, virtual and docker interfaces - they're just messy
-
-echo -e "$(lsb_release -d -s) \\\n \l\n" > /etc/issue
-echo "$(ls -1 /sys/class/net | egrep -v 'lo|vir|docker|tap|veth|br-' | xargs -I {} echo '   {} : \4{{}}')" >> /etc/issue
-echo "" >> /etc/issue
-EOF
-
-chmod +x /usr/local/bin/showip.sh
-systemctl enable showip.service
-
-# Set apt/dpkg to automagically snap the system datasets on install/remove
-cat > /etc/apt/apt.conf.d/30pre-snap <<-EOF
-	# Snapshot main datasets before installing or removing packages
-	# We use a DATE variable to ensure all snaps have SAME date
-	
-	 Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; ${ZFSLOCATION} snap \$(${ZFSLOCATION} list -o name | /usr/bin/grep -E 'ROOT/.*$' | sort | head -1)@apt_\${DATE}"; };
-EOF
-
-zfs snapshot ${POOLNAME}/ROOT/${SUITE}@base_install
-
-# Optionally create a clone of the new system as a rescue dataset.
-# This wlil show up in zfsbootmenu as a bootable dataset just in
-# case the main dataset gets corrupted during an update or something.
-# As the system is upgraded, the clone should periodically be replaced
-# with a clone of a newer snapshot.
-if [ "${RESCUE}" = "y" ]; then
-    zfs clone ${POOLNAME}/ROOT/${SUITE}@base_install ${POOLNAME}/ROOT/${SUITE}_rescue
-    zfs set canmount=noauto ${POOLNAME}/ROOT/${SUITE}_rescue
-    zfs set mountpoint=/ ${POOLNAME}/ROOT/${SUITE}_rescue
+# Snapshot the clean desktop(s) after base install
+if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] || [ "${NEON}" = "y" ] || [ "${XFCE}" = "y" ] ; then
+    zfs snapshot ${POOLNAME}/ROOT/${SUITE}@desktop_install
+    
+    # Optionally create a clone of the new system with desktop as a rescue dataset.
+    # This wlil show up in zfsbootmenu as a bootable dataset just in
+    # case the main dataset gets corrupted during an update or something.
+    # As the system is upgraded, the clone should periodically be replaced
+    # with a clone of a newer snapshot.
+    if [ "${RESCUE}" = "y" ]; then
+        zfs clone ${POOLNAME}/ROOT/${SUITE}@desktop_install ${POOLNAME}/ROOT/${SUITE}_rescue_desktop
+        zfs set canmount=noauto ${POOLNAME}/ROOT/${SUITE}_rescue_desktop
+        zfs set mountpoint=/ ${POOLNAME}/ROOT/${SUITE}_rescue_desktop
+    fi
 fi
+
 umount /boot/efi
 
 # End of Setup.sh
