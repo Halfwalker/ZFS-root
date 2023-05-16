@@ -334,9 +334,14 @@ if [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]]
 fi # Check ALL options from ZFS-root.conf
 
 # See if we need to install Nvidia drivers, notify if so
-if [ ${GNOME} = "y" ] || [ ${KDE} = "y" ] ; then
+NVIDIA=n
+if [ ${GNOME} = "y" ] || [ ${KDE} = "y" ] || [ ${NEON} = "y" ] || [ ${XFCE} = "y" ] ; then
     if [ $(lspci | fgrep -i nvidia | wc -l) -gt 0 ] ; then
-        whiptail --title "Nvidia drivers needed" --msgbox "Gnome or KDE was selected, and Nvidia graphics HW was detected on this system\n\nThe ppa:graphics-drivers/ppa repo will be installed in order to get the latest video driver" 12 70
+        whiptail --title "Nvidia Hardware detected - install latest driver ?" --yesno "Gnome/KDE/NEON was selected, and Nvidia graphics HW was detected on this system.  The ppa:graphics-drivers/ppa repo could be installed in order to get the latest video driver\n\nNOTE: This will install the latest driver, which does NOT support older legacy HW.  Be sure to select NO if you have old HW or are unsure.  You can always install the driver later" 14 70 \
+        3>&1 1>&2 2>&3
+        RET=${?}
+        [[ ${RET} = 0 ]] && NVIDIA=y
+        [[ ${RET} = 1 ]] && NVIDIA=n
     fi
 fi
 
@@ -514,7 +519,7 @@ case ${SUITE} in
         ;;
 esac
 
-box_height=$(( ${#zfsdisks[@]} + 26 ))
+box_height=$(( ${#zfsdisks[@]} + 27 ))
 whiptail --title "Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
     Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
     $(echo $SUITE $SUITE_NUM) $([ ${HWE} ] && echo WITH || echo without) $(echo hwe kernel ${HWE})\n \
@@ -532,6 +537,7 @@ whiptail --title "Summary of install options" --msgbox "These are the options we
     XFCE      = $(echo $XFCE)  : Install Ubuntu XFCE4 desktop\n \
     KDE       = $(echo $KDE)  : Install Ubuntu KDE Plasma desktop\n \
     NEON      = $(echo $NEON)  : Install Neon KDE Plasma desktop\n \
+    NVIDIA    = $(echo $NVIDIA)  : Install Nvidia latest drivers\n \
     SOF       = $(echo $SOF)  : Install Sound Open Firmware binaries\n \
     HIBERNATE = $(echo $HIBERNATE)  : Enable SWAP disk partition for hibernation\n \
     DISCENC   = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
@@ -963,6 +969,7 @@ cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
 	export XFCE=${XFCE}
 	export NEON=${NEON}
 	export KDE=${KDE}
+    export NVIDIA=${NVIDIA}
 	export HIBERNATE=${HIBERNATE}
 	export SIZE_SWAP=${SIZE_SWAP}
 	export PARTITION_BOOT=${PARTITION_BOOT}
@@ -1802,7 +1809,7 @@ if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] || [ "${NEON}" = "y" ] || [ "${XFC
 	EOF
 
     # Check for Nvidia graphics - if so, install from the ppa:graphics-drivers/ppa
-    if [ $(lspci | fgrep -i nvidia | wc -l) -gt 0 ] ; then
+    if [ "${NVIDIA}" = "y" ] ; then
         apt-add-repository --yes --update ppa:graphics-drivers/ppa
         NVIDIA_LATEST=$(apt-cache search nvidia-driver- | cut -d ' ' -f1 | grep -e "nvidia-driver-...$" | cut -d'-' -f3 | sort | tail -1)
         apt-get -qq --yes install nvidia-driver-${NVIDIA_LATEST}
