@@ -334,14 +334,21 @@ if [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]]
 fi # Check ALL options from ZFS-root.conf
 
 # See if we need to install Nvidia drivers, notify if so
-NVIDIA=n
-if [ ${GNOME} = "y" ] || [ ${KDE} = "y" ] || [ ${NEON} = "y" ] || [ ${XFCE} = "y" ] ; then
-    if [ $(lspci | fgrep -i nvidia | wc -l) -gt 0 ] ; then
-        whiptail --title "Nvidia Hardware detected - install latest driver ?" --yesno "Gnome/KDE/NEON was selected, and Nvidia graphics HW was detected on this system.  The ppa:graphics-drivers/ppa repo could be installed in order to get the latest video driver\n\nNOTE: This will install the latest driver, which does NOT support older legacy HW.  Be sure to select NO if you have old HW or are unsure.  You can always install the driver later" 14 70 \
-        3>&1 1>&2 2>&3
-        RET=${?}
-        [[ ${RET} = 0 ]] && NVIDIA=y
-        [[ ${RET} = 1 ]] && NVIDIA=n
+if [[ ! -v NVIDIA ]] ; then
+    if [ ${GNOME} = "y" ] || [ ${KDE} = "y" ] || [ ${NEON} = "y" ] || [ ${XFCE} = "y" ] ; then
+        if [ $(lspci | fgrep -i nvidia | wc -l) -gt 0 ] ; then
+            # Installing Nvidia PPA here just so we can search for versions
+            apt-add-repository --yes --update ppa:graphics-drivers/ppa
+            NVIDIA_LATEST=$(apt-cache search nvidia-driver- | cut -d ' ' -f1 | grep -e "nvidia-driver-...$" | cut -d'-' -f3 | sort | tail -1)
+            NVIDIA=$(whiptail --title "Nvidia Hardware detected - install latest driver ?" --radiolist "Gnome/KDE/NEON was selected, and Nvidia graphics HW was detected on this system.  The ppa:graphics-drivers/ppa repo could be installed in order to get the binary Nvidia driver\n\nNOTE: Be sure to select the correct driver - the latest (${NVIDIA_LATEST}) may not support older legacy HW.  See\n\nhttps://www.nvidia.com/en-us/drivers/unix/legacy-gpu/\n\nfor more information on legacy HW.  It is safe to select NONE if you are unsure.  You can always install the appropriate driver later via Additional Drivers" 22 70 4 \
+                ${NVIDIA_LATEST} "Latest ${NVIDIA_LATEST}" OFF \
+                470    "Legacy 470 driver" OFF \
+                390    "Legacy 390 driver" OFF \
+                none   "No Nvidia driver" ON \
+                3>&1 1>&2 2>&3)
+            RET=${?}
+            [[ ${RET} = 1 ]] && exit 1
+        fi
     fi
 fi
 
@@ -537,7 +544,7 @@ whiptail --title "Summary of install options" --msgbox "These are the options we
     XFCE      = $(echo $XFCE)  : Install Ubuntu XFCE4 desktop\n \
     KDE       = $(echo $KDE)  : Install Ubuntu KDE Plasma desktop\n \
     NEON      = $(echo $NEON)  : Install Neon KDE Plasma desktop\n \
-    NVIDIA    = $(echo $NVIDIA)  : Install Nvidia latest drivers\n \
+    NVIDIA    = $(echo $NVIDIA)  : Install Nvidia drivers\n \
     SOF       = $(echo $SOF)  : Install Sound Open Firmware binaries\n \
     HIBERNATE = $(echo $HIBERNATE)  : Enable SWAP disk partition for hibernation\n \
     DISCENC   = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
@@ -1877,10 +1884,10 @@ if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] || [ "${NEON}" = "y" ] || [ "${XFC
 	EOF
 
     # Check for Nvidia graphics - if so, install from the ppa:graphics-drivers/ppa
-    if [ "${NVIDIA}" = "y" ] ; then
+    # The NVIDIA var should be set to the appropriate version from the menu query
+    if [ "${NVIDIA}" != "none" ] ; then
         apt-add-repository --yes --update ppa:graphics-drivers/ppa
-        NVIDIA_LATEST=$(apt-cache search nvidia-driver- | cut -d ' ' -f1 | grep -e "nvidia-driver-...$" | cut -d'-' -f3 | sort | tail -1)
-        apt-get -qq --yes install nvidia-driver-${NVIDIA_LATEST}
+        apt-get -qq --yes install nvidia-driver-${NVIDIA}
     fi
 
     ####

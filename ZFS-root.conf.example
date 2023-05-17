@@ -78,6 +78,15 @@ KDE=n
 NEON=n
 XFCE=n
 
+# If you have Nvidia video HW and you *know* which version of driver you want
+# it can be preset here. Leaving undefined will cause the script to prompt.
+# The package installed will be : nvidia-driver-${NVIDIA}
+#
+# none for no driver
+# 390 or 470 for legacy driver
+# 530 for current latest, or whatever version you prefer
+# NVIDIA=none
+
 #
 # Below are additional options that can be set that do NOT have a menu process
 # to ask for their values.  Less-likely to be used, and larger ones that are not
