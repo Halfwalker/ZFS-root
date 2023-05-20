@@ -1788,7 +1788,7 @@ cat > /etc/apt/apt.conf.d/30pre-snap <<-EOF
     # Use df to find root dataset
 	
 	 # Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; ${ZFSLOCATION} snap \$(${ZFSLOCATION} list -o name | /usr/bin/grep -E 'ROOT/.*$' | sort | head -1)@apt_\${DATE}"; };
-	 Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; ${ZFSLOCATION} snap \$(/usr/bin/df | /usr/bin/egrep "/\$" | /usr/bin/cut -d' ' -f1)@apt_\${DATE}"; };
+	 Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; ${ZFSLOCATION} snap \$(/usr/bin/df | /usr/bin/grep -E '/\$' | /usr/bin/cut -d' ' -f1)@apt_\${DATE}"; };
 EOF
 
 zfs snapshot ${POOLNAME}/ROOT/${SUITE}@base_install
