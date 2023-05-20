@@ -1783,10 +1783,12 @@ systemctl enable showip.service
 
 # Set apt/dpkg to automagically snap the system datasets on install/remove
 cat > /etc/apt/apt.conf.d/30pre-snap <<-EOF
-	# Snapshot main datasets before installing or removing packages
+	# Snapshot main dataset before installing or removing packages
 	# We use a DATE variable to ensure all snaps have SAME date
+    # Use df to find root dataset
 	
-	 Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; ${ZFSLOCATION} snap \$(${ZFSLOCATION} list -o name | /usr/bin/grep -E 'ROOT/.*$' | sort | head -1)@apt_\${DATE}"; };
+	 # Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; ${ZFSLOCATION} snap \$(${ZFSLOCATION} list -o name | /usr/bin/grep -E 'ROOT/.*$' | sort | head -1)@apt_\${DATE}"; };
+	 Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; ${ZFSLOCATION} snap \$(/usr/bin/df | /usr/bin/egrep "/\$" | /usr/bin/cut -d' ' -f1)@apt_\${DATE}"; };
 EOF
 
 zfs snapshot ${POOLNAME}/ROOT/${SUITE}@base_install
