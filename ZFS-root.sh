@@ -930,20 +930,33 @@ fi
 
 # sources
 cat > ${ZFSBUILD}/etc/apt/sources.list <<-EOF
-	deb http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse
-	deb-src http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse
+	deb http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse restricted
+	deb-src http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse restricted
 	
-	deb http://security.ubuntu.com/ubuntu ${SUITE}-security main multiverse
-	deb-src http://security.ubuntu.com/ubuntu ${SUITE}-security main multiverse
+	deb http://security.ubuntu.com/ubuntu ${SUITE}-security main multiverse restricted
+	deb-src http://security.ubuntu.com/ubuntu ${SUITE}-security main multiverse restricted
 	
-	deb http://archive.ubuntu.com/ubuntu ${SUITE}-updates main multiverse
-	deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-updates main multiverse
+	deb http://archive.ubuntu.com/ubuntu ${SUITE}-updates main multiverse restricted
+	deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-updates main multiverse restricted
+	
+	deb http://archive.ubuntu.com/ubuntu ${SUITE}-backports main multiverse restricted
+	deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-backports main multiverse restricted
 EOF
 
 # We put universe into its own .list file so ansible apt_repository will match 
-echo "deb http://archive.ubuntu.com/ubuntu ${SUITE} universe" > ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu_universe.list
-echo "deb http://archive.ubuntu.com/ubuntu ${SUITE}-updates universe" >> ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu_universe.list
-echo "deb http://security.ubuntu.com/ubuntu ${SUITE}-security universe" >> ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu_universe.list
+cat > ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu_universe.list <<-EOF
+	deb http://archive.ubuntu.com/ubuntu ${SUITE} universe
+	deb-src http://archive.ubuntu.com/ubuntu ${SUITE} universe
+
+	deb http://security.ubuntu.com/ubuntu ${SUITE}-security universe
+	deb-src http://security.ubuntu.com/ubuntu ${SUITE}-security universe
+
+	deb http://archive.ubuntu.com/ubuntu ${SUITE}-updates universe
+	deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-updates universe
+
+	deb http://archive.ubuntu.com/ubuntu ${SUITE}-backports universe
+	deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-backports universe
+EOF
 
 # Copy logo for rEFInd
 [ -e logo_sm.jpg ] && cp logo_sm.jpg ${ZFSBUILD}/root/logo_sm.jpg
