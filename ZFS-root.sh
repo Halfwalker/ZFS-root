@@ -100,7 +100,7 @@ PARTITION_DATA=3
 ZFSENC_ROOT_OPTIONS="-o encryption=aes-256-gcm -o keylocation=prompt -o keyformat=passphrase"
 # NOTE: for keyfile, put key in local /etc/zfs, then later copy to target /etc/zfs
 #       to be used for encrypting /home
-ZFSENC_HOME_OPTIONS="-o encryption=aes-256-gcm -o keylocation=file:///etc/zfs/zroot.rawkey -o keyformat=raw"
+ZFSENC_HOME_OPTIONS="-o encryption=aes-256-gcm -o keylocation=file:///etc/zfs/zroot.homekey -o keyformat=passphrase"
 
 # Check for a local apt-cacher-ng system - looking for these hosts
 # aptcacher.local
@@ -604,11 +604,17 @@ if [[ ("${ZFS_LIVECD}" = "y" && "${ZFS_INSTALLED}" != "${ZFS_MODULE}")  || "${ZF
     ZFSPPA="y"
 fi                                                                      
 
-# Create an encryption key for non-root datasets (/home).  The root dataset
-# is encrypted with the passphrase above, but other datasets use a key that
-# is stored in /etc/zfs/zroot.rawkey.  This key isn't available unless the root
-# dataset is unlocked, so we're still secure.
-dd if=/dev/urandom of=/etc/zfs/zroot.rawkey bs=32 count=1
+# Create an encryption key for LUKs partitions
+if [ ${DISCENC} = "LUKS" ] ; then
+    dd if=/dev/urandom of=/etc/zfs/zroot.rawkey bs=32 count=1
+fi
+# Put zfs encryption key into place
+# We use two keys so the user can change the home dataset to something else if desired
+if [ ${DISCENC} = "ZFSENC" ] ; then
+    echo "${PASSPHRASE}" > /etc/zfs/zroot.key
+    echo "${PASSPHRASE}" > /etc/zfs/zroot.homekey
+    chmod 000 /etc/zfs/zroot.key /etc/zfs/zroot.homekey
+fi
 
 apt-get -qq --no-install-recommends --yes install openssh-server debootstrap gdisk dosfstools mdadm
 
@@ -806,9 +812,10 @@ zpool set bootfs=${POOLNAME}/ROOT/${SUITE} ${POOLNAME}
 zfs mount ${POOLNAME}/ROOT/${SUITE}
 
 if [ ${DISCENC} != "NOENC" ] ; then
+    # Making sure we have the LUKS raw key available and/or
     # Making sure we have the non-root key used for other datasets (/home)
     mkdir -p ${ZFSBUILD}/etc/zfs
-    cp /etc/zfs/zroot.rawkey ${ZFSBUILD}/etc/zfs
+    cp /etc/zfs/zroot.*key ${ZFSBUILD}/etc/zfs
 fi
 
 # zfs create pool/home and main user home dataset - possibly zfs native encrypted
@@ -1723,14 +1730,12 @@ if [ "${DROPBEAR}" = "y" ] ; then
   echo 'install_items+=" /etc/cmdline.d/dracut-network.conf "' >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
   # Have dracut use main user authorized_keys for access
   echo "dropbear_acl=/home/${USERNAME}/.ssh/authorized_keys"   >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
-
-  echo ${PASSPHRASE} > /etc/zfs/zroot.key
-  chmod 000 /etc/zfs/zroot.key
-  echo 'install_items+=" /etc/zfs/zroot.key "' >> /etc/dracut.conf.d/zfskey.conf
 fi
 
-# For ZFS encryption point to the /etc/zfs/zroot.key in the initramfs
+# For ZFS encryption point to the /etc/zfs/zroot.key files in the initramfs
+# These keys should have been copied into place above outside the chroot
 if [ "${DISCENC}" = "ZFSENC" ] ; then
+  echo 'install_items+=" /etc/zfs/zroot.key /etc/zfs/zroot.homekey"' >> /etc/dracut.conf.d/zfskey.conf
   zfs change-key -o keylocation=file:///etc/zfs/zroot.key -o keyformat=passphrase ${POOLNAME}/ROOT
 fi
 
