@@ -57,6 +57,13 @@ SIZE_SWAP=300
 #       RTNETLINK answers: File exists will appear and it will just sit ...
 # So, do not enable Dropbear for laptops
 #
+# For ZFS encryption, the passphrase is stored in /etc/zfs/zroot.key and /etc/zfs/zroot.homekey
+# zroot.key is for the root datasets, zroot.homekey for the home datasets
+# This is so the user can change the key for home so it's different from root
+# See `zfs change-key` command
+# It is safe to store the keys there as they're not visible until the main root
+# dataset is unlocked
+#
 DISCENC="NOENC"
 PASSPHRASE="password"
 DROPBEAR=n
@@ -73,6 +80,7 @@ ZFSPPA=y
 HIBERNATE=n
 DELAY=n
 SOF=n
+NVIDIA=n
 GNOME=n
 KDE=n
 NEON=n
