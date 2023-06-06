@@ -1835,7 +1835,7 @@ jobs:
         # than the threshold value in dataset property com.zrepl:snapshot-threshold
         # zfs set com.zrepl:snapshot-threshold=10000000 ${POOLNAME}/ROOT/${SUITE}
         - type: command
-          path: /usr/local/bin/zrepl_threshold.sh
+          path: /usr/local/bin/zrepl_threshold_check.sh
           err_is_fatal: true
           filesystems: {
             "${POOLNAME}/ROOT/${SUITE}<": true,
@@ -1894,9 +1894,9 @@ cat > /usr/local/bin/zfs_threshold_check.sh <<-'EOF'
 set -e
 
 # Checks the data-written threshold of a zfs dataset for use with zrepl
-# Returns 0 if amount written has not reached threshold
-# Returns 1 if over threshold
-# If no threshold set, then defaults to {{ (zfs_snapshot_threshold / 1024) }}M (arbitrary)
+# Returns 0 if over threshold so should be snapshot'd
+# Returns 255 if amount written has not reached threshold
+# If no threshold property set in dataset default yes, take snapshot
 
 # Set threshold in bytes like this :
 # zfs set com.zrepl:snapshot-threshold=6000000 pool/dataset
