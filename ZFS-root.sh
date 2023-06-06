@@ -1854,7 +1854,7 @@ jobs:
       - type: last_n
         count: 10
         regex: "^apt_.*"
-      # keep all base or desktop installs
+      # keep all base or desktop install snapshots
       - type: regex
         regex: "^(base_install|desktop_install)"
       # keep all snapshots that don't have the 'zrepl_' or 'apt_' prefix
@@ -1889,7 +1889,7 @@ jobs:
         regex: "^zrepl_.*"
 EOF
 
-cat > /usr/local/bin/zfs_threshold_check.sh <<-'EOF'
+cat > /usr/local/bin/zrepl_threshold_check.sh <<-'EOF'
 #!/usr/bin/env bash
 set -e
 
@@ -1915,6 +1915,7 @@ pre_snapshot() {
         elif [ ${WRITTEN} -gt ${THRESH} ] ; then
             RC=0
         else
+            printf '%s dataset has written %s, NOT over threshold %s, skipping\n' "$ZREPL_FS" "$WRITTEN" "$THRESH"
             RC=255
         fi
     fi
@@ -1936,8 +1937,8 @@ case "$ZREPL_HOOKTYPE" in
 esac
 
 exit $RC
-chmod +x /usr/local/bin/zfs_threshold_check.sh
 EOF
+chmod +x /usr/local/bin/zrepl_threshold_check.sh
 #-----------------------------------------------------------------------------
 
 # Set apt/dpkg to automagically snap the system datasets on install/remove
