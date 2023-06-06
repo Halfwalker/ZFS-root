@@ -1799,6 +1799,147 @@ EOF
 chmod +x /usr/local/bin/showip.sh
 systemctl enable showip.service
 
+#-----------------------------------------------------------------------------
+# Install zrepl for zfs snapshot management
+zrepl_apt_key_url=https://zrepl.cschwarz.com/apt/apt-key.asc
+zrepl_apt_key_dst=/usr/share/keyrings/zrepl.gpg
+zrepl_apt_repo_file=/etc/apt/sources.list.d/zrepl.list
+curl -fsSL "$zrepl_apt_key_url" | tee | gpg --dearmor | tee "$zrepl_apt_key_dst" > /dev/null
+echo "deb [signed-by=$zrepl_apt_key_dst] https://zrepl.cschwarz.com/apt/ubuntu ${SUITE} main" | tee /etc/apt/sources.list.d/zrepl.list
+apt-get -qq update
+apt-get -qq --yes install zrepl
+systemctl stop zrepl
+mv /etc/zrepl/zrepl.yml /etc/zrepl/zrepl.yml.BAK
+cat > /etc/zrepl/zrepl.yml <<-EOF
+global:
+  logging:
+    # use syslog instead of stdout because it makes journald happy
+    - type: syslog
+      format: human
+      level: warn
+
+jobs:
+  - name: snaproot
+    type: snap
+    filesystems: {
+        "${POOLNAME}/ROOT/${SUITE}<": true,
+    }
+    # create snapshots with prefix 'zrepl_' every 15 minutes
+    snapshotting:
+      type: periodic
+      interval: 15m
+      timestamp_format: human
+      prefix: zrepl_
+      hooks:
+        # threshold script only allows snaps if amount of data written is greater
+        # than the threshold value in dataset property com.zrepl:snapshot-threshold
+        # zfs set com.zrepl:snapshot-threshold=10000000 ${POOLNAME}/ROOT/${SUITE}
+        - type: command
+          path: /usr/local/bin/zrepl_threshold.sh
+          err_is_fatal: true
+          filesystems: {
+            "${POOLNAME}/ROOT/${SUITE}<": true,
+          }
+    pruning:
+      keep:
+      # fade-out scheme for snapshots starting with 'zrepl_'
+      # - keep all created in the last hour
+      # - then destroy snapshots such that we keep 24 each 1 hour apart
+      # - then destroy snapshots such that we keep 14 each 1 day apart
+      # - then destroy all older snapshots
+      - type: grid
+        grid: 1x1h(keep=all) | 24x1h | 14x1d
+        regex: "^zrepl_.*"
+      # Only keep the last 10 of the auto snaps by apt
+      - type: last_n
+        count: 10
+        regex: "^apt_.*"
+      # keep all base or desktop installs
+      - type: regex
+        regex: "^(base_install|desktop_install)"
+      # keep all snapshots that don't have the 'zrepl_' or 'apt_' prefix
+      # Note: apt snapshots are governed by the apt last_n policy above
+      - type: regex
+        negate: true
+        regex: "^(zrepl|apt)_.*"
+
+  - name: snaphome
+    type: snap
+    filesystems: {
+        "${POOLNAME}/home/${USERNAME}<": true,
+    }
+    # create snapshots with prefix 'zrepl_' every 15 minutes
+    snapshotting:
+      type: periodic
+      interval: 15m
+      timestamp_format: human
+      prefix: zrepl_
+    pruning:
+      keep:
+      - type: grid
+        grid: 1x1h(keep=all) | 24x1h | 30x1d
+        regex: "^zrepl_.*"
+      # keep all base or desktop installs
+      - type: regex
+        regex: "^(base_install|desktop_install)"
+      # keep all snapshots that don't have the 'zrepl_' or 'apt_' prefix
+      # Note: apt snapshots are governed by the apt last_n policy above
+      - type: regex
+        negate: true
+        regex: "^zrepl_.*"
+EOF
+
+cat > /usr/local/bin/zfs_threshold_check.sh <<-'EOF'
+#!/usr/bin/env bash
+set -e
+
+# Checks the data-written threshold of a zfs dataset for use with zrepl
+# Returns 0 if amount written has not reached threshold
+# Returns 1 if over threshold
+# If no threshold set, then defaults to {{ (zfs_snapshot_threshold / 1024) }}M (arbitrary)
+
+# Set threshold in bytes like this :
+# zfs set com.zrepl:snapshot-threshold=6000000 pool/dataset
+
+WRITTEN=$(zfs get -Hpo value written ${ZREPL_FS})
+THRESH=$(zfs get -Hpo value com.zrepl:snapshot-threshold ${ZREPL_FS})
+
+[ "$ZREPL_DRYRUN" = "true" ] && DRYRUN="echo DRYRUN (WRITTEN ${WRITTEN} THRESH ${THRESH}) : "
+
+pre_snapshot() {
+    echo -n "pre_snap "
+    $DRYRUN date
+    if [ "$ZREPL_DRYRUN" != "true" ] ; then
+        if [ "${THRESH}" = "-" ]; then
+            RC=0
+        elif [ ${WRITTEN} -gt ${THRESH} ] ; then
+            RC=0
+        else
+            RC=255
+        fi
+    fi
+}
+
+post_snapshot() {
+    echo -n "post_snap "
+    $DRYRUN date
+}
+
+case "$ZREPL_HOOKTYPE" in
+    pre_snapshot|post_snapshot)
+        "$ZREPL_HOOKTYPE"
+        ;;
+    *)
+        printf 'Unrecognized hook type: %s\n' "$ZREPL_HOOKTYPE"
+        exit 255
+        ;;
+esac
+
+exit $RC
+chmod +x /usr/local/bin/zfs_threshold_check.sh
+EOF
+#-----------------------------------------------------------------------------
+
 # Set apt/dpkg to automagically snap the system datasets on install/remove
 cat > /etc/apt/apt.conf.d/30pre-snap <<-EOF
 	# Snapshot main dataset before installing or removing packages

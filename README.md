@@ -31,6 +31,7 @@ Number  Start (sector)    End (sector)  Size       Code  Name
 * Optionally can install google_authenticator for the main user.  This will prompt for a TOTP code on login via ssh if no ssh-key is used.  The code and a QR code are displayed during initial config setup.
 * If a local *apt-cacher* system is available it will point `apt` to that to speed up package downloads.
 * Memtest86+ included as a boot option.
+* [zrepl](https://zrepl.github.io/) installed with a base snapshot-only config to auto-snapshot the main and home datasets (see _/etc/zrepl_)
 
 *initramfs-tools* is NOT used, and is in fact disabled via `apt-mark hold initramfs-tools`.  Instead *dracut* is used for managing the initramfs.
 
