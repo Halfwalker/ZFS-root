@@ -289,15 +289,16 @@ HIBERNATE_AVAIL=${?}
 #
 # Slightly fugly - have to check if ANY of these are not set
 #
-if [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]] || [[ ! -v HIBERNATE ]] || [[ ! -v DELAY ]] || [[ ! -v SOF ]] || [[ ! -v GNOME ]] || [[ ! -v KDE ]] || [[ ! -v NEON ]] || [[ ! -v XFCE ]] ; then
+if [[ ! -v ZREPL ]] || [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]] || [[ ! -v HIBERNATE ]] || [[ ! -v DELAY ]] || [[ ! -v SOF ]] || [[ ! -v GNOME ]] || [[ ! -v KDE ]] || [[ ! -v NEON ]] || [[ ! -v XFCE ]] ; then
     # Hibernate can only resume from a single disk, and currently not available for ZFS encryption
     if [ "${DISCENC}" == "ZFSENC" ] || [ ${#zfsdisks[@]} -gt 1 ] || [ ${HIBERNATE_AVAIL} -ne 0 ] ; then
         # Set basic options for install - ZFSENC so no Hibernate available (yet)
-        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 21 83 10 \
+        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 22 83 11 \
             RESCUE "Create rescue dataset by cloning initial install" OFF \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
             HWE "Install Hardware Enablement kernel" OFF \
             ZFSPPA "Update to latest ZFS 2.1 from PPA" ON \
+            ZREPL "Install Zrepl zfs snapshot manager" OFF \
             DELAY "Add delay before importing root pool - for many-disk systems" OFF \
             SOF "Install Sound Open Firmware binaries (for some laptops)" OFF \
             GNOME "Install Ubuntu Gnome desktop" OFF \
@@ -306,11 +307,12 @@ if [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]]
             NEON "Install Neon KDE Plasma desktop" OFF 2>"${TMPFILE}"
     else
         # Set basic options for install - ZFSENC so no Hibernate available (yet)
-        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 22 83 11 \
+        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 23 83 12 \
             RESCUE "Create rescue dataset by cloning initial install" OFF \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
             HWE "Install Hardware Enablement kernel" OFF \
             ZFSPPA "Update to latest ZFS 2.1 from PPA" ON \
+            ZREPL "Install Zrepl zfs snapshot manager" OFF \
             HIBERNATE "Enable swap partition for hibernation" OFF \
             DELAY "Add delay before importing root pool - for many-disk systems" OFF \
             SOF "Install Sound Open Firmware binaries (for some laptops)" OFF \
@@ -328,7 +330,7 @@ if [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]]
     done < "${TMPFILE}"
 
     # Any options not enabled in the basic options menu we now set to 'n'
-    for option in RESCUE GNOME XFCE NEON KDE HWE HIBERNATE ZFSPPA DELAY SOF GOOGLE; do
+    for option in ZREPL RESCUE GNOME XFCE NEON KDE HWE HIBERNATE ZFSPPA DELAY SOF GOOGLE; do
         [ ${!option} ] || eval "${option}"='n'
     done
 fi # Check ALL options from ZFS-root.conf
@@ -526,7 +528,7 @@ case ${SUITE} in
         ;;
 esac
 
-box_height=$(( ${#zfsdisks[@]} + 27 ))
+box_height=$(( ${#zfsdisks[@]} + 28 ))
 whiptail --title "Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
     Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
     $(echo $SUITE $SUITE_NUM) $([ ${HWE} ] && echo WITH || echo without) $(echo hwe kernel ${HWE})\n \
@@ -539,6 +541,7 @@ whiptail --title "Summary of install options" --msgbox "These are the options we
     RESCUE    = $(echo $RESCUE)  : Create rescue dataset by cloning install\n \
     DELAY     = $(echo $DELAY)  : Enable delay before importing zpool\n \
     ZFS ver   = $(echo $ZFSPPA)  : Update to latest ZFS 2.1 via PPA\n \
+    ZREPL     = $(echo $ZREPL)  : Install Zrepl zfs snapshot manager\n \
     GOOGLE    = $(echo $GOOGLE)  : Install google authenticator\n \
     GNOME     = $(echo $GNOME)  : Install Ubuntu Gnome desktop\n \
     XFCE      = $(echo $XFCE)  : Install Ubuntu XFCE4 desktop\n \
@@ -988,6 +991,7 @@ cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
 	export DROPBEAR=${DROPBEAR}
 	export AUTHKEYS=${AUTHKEYS}
 	export ZFSPPA=${ZFSPPA}
+    export ZREPL=${ZREPL}
 	export GOOGLE=${GOOGLE}
 	export SOF=${SOF}
 	export PROXY=${PROXY}
@@ -1333,6 +1337,7 @@ if [ "${DISCENC}" = "LUKS" ] ; then
     # Early-stage script for zfsbootmenu - scan for ZFS_ partitions which
     # should be LUKS encrypted and try to open them all
     #
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
     cat > /usr/local/bin/zfsbootmenu_luks_unlock.sh <<-'EOF'
 	#!/bin/bash
 	
@@ -1494,6 +1499,7 @@ cp /usr/share/doc/avahi-daemon/examples/ssh.service /etc/avahi/services
 
 # For ZFSENC we need to set up a script and systemd unit to load the keyfile
 if [ ${DISCENC} = "ZFSENC" ] ; then
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
     cat > /usr/local/bin/zfs-multi-mount.sh <<-'EOF'
 	#!/usr/bin/env bash
 	
@@ -1643,6 +1649,7 @@ PS1="${debian_chroot:+($debian_chroot)}\[\$(tput setaf 2)\]\u@\[\$(tput bold)\]\
 PROMPT_COMMAND="history -a; history -c; history -r; \${PROMPT_COMMAND}"
 EOF
 
+# NOTE: heredoc using TABS - be sure to use TABS if you make any changes
 cat >> /etc/skel/.bashrc <<-EOF
 	
 	PS1="${debian_chroot:+($debian_chroot)}\[\$(tput setaf 2)\]\u@\[\$(tput bold)\]\[\$(tput setaf 5)\]\h\[\$(tput sgr0)\]\[\$(tput setaf 7)\]:\[\$(tput bold)\]\[\$(tput setaf 4)\]\w\[\$(tput setaf 7)\]\\$ \[\$(tput sgr0)\]"
@@ -1800,145 +1807,151 @@ chmod +x /usr/local/bin/showip.sh
 systemctl enable showip.service
 
 #-----------------------------------------------------------------------------
-# Install zrepl for zfs snapshot management
-zrepl_apt_key_url=https://zrepl.cschwarz.com/apt/apt-key.asc
-zrepl_apt_key_dst=/usr/share/keyrings/zrepl.gpg
-zrepl_apt_repo_file=/etc/apt/sources.list.d/zrepl.list
-curl -fsSL "$zrepl_apt_key_url" | tee | gpg --dearmor | tee "$zrepl_apt_key_dst" > /dev/null
-echo "deb [signed-by=$zrepl_apt_key_dst] https://zrepl.cschwarz.com/apt/ubuntu ${SUITE} main" | tee /etc/apt/sources.list.d/zrepl.list
-apt-get -qq update
-apt-get -qq --yes install zrepl
-systemctl stop zrepl
-mv /etc/zrepl/zrepl.yml /etc/zrepl/zrepl.yml.BAK
-cat > /etc/zrepl/zrepl.yml <<-EOF
-global:
-  logging:
-    # use syslog instead of stdout because it makes journald happy
-    - type: syslog
-      format: human
-      level: warn
+if [ "${ZREPL}" = "y" ]; then
+    # Install zrepl for zfs snapshot management
+    zrepl_apt_key_url=https://zrepl.cschwarz.com/apt/apt-key.asc
+    zrepl_apt_key_dst=/usr/share/keyrings/zrepl.gpg
+    zrepl_apt_repo_file=/etc/apt/sources.list.d/zrepl.list
+    curl -fsSL "$zrepl_apt_key_url" | tee | gpg --dearmor | tee "$zrepl_apt_key_dst" > /dev/null
+    echo "deb [signed-by=$zrepl_apt_key_dst] https://zrepl.cschwarz.com/apt/ubuntu ${SUITE} main" | tee /etc/apt/sources.list.d/zrepl.list
+    apt-get -qq update
+    apt-get -qq --yes install zrepl
+    systemctl stop zrepl
+    mv /etc/zrepl/zrepl.yml /etc/zrepl/zrepl.yml.BAK
 
-jobs:
-  - name: snaproot
-    type: snap
-    filesystems: {
-        "${POOLNAME}/ROOT/${SUITE}<": true,
-    }
-    # create snapshots with prefix 'zrepl_' every 15 minutes
-    snapshotting:
-      type: periodic
-      interval: 15m
-      timestamp_format: human
-      prefix: zrepl_
-      hooks:
-        # threshold script only allows snaps if amount of data written is greater
-        # than the threshold value in dataset property com.zrepl:snapshot-threshold
-        # zfs set com.zrepl:snapshot-threshold=10000000 ${POOLNAME}/ROOT/${SUITE}
-        - type: command
-          path: /usr/local/bin/zrepl_threshold_check.sh
-          err_is_fatal: true
-          filesystems: {
-            "${POOLNAME}/ROOT/${SUITE}<": true,
-          }
-    pruning:
-      keep:
-      # fade-out scheme for snapshots starting with 'zrepl_'
-      # - keep all created in the last hour
-      # - then destroy snapshots such that we keep 24 each 1 hour apart
-      # - then destroy snapshots such that we keep 14 each 1 day apart
-      # - then destroy all older snapshots
-      - type: grid
-        grid: 1x1h(keep=all) | 24x1h | 14x1d
-        regex: "^zrepl_.*"
-      # Only keep the last 10 of the auto snaps by apt
-      - type: last_n
-        count: 10
-        regex: "^apt_.*"
-      # keep all base or desktop install snapshots
-      - type: regex
-        regex: "^(base_install|desktop_install)"
-      # keep all snapshots that don't have the 'zrepl_' or 'apt_' prefix
-      # Note: apt snapshots are governed by the apt last_n policy above
-      - type: regex
-        negate: true
-        regex: "^(zrepl|apt)_.*"
-
-  - name: snaphome
-    type: snap
-    filesystems: {
-        "${POOLNAME}/home/${USERNAME}<": true,
-    }
-    # create snapshots with prefix 'zrepl_' every 15 minutes
-    snapshotting:
-      type: periodic
-      interval: 15m
-      timestamp_format: human
-      prefix: zrepl_
-    pruning:
-      keep:
-      - type: grid
-        grid: 1x1h(keep=all) | 24x1h | 30x1d
-        regex: "^zrepl_.*"
-      # keep all base or desktop installs
-      - type: regex
-        regex: "^(base_install|desktop_install)"
-      # keep all snapshots that don't have the 'zrepl_' or 'apt_' prefix
-      # Note: apt snapshots are governed by the apt last_n policy above
-      - type: regex
-        negate: true
-        regex: "^zrepl_.*"
-EOF
-
-cat > /usr/local/bin/zrepl_threshold_check.sh <<-'EOF'
-#!/usr/bin/env bash
-set -e
-
-# Checks the data-written threshold of a zfs dataset for use with zrepl
-# Returns 0 if over threshold so should be snapshot'd
-# Returns 255 if amount written has not reached threshold
-# If no threshold property set in dataset default yes, take snapshot
-
-# Set threshold in bytes like this :
-# zfs set com.zrepl:snapshot-threshold=6000000 pool/dataset
-
-WRITTEN=$(zfs get -Hpo value written ${ZREPL_FS})
-THRESH=$(zfs get -Hpo value com.zrepl:snapshot-threshold ${ZREPL_FS})
-
-[ "$ZREPL_DRYRUN" = "true" ] && DRYRUN="echo DRYRUN (WRITTEN ${WRITTEN} THRESH ${THRESH}) : "
-
-pre_snapshot() {
-    echo -n "pre_snap "
-    $DRYRUN date
-    if [ "$ZREPL_DRYRUN" != "true" ] ; then
-        if [ "${THRESH}" = "-" ]; then
-            RC=0
-        elif [ ${WRITTEN} -gt ${THRESH} ] ; then
-            RC=0
-        else
-            printf '%s dataset has written %s, NOT over threshold %s, skipping\n' "$ZREPL_FS" "$WRITTEN" "$THRESH"
-            RC=255
-        fi
-    fi
-}
-
-post_snapshot() {
-    echo -n "post_snap "
-    $DRYRUN date
-}
-
-case "$ZREPL_HOOKTYPE" in
-    pre_snapshot|post_snapshot)
-        "$ZREPL_HOOKTYPE"
-        ;;
-    *)
-        printf 'Unrecognized hook type: %s\n' "$ZREPL_HOOKTYPE"
-        exit 255
-        ;;
-esac
-
-exit $RC
-EOF
-chmod +x /usr/local/bin/zrepl_threshold_check.sh
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+    cat > /etc/zrepl/zrepl.yml <<-EOF
+	global:
+	  logging:
+	    # use syslog instead of stdout because it makes journald happy
+	    - type: syslog
+	      format: human
+	      level: warn
+	
+	jobs:
+	  - name: snaproot
+	    type: snap
+	    filesystems: {
+	        "${POOLNAME}/ROOT/${SUITE}<": true,
+	    }
+	    # create snapshots with prefix 'zrepl_' every 15 minutes
+	    snapshotting:
+	      type: periodic
+	      interval: 15m
+	      timestamp_format: human
+	      prefix: zrepl_
+	      hooks:
+	        # threshold script only allows snaps if amount of data written is greater
+	        # than the threshold value in dataset property com.zrepl:snapshot-threshold
+	        # zfs set com.zrepl:snapshot-threshold=10000000 ${POOLNAME}/ROOT/${SUITE}
+	        - type: command
+	          path: /usr/local/bin/zrepl_threshold_check.sh
+	          err_is_fatal: true
+	          filesystems: {
+	            "${POOLNAME}/ROOT/${SUITE}<": true,
+	          }
+	    pruning:
+	      keep:
+	      # fade-out scheme for snapshots starting with 'zrepl_'
+	      # - keep all created in the last hour
+	      # - then destroy snapshots such that we keep 24 each 1 hour apart
+	      # - then destroy snapshots such that we keep 14 each 1 day apart
+	      # - then destroy all older snapshots
+	      - type: grid
+	        grid: 1x1h(keep=all) | 24x1h | 14x1d
+	        regex: "^zrepl_.*"
+	      # Only keep the last 10 of the auto snaps by apt
+	      - type: last_n
+	        count: 10
+	        regex: "^apt_.*"
+	      # keep all base or desktop install snapshots
+	      - type: regex
+	        regex: "^(base_install|desktop_install)"
+	      # keep all snapshots that don't have the 'zrepl_' or 'apt_' prefix
+	      # Note: apt snapshots are governed by the apt last_n policy above
+	      - type: regex
+	        negate: true
+	        regex: "^(zrepl|apt)_.*"
+	
+	  - name: snaphome
+	    type: snap
+	    filesystems: {
+	        "${POOLNAME}/home/${USERNAME}<": true,
+	    }
+	    # create snapshots with prefix 'zrepl_' every 15 minutes
+	    snapshotting:
+	      type: periodic
+	      interval: 15m
+	      timestamp_format: human
+	      prefix: zrepl_
+	    pruning:
+	      keep:
+	      - type: grid
+	        grid: 1x1h(keep=all) | 24x1h | 30x1d
+	        regex: "^zrepl_.*"
+	      # keep all base or desktop installs
+	      - type: regex
+	        regex: "^(base_install|desktop_install)"
+	      # keep all snapshots that don't have the 'zrepl_' or 'apt_' prefix
+	      # Note: apt snapshots are governed by the apt last_n policy above
+	      - type: regex
+	        negate: true
+	        regex: "^zrepl_.*"
+	EOF
+    
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+    cat > /usr/local/bin/zrepl_threshold_check.sh <<-'EOF'
+	#!/usr/bin/env bash
+	set -e
+	
+	# Checks the data-written threshold of a zfs dataset for use with zrepl
+	# Returns 0 if over threshold so should be snapshot'd
+	# Returns 255 if amount written has not reached threshold
+	# If no threshold property set in dataset default yes, take snapshot
+	
+	# Set threshold in bytes like this :
+	# zfs set com.zrepl:snapshot-threshold=6000000 pool/dataset
+	
+	WRITTEN=$(zfs get -Hpo value written ${ZREPL_FS})
+	THRESH=$(zfs get -Hpo value com.zrepl:snapshot-threshold ${ZREPL_FS})
+	
+	[ "$ZREPL_DRYRUN" = "true" ] && DRYRUN="echo DRYRUN (WRITTEN ${WRITTEN} THRESH ${THRESH}) : "
+	
+	pre_snapshot() {
+	    echo -n "pre_snap "
+	    $DRYRUN date
+	
+	    if [ "$ZREPL_DRYRUN" != "true" ] ; then
+	        # [[ $( $(zfs get -Hpo value written ${ZREPL_FS}) -gt ($(zfs get -Hpo value com.zrepl:snapshot-threshold ${ZREPL_FS}) +0)) ]] && RC=0 || RC=255
+	        if [ "${THRESH}" = "-" ]; then
+	            RC=0
+	        elif [ ${WRITTEN} -gt ${THRESH} ] ; then
+	            RC=0
+	        else
+	            printf '%s dataset has written %s, NOT over threshold %s, skipping\n' "$ZREPL_FS" "$WRITTEN" "$THRESH"
+	            RC=255
+	        fi
+	    fi
+	}
+	
+	post_snapshot() {
+	    echo -n "post_snap "
+	    $DRYRUN date
+	}
+	
+	case "$ZREPL_HOOKTYPE" in
+	    pre_snapshot|post_snapshot)
+	        "$ZREPL_HOOKTYPE"
+	        ;;
+	    *)
+	        printf 'Unrecognized hook type: %s\n' "$ZREPL_HOOKTYPE"
+	        exit 255
+	        ;;
+	esac
+	
+	exit $RC
+	EOF
+    chmod +x /usr/local/bin/zrepl_threshold_check.sh
 #-----------------------------------------------------------------------------
 
 # Set apt/dpkg to automagically snap the system datasets on install/remove
