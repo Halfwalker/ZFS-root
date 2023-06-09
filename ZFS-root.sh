@@ -1819,6 +1819,9 @@ if [ "${ZREPL}" = "y" ]; then
     systemctl stop zrepl
     mv /etc/zrepl/zrepl.yml /etc/zrepl/zrepl.yml.BAK
 
+    # Set the main root dataset snapshot threshold to 120mb
+    zfs set com.zrepl:snapshot-threshold=120000000 ${POOLNAME}/ROOT/${SUITE}
+
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
     cat > /etc/zrepl/zrepl.yml <<-EOF
 	global:

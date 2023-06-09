@@ -35,6 +35,20 @@ Number  Start (sector)    End (sector)  Size       Code  Name
 
 *initramfs-tools* is NOT used, and is in fact disabled via `apt-mark hold initramfs-tools`.  Instead *dracut* is used for managing the initramfs.
 
+### zrepl ZFS snapshot management and replication
+
+The simple *zrepl* config install sets up two snapshot/prune only jobs, no replication.  Both the main root dataset and the home user dataset are snap'd on a 15min cadence.  The root dataset prune policy is to keep 1 hour of 15min snaps, 24 hourly and 14 daily.  The home user dataset policy is similar, 1 hour of 15min snaps, 24 hourly and 30 daily snaps.
+
+In addition, the root dataset is only snap'd if there has been more that 120mb written to it - the idea being that we don't _really_ need mostly-empty snaps of an idle system.  Home data though, snap them all ...
+
+The snapshot config uses _/usr/local/bin/zrepl_threshold.sh_ to determine whether or not to snap.  It reads the *com.zrepl:snapshot-threshold* property for the threshold value to compare against the *written* property.
+
+For any dataset that you want a threshold set, use something similar to
+
+```
+sudo zfs set com.zrepl:snapshot-threshold=120000000 tank/ROOT/jammy
+```
+
 ### Sample SSH config for Dropbear
 
 If using Dropbear for remote unlocking of an encrypted system, a sample `~/.ssh/config` entry could look like this
