@@ -1955,6 +1955,7 @@ if [ "${ZREPL}" = "y" ]; then
 	exit $RC
 	EOF
     chmod +x /usr/local/bin/zrepl_threshold_check.sh
+fi
 #-----------------------------------------------------------------------------
 
 # Set apt/dpkg to automagically snap the system datasets on install/remove
