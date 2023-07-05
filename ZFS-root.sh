@@ -1502,6 +1502,7 @@ if [ ${DISCENC} = "ZFSENC" ] ; then
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
     cat > /usr/local/bin/zfs-multi-mount.sh <<-'EOF'
 	#!/usr/bin/env bash
+	# https://gbyte.dev/blog/unlock-mount-several-zfs-datasets-boot-single-passphrase
 	
 	PATH=/usr/bin:/sbin:/bin
 	
@@ -1586,13 +1587,14 @@ if [ ${DISCENC} = "ZFSENC" ] ; then
 	EOF
   chmod 755 /usr/local/bin/zfs-multi-mount.sh
 
-  cat > /etc/systemd/system/zfs-load-key.service << 'EOF'
+  cat > /etc/systemd/system/zfs-load-key.service << EOF
 [Unit]
 Description=Import keys for all datasets
 DefaultDependencies=no
 Before=zfs-mount.service
 Before=systemd-user-sessions.service
 After=zfs-import.target
+### https://gbyte.dev/blog/unlock-mount-several-zfs-datasets-boot-single-passphrase
 ### With emergency.target if the key cannot be loaded then boot will stop
 ### This can happen when datasets have different keys, and one or more datasets
 ### do not have the keys available (backups from remote systems etc.)
@@ -1600,11 +1602,17 @@ After=zfs-import.target
 ### to ensure a proper stop when missing keys.
 # OnFailure=emergency.target
 
+### For now, we only unlock the home dataset which will unlock any child
+### datasets under it (root and ${USERNAME} by default from the ZFS-root.sh script)
+### If we do NOT specify the datasets here, then zfs-multi-mount.sh will try
+### to unlock ALl encrypted datasets it finds.  For those without keys this can
+### cause a delay until it times out.
+
 [Service]
 Type=oneshot
 RemainAfterExit=yes
 
-ExecStart=zfs-multi-mount.sh --systemd --no-mount
+ExecStart=/usr/local/bin/zfs-multi-mount.sh --systemd ${POOLNAME}/home
 
 [Install]
 WantedBy=zfs-mount.service
