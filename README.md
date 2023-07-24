@@ -2,6 +2,20 @@
 
 This script is meant to be run from an Ubuntu Live CD.  It will build an Ubuntu system on the local system or VM using root-on-ZFS, with optional LUKS whole-disk encryption or ZFS native encryption.
 
+## tl;dr
+
+- Boot an Ubuntu live-cd, like [ubuntu-22.04.2-live-server-amd64.iso](https://releases.ubuntu.com/22.04.2/ubuntu-22.04.2-live-server-amd64.iso) And select *Try or install Ubuntu server*
+- At the language selection prompt, type in `ctrl-z` to put the installer into the background
+- Clone the **ZFS-root** repo
+    ```
+    git clone https://github.com/Halfwalker/ZFS-root.git
+    ```
+- Run the `ZFS-root.sh` script - it will prompt for everything it needs.
+    ```
+    cd ZFS-root
+    ./ZFS-root.sh
+    ```
+
 The partition layout will look similar to this, depending on if a SWAP partition is needed for Hibernation and if encryption is selected.
 
 ```
@@ -35,6 +49,18 @@ Number  Start (sector)    End (sector)  Size       Code  Name
 
 *initramfs-tools* is NOT used, and is in fact disabled via `apt-mark hold initramfs-tools`.  Instead *dracut* is used for managing the initramfs.
 
+## Configuration
+
+The *ZFS-root.sh* script will prompt for all details it needs.  In addition, you can pre-seed those details via a *ZFS-root.conf* file, and an example is provided.  There are several extra config items that can only be set via a *ZFS-root.conf* file and not the menu questions.
+
+NOTE: It will _always_ prompt for the list of disks to install to, and will pause with a textbox showing the selected options.
+
+*SSHPUBKEY*
+: Any SSH pubkey to add to the new system main user `~/.ssh/authorized_keys` file.
+
+*HOST_ECDSA_KEY* or *HOST_RSA_KEY*
+: Can specify the host ECDSA or RSA keys if desired.  Comes in handy for repeated runs of the script in testing, so you don't have to keep editing your `~/.ssh/known_hosts`.
+
 ### zrepl ZFS snapshot management and replication
 
 The simple *zrepl* config install sets up two snapshot/prune only jobs, no replication.  Both the main root dataset and the home user dataset are snap'd on a 15min cadence.  The root dataset prune policy is to keep 1 hour of 15min snaps, 24 hourly and 14 daily.  The home user dataset policy is similar, 1 hour of 15min snaps, 24 hourly and 30 daily snaps.
@@ -65,18 +91,6 @@ Host unlock-foobox
 ```
 
 This will run the `zfsbootmenu` command upon login automagically.  NOTE: one problem is that the ssh session remains after unlocking - need a clean way to ensure it exits after the unlock is finished
-
-## Configuration
-
-The *ZFS-root.sh* script will prompt for all details it needs.  In addition, you can pre-seed those details via a *ZFS-root.conf* file, and an example is provided.  There are several extra config items that can only be set via a *ZFS-root.conf* file and not the menu questions.
-
-NOTE: It will _always_ prompt for the list of disks to install to, and will pause with a textbox showing the selected options.
-
-*SSHPUBKEY*
-: Any SSH pubkey to add to the new system main user `~/.ssh/authorized_keys` file.
-
-*HOST_ECDSA_KEY* or *HOST_RSA_KEY*
-: Can specify the host ECDSA or RSA keys if desired.  Comes in handy for repeated runs of the script in testing, so you don't have to keep editing your `~/.ssh/known_hosts`.
 
 ## Booting details
 
