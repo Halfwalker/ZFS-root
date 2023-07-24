@@ -1,5 +1,24 @@
 #!/bin/bash
 
+# https://www.osso.nl/blog/proxmox-virtio-blk-disk-by-id/
+#
+# packer with virtio-scsi as disk_interface creates
+# /dev/disk/by-id/scsi-0QWMU_QEMU_HARDDISK_drive0
+#
+# Manual packer run using docker as a non-local/CICD run
+# Must do "packer init" first with the whole "init ZFS-root_local.pkr.hcl" to populate .packer.d/plugins
+# The volume for /root/.cache/packer is for persistent cache of the ISO download
+# Could do this as a local run with a volume pointing to the ISO location
+#
+# ❯ docker run --rm -it -v "$(pwd)":"${PWD}" -w "${PWD}" --privileged --cap-add=ALL -v "${PWD}/.packer.d":/root/.cache/packer -v /usr/share/OVMF:/usr/share/OVMF -e PACKER_PLUGIN_PATH="${PWD}/.packer.d/plugins" -e PACKER_LOG=1 halfwalker/docker-qemu build ZFS-root_local.pkr.hcl
+#
+# Running locally
+# ❯ packer build -var-file=ZFS-root-packer_local.vars.hcl ZFS-root_local.pkr.hcl
+#
+# Sample cmd to run a VM with the resulting disk image - needs virtio-scsi-pci to get
+# disk to show up in /dev/disk/by-id
+# ❯ kvm -no-reboot -m 2048 -drive file=packer-zfsroot-2023-07-23-1754,format=qcow2,cache=none -device virtio-scsi-pci,id=scsi0
+
 # LUKS
 # https://fossies.org/linux/cryptsetup/docs/Keyring.txt
 
@@ -32,7 +51,7 @@
 # This will set up a single-disk system with root-on-zfs, using
 # bionic/18.04 or focal/20.04 or jammy/22.04.
 #
-# >>>>>>>>>> NOTE: This will totally overwrite the disk chosen <<<<<<<<<<<<<
+# >>>>>>>>>> NOTE: This will totally overwrite the disk(s) chosen <<<<<<<<<<<<<
 #
 # 1) Boot an Ubuntu live cd to get a shell. Ubuntu live-server is a good choice.
 # 2) Open a shell (ctrl-t) and become root (sudo -i)
@@ -40,6 +59,7 @@
 # 4) Make it executable (chmod +x ZFS-root.sh)
 # 5) Run it (./ZFS-root.sh)
 # 6) Add -d to enable set -x debugging (./ZFS-root.sh -d)
+# 7) Add packerci to run in a CI/CD pipeline using ZFS-root-packerci.conf
 #
 # It will ask a few questions (username, which disk, bionic/focal etc)
 # and then fully install a minimal Ubuntu system. Depending on the choices
@@ -82,6 +102,16 @@ fi
 # Grab any possible pre-config settings in ZFS-root.conf
 if [ -e ZFS-root.conf ] ; then
     . ZFS-root.conf
+fi
+
+if [ "$1" = "packerci" ] ; then
+    # Ensure we pick up the packerci-specific config
+    if [ -e ZFS-root-packerci.conf ] ; then
+        . ZFS-root-packerci.conf
+    else
+        echo "ZFS-root-packerci.conf is MISSING - cannot run packer in CI/CD"
+        exit 1
+    fi
 fi
 
 # No magenta overrides for whiptail dialogs please
@@ -182,46 +212,55 @@ if [[ ! -v POOLNAME ]] ; then
     fi
 fi # Check if POOLNAME already set
 
-# Set main disk here - be sure to include the FULL path
-# Get list of disks, ask user which one to install to
-# Ignore cdrom etc.  Limit disk name length to avoid menu uglyness
-readarray -t disks < <(ls -l /dev/disk/by-id | egrep -v '(CDROM|CDRW|-ROM|CDDVD|-part|md-|dm-|wwn-)' | sort -t '/' -k3 | tr -s " " | cut -d' ' -f9 | cut -c -58 | sed '/^$/d')
-
-# If no disks available (kvm needs to use scsi, not virtio) then error out
-if [ ${#disks[@]} -eq 0 ] ; then
-    whiptail --title "No disks available in /dev/disk/by-id" --msgbox "No valid disk links were found in /dev/disk/by-id - ensure your target disk has a link in that directory.\n\nKVM/qemu VMs need to use the SCSI storage driver, not the default virtio one (which does not create links in /dev/disk/by-id)" 12 70
-    exit 1
-fi
-
-TMPFILE=$(mktemp)
-# Find longest disk name
-m=-1
-for disk in "${disks[@]}"
-do
-   if [ ${#disk} -gt $m ]
-   then
-      m=${#disk}
-   fi
-done
-
-# Set dialog box size to num disks
-list_height=$(( ${#disks[@]} + 1 ))
-box_height=$(( ${#disks[@]} + 8 ))
-box_width=$(( ${m} + 26 ))
-
-DONE=false
-until ${DONE} ; do
-    whiptail --title "List of disks" --separate-output --checklist --noitem \
-        "Choose disk(s) to install to" ${box_height} ${box_width} ${list_height} \
-        $( for disk in $(seq 0 $(( ${#disks[@]}-1)) ) ; do echo "${disks[${disk}]}" OFF ; done) 2> "${TMPFILE}"
-    RET=${?}
-    [[ ${RET} = 1 ]] && exit 1
+#
+# If script was started with one parameter "packerci" then we're running under CI/CD
+# and using packer to build an image via qemu. That means a single disk /dev/vda
+# We need to create the symlink in /dev/disk/by-id for it
+#
+if [ "$1" = "packerci" ] ; then
+    readarray -t zfsdisks < <(echo "scsi-0QEMU_QEMU_HARDDISK_drive0")
+else
+    # Set main disk here - be sure to include the FULL path
+    # Get list of disks, ask user which one to install to
+    # Ignore cdrom etc.  Limit disk name length to avoid menu uglyness
+    readarray -t disks < <(ls -l /dev/disk/by-id | egrep -v '(CDROM|CDRW|-ROM|CDDVD|-part|md-|dm-|wwn-)' | sort -t '/' -k3 | tr -s " " | cut -d' ' -f9 | cut -c -58 | sed '/^$/d')
     
-    readarray -t zfsdisks < <(cat ${TMPFILE})
-    if [ ${#zfsdisks[@]} != 0 ] ; then
-        DONE=true
+    # If no disks available (kvm needs to use scsi, not virtio) then error out
+    if [ ${#disks[@]} -eq 0 ] ; then
+        whiptail --title "No disks available in /dev/disk/by-id" --msgbox "No valid disk links were found in /dev/disk/by-id - ensure your target disk has a link in that directory.\n\nKVM/qemu VMs need to use the SCSI storage driver, not the default virtio one (which does not create links in /dev/disk/by-id)" 12 70
+        exit 1
     fi
-done
+    
+    TMPFILE=$(mktemp)
+    # Find longest disk name
+    m=-1
+    for disk in "${disks[@]}"
+    do
+       if [ ${#disk} -gt $m ]
+       then
+          m=${#disk}
+       fi
+    done
+    
+    # Set dialog box size to num disks
+    list_height=$(( ${#disks[@]} + 1 ))
+    box_height=$(( ${#disks[@]} + 8 ))
+    box_width=$(( ${m} + 26 ))
+    
+    DONE=false
+    until ${DONE} ; do
+        whiptail --title "List of disks" --separate-output --checklist --noitem \
+            "Choose disk(s) to install to" ${box_height} ${box_width} ${list_height} \
+            $( for disk in $(seq 0 $(( ${#disks[@]}-1)) ) ; do echo "${disks[${disk}]}" OFF ; done) 2> "${TMPFILE}"
+        RET=${?}
+        [[ ${RET} = 1 ]] && exit 1
+        
+        readarray -t zfsdisks < <(cat ${TMPFILE})
+        if [ ${#zfsdisks[@]} != 0 ] ; then
+            DONE=true
+        fi
+    done
+fi # Check for packerci
 
 # Single disk can only be "single"
 if [ ${#zfsdisks[@]} -eq 1 ] ; then
@@ -528,39 +567,47 @@ case ${SUITE} in
         ;;
 esac
 
-box_height=$(( ${#zfsdisks[@]} + 28 ))
-whiptail --title "Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
-    Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
-    $(echo $SUITE $SUITE_NUM) $([ ${HWE} ] && echo WITH || echo without) $(echo hwe kernel ${HWE})\n \
-    Disk $(for disk in $(seq 0 $(( ${#zfsdisks[@]}-1)) ) ; do \
-      if [ ${disk} -ne 0 ] ; then echo -n "          " ; fi ; echo ${zfsdisks[${disk}]} ; done)\n \
-    Raid $([ ${RAIDLEVEL} ] && echo ${RAIDLEVEL} || echo vdevs)\n \
-    Hostname $(echo $MYHOSTNAME)\n \
-    Poolname $(echo $POOLNAME)\n \
-    User $(echo $USERNAME $UCOMMENT)\n\n \
-    RESCUE    = $(echo $RESCUE)  : Create rescue dataset by cloning install\n \
-    DELAY     = $(echo $DELAY)  : Enable delay before importing zpool\n \
-    ZFS ver   = $(echo $ZFSPPA)  : Update to latest ZFS 2.1 via PPA\n \
-    ZREPL     = $(echo $ZREPL)  : Install Zrepl zfs snapshot manager\n \
-    GOOGLE    = $(echo $GOOGLE)  : Install google authenticator\n \
-    GNOME     = $(echo $GNOME)  : Install Ubuntu Gnome desktop\n \
-    XFCE      = $(echo $XFCE)  : Install Ubuntu XFCE4 desktop\n \
-    KDE       = $(echo $KDE)  : Install Ubuntu KDE Plasma desktop\n \
-    NEON      = $(echo $NEON)  : Install Neon KDE Plasma desktop\n \
-    NVIDIA    = $(echo $NVIDIA)  : Install Nvidia drivers\n \
-    SOF       = $(echo $SOF)  : Install Sound Open Firmware binaries\n \
-    HIBERNATE = $(echo $HIBERNATE)  : Enable SWAP disk partition for hibernation\n \
-    DISCENC   = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
-    DROPBEAR  = $(echo $DROPBEAR)  : Enable Dropbear unlocking of encrypted disks\n \
-    Swap size = $(echo $SIZE_SWAP)M $([ ${SIZE_SWAP} -eq 0 ] && echo ': DISABLED')\n" \
-    ${box_height} 70
-RET=${?}
-[[ ${RET} = 1 ]] && exit 1
+#
+# If script was started with one parameter "packerci" then we're running under CI/CD
+# and using packer to build an image via qemu. That means a single disk /dev/vda was
+# selected above and we do not want to pause here for 
+#
+if [ "$1" != "packerci" ] ; then
+    box_height=$(( ${#zfsdisks[@]} + 28 ))
+    whiptail --title "Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
+        Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
+        $(echo $SUITE $SUITE_NUM) $([ ${HWE} ] && echo WITH || echo without) $(echo hwe kernel ${HWE})\n \
+        Disk $(for disk in $(seq 0 $(( ${#zfsdisks[@]}-1)) ) ; do \
+          if [ ${disk} -ne 0 ] ; then echo -n "          " ; fi ; echo ${zfsdisks[${disk}]} ; done)\n \
+        Raid $([ ${RAIDLEVEL} ] && echo ${RAIDLEVEL} || echo vdevs)\n \
+        Hostname $(echo $MYHOSTNAME)\n \
+        Poolname $(echo $POOLNAME)\n \
+        User $(echo $USERNAME $UCOMMENT)\n\n \
+        RESCUE    = $(echo $RESCUE)  : Create rescue dataset by cloning install\n \
+        DELAY     = $(echo $DELAY)  : Enable delay before importing zpool\n \
+        ZFS ver   = $(echo $ZFSPPA)  : Update to latest ZFS 2.1 via PPA\n \
+        ZREPL     = $(echo $ZREPL)  : Install Zrepl zfs snapshot manager\n \
+        GOOGLE    = $(echo $GOOGLE)  : Install google authenticator\n \
+        GNOME     = $(echo $GNOME)  : Install Ubuntu Gnome desktop\n \
+        XFCE      = $(echo $XFCE)  : Install Ubuntu XFCE4 desktop\n \
+        KDE       = $(echo $KDE)  : Install Ubuntu KDE Plasma desktop\n \
+        NEON      = $(echo $NEON)  : Install Neon KDE Plasma desktop\n \
+        NVIDIA    = $(echo $NVIDIA)  : Install Nvidia drivers\n \
+        SOF       = $(echo $SOF)  : Install Sound Open Firmware binaries\n \
+        HIBERNATE = $(echo $HIBERNATE)  : Enable SWAP disk partition for hibernation\n \
+        DISCENC   = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
+        DROPBEAR  = $(echo $DROPBEAR)  : Enable Dropbear unlocking of encrypted disks\n \
+        Swap size = $(echo $SIZE_SWAP)M $([ ${SIZE_SWAP} -eq 0 ] && echo ': DISABLED')\n" \
+        ${box_height} 70
+    RET=${?}
+    [[ ${RET} = 1 ]] && exit 1
+fi # Check for packerci
 
 # Log everything we do
 rm -f /root/ZFS-setup.log
 exec > >(tee -a "/root/ZFS-setup.log") 2>&1
 [ "$1" = "-d" ] && set -x
+[ "$1" = "packerci" ] && set -x
 
 # Pre-OK the zfs-dkms licenses notification
 cat > /tmp/selections <<-EOFPRE
@@ -1031,6 +1078,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 # Setup inside chroot
 
 [ "$1" = "-d" ] && set -x
+[ "$1" = "packerci" ] && set -x
 
 ln -s /proc/self/mounts /etc/mtab
 apt-get -qq update
