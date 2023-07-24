@@ -1,3 +1,8 @@
 *.swp
 *.BAK
 ZFS-root.conf
+dialog_test.sh
+Rich*
+datto*
+.packer.d
+packer_*

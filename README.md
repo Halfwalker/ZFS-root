@@ -46,6 +46,7 @@ Number  Start (sector)    End (sector)  Size       Code  Name
 * If a local *apt-cacher* system is available it will point `apt` to that to speed up package downloads.
 * Memtest86+ included as a boot option.
 * Optionally can install [zrepl](https://zrepl.github.io/) with a base snapshot-only config to auto-snapshot the main and home datasets (see _/etc/zrepl_)
+* [Packer](https://developer.hashicorp.com/packer) config to generate a *qcow2* KVM disk image for testing or CI/CD
 
 *initramfs-tools* is NOT used, and is in fact disabled via `apt-mark hold initramfs-tools`.  Instead *dracut* is used for managing the initramfs.
 
@@ -122,5 +123,86 @@ A list of bootable datasets is presented, and it will boot the default one in 10
 
 The booting process is essentially the same, except Syslinux (in `/boot/efi/syslinux`) prompts for *zfsbootmenu*.  The Syslinux config file is in `/boot/efi/syslinux/syslinux.cfg`.
 
-## More information
+## Packer
+
+A [Packer](https://developer.hashicorp.com/packer) configuration (_ZFS-root_local.pkr.hcl_) is provided that will generate a `.qcow2` disk image for a typical simple install.  It can be run with a locally-installed packer/qemu setup, or with a docker container.
+
+### Running packer locally
+
+Packer and QEMU will need to be installed
+
+```
+wget -O- https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+echo "deb [signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+sudo apt update
+sudo apt install packer qemu-kvm qemu-utils ovmf
+```
+
+To run locally, a command like
+
+```
+packer build -var-file=ZFS-root_local.vars.hcl ZFS-root_local.pkr.hcl
+```
+
+Note: This makes use of a `vars` file to supply overrides to the packer config.  For example
+
+```
+# Where to dump the resuling files
+output_prefix       = "/home/myuser/qemu/"
+
+# false -> we can see the VM console gui
+# true  -> console is hidden
+headless            = false
+
+ubuntu_version      = "22.04.1"
+
+# Usually set to "" as the entire src dir is specified in ubuntu_live_iso_src
+ubuntu_version_dir  = ""
+
+# Where to find locally downloaded ISOs
+ubuntu_live_iso_src = "file:///home/myuser/ISOs"
+```
+
+This uses the _ZFS-root-packerci.conf_ config file for **ZFS-root.sh** to provide all the information for a local install.  The username/password is `packer/packer`.
+
+It will create a directory `.packer.d` in the repo that contains the packer qemu plugins - ignored via `.gitignore`.
+
+The destination directory specified by `output_prefix` will contain a subdirectory like `packer_zfsroot_2023-07-24-1104` with the disk image.
+
+### Running packer via docker
+
+A simple `Dockerfile` is provided to create a container based off the official Hashicorp packet image, with Qemu added.  That is in `packer/Dockerfile` and can be built locally with something like
+
+```
+docker build -t myname/packer-qemu packer
+```
+
+A sample run from the repo directory with docker would be
+
+```
+docker run --rm -it -v "$(pwd)":"${PWD}" -w "${PWD}" \
+  --privileged --cap-add=ALL \
+  -e PACKER_PLUGIN_PATH="${PWD}/.packer.d/plugins" \
+  myname/packer-qemu init ZFS-root_local.pkr.hcl
+
+docker run --rm -it -v "$(pwd)":"${PWD}" -w "${PWD}" \
+  --privileged --cap-add=ALL \
+  -v "${PWD}/.packer.d":/root/.cache/packer \
+  -v /usr/share/OVMF:/usr/share/OVMF \
+  -e PACKER_PLUGIN_PATH="${PWD}/.packer.d/plugins" \
+  -e PACKER_LOG=1 \
+  myname/packer-qemu build ZFS-root_local.pkr.hcl
+```
+
+The first `init` command only needs to be done once to download the packer qemu plugin.  Note: This does not use a `vars` file for packer, so will use the defaults in the `ZFS-root_local.pkr.hcl` packer config file.  That downloads the ISO to `.packer.d` and places the output directory (eg. `packer_zfsroot_2023-07-24-1104)` right in the current (repo) directory.
+
+Of course you may pass in a `vars` file - if any directories are specified outside the repo directory they will have to be provided via `-v outside:inside` type volume mounts on the `docker run` command.
+
+### Running the disk image
+
+The `.qcow2` format disk image may be run locally with a command like
+
+```
+kvm -no-reboot -m 2048 -drive file=packer-zfsroot-2023-07-23-2233,format=qcow2,cache=none -device virtio-scsi-pci,id=scsi0
+```
 
