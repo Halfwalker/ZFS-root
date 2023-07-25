@@ -4,8 +4,8 @@ This script is meant to be run from an Ubuntu Live CD.  It will build an Ubuntu 
 
 ## tl;dr
 
-- Boot an Ubuntu live-cd, like [ubuntu-22.04.2-live-server-amd64.iso](https://releases.ubuntu.com/22.04.2/ubuntu-22.04.2-live-server-amd64.iso) And select *Try or install Ubuntu server*
-- At the language selection prompt, type in `ctrl-z` to put the installer into the background
+- Boot an Ubuntu live-cd, like [ubuntu-22.04.2-live-server-amd64.iso](https://releases.ubuntu.com/22.04.2/ubuntu-22.04.2-live-server-amd64.iso) and select *Try or install Ubuntu server*
+- At the language selection prompt, type in `ctrl-z` to put the installer into the background and get a root shell
 - Clone the **ZFS-root** repo
     ```
     git clone https://github.com/Halfwalker/ZFS-root.git
@@ -16,7 +16,7 @@ This script is meant to be run from an Ubuntu Live CD.  It will build an Ubuntu 
     ./ZFS-root.sh
     ```
 
-The partition layout will look similar to this, depending on if a SWAP partition is needed for Hibernation and if encryption is selected.
+The partition layout will look similar to this, depending on if a SWAP partition is needed for Hibernation and if encryption is selected.  The **_0** refers to the disk number.  **_0** for first disk, **_1** for second and so on.
 
 ```
 Number  Start (sector)    End (sector)  Size       Code  Name
@@ -26,14 +26,14 @@ Number  Start (sector)    End (sector)  Size       Code  Name
    3        11290624        53052222   19.9 GiB    BF00  ZFS_0
 ```
 
-*BOOT_0*
-: Used for EFI and Syslinux booting.  Mounted at `/boot/efi`
-
-*SWAP_0*
-: Swap partition for use with Hibernate/Resume - only created if Hibernate is available and selected.  Will be encrypted if using LUKS.  Hibernate/Resume only uses the first disk for resume, no matter how many disks and swap partitions there are.  This means that the swap partitions must be at least the size of ram for Hibernate/Resume to work.
-
-*ZFS_0*
-: Partition for main ZFS pool.  Root dataset, /home dataset etc. all go in here.  NOTE: With ZFS native encryption the whole pool is NOT encrypted, only the main /rpool/ROOT and rpool/home container datasets.  This allows for non-encrypted datasets if desired.
+> <dl>
+>     <dt>BOOT_0
+>     <dd>Used for EFI and Syslinux booting.  Mounted at `/boot/efi`
+>     <dt>SWAP_0
+>     <dd>Swap partition for use with Hibernate/Resume - only created if Hibernate is available and selected.  Will be encrypted if using LUKS.  Hibernate/Resume only uses the first disk for resume, no matter how many disks and swap partitions there are.  This means that the swap partitions must be at least the size of ram for Hibernate/Resume to work.
+>     <dt>ZFS_0
+>     <dd>Partition for main ZFS pool.  Root dataset, /home dataset etc. all go in here.  NOTE: With ZFS native encryption the whole pool is NOT encrypted, only the main /rpool/ROOT and rpool/home container datasets.  This allows for non-encrypted datasets if desired.
+> </dl>
 
 ## Features
 
@@ -54,13 +54,14 @@ Number  Start (sector)    End (sector)  Size       Code  Name
 
 The *ZFS-root.sh* script will prompt for all details it needs.  In addition, you can pre-seed those details via a *ZFS-root.conf* file, and an example is provided.  There are several extra config items that can only be set via a *ZFS-root.conf* file and not the menu questions.
 
+> <dl>
+>   <dt>SSHPUBKEY
+>   <dd> Any SSH pubkey to add to the new system main user `~/.ssh/authorized_keys` file.
+>   <dt>HOST_ECDSA_KEY or HOST_RSA_KEY
+>   <dd> Can specify the host ECDSA or RSA keys if desired.  Comes in handy for repeated runs of the script in testing, so you don't have to keep editing your `~/.ssh/known_hosts`.
+> </dl>
+
 NOTE: It will _always_ prompt for the list of disks to install to, and will pause with a textbox showing the selected options.
-
-*SSHPUBKEY*
-: Any SSH pubkey to add to the new system main user `~/.ssh/authorized_keys` file.
-
-*HOST_ECDSA_KEY* or *HOST_RSA_KEY*
-: Can specify the host ECDSA or RSA keys if desired.  Comes in handy for repeated runs of the script in testing, so you don't have to keep editing your `~/.ssh/known_hosts`.
 
 ### zrepl ZFS snapshot management and replication
 
@@ -82,7 +83,7 @@ If using Dropbear for remote unlocking of an encrypted system, a sample `~/.ssh/
 
 ```
 Host unlock-foobox
-    Hostname foorbox.example.com
+    Hostname foobox.example.com
     User root
     Port 222
     IdentityFile ~/.ssh/unlock_luks
