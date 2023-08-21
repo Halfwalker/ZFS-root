@@ -81,7 +81,6 @@ ZREPL=n
 HIBERNATE=n
 DELAY=n
 SOF=n
-NVIDIA=n
 GNOME=n
 KDE=n
 NEON=n
@@ -94,7 +93,7 @@ XFCE=n
 # none for no driver
 # 390 or 470 for legacy driver
 # 530 for current latest, or whatever version you prefer
-# NVIDIA=none
+NVIDIA=none
 
 #
 # Below are additional options that can be set that do NOT have a menu process
