@@ -172,7 +172,7 @@ The destination directory specified by `output_prefix` will contain a subdirecto
 
 ### Running packer via docker
 
-A simple `Dockerfile` is provided to create a container based off the official Hashicorp packet image, with Qemu added.  That is in `packer/Dockerfile` and can be built locally with something like
+A simple `Dockerfile` is provided to create a container based off the official Hashicorp packer image, with Qemu added.  That is in `packer/Dockerfile` and can be built locally with something like
 
 ```
 docker build -t myname/packer-qemu packer
