@@ -1704,7 +1704,7 @@ cat >> /etc/bash.bashrc << EOF
 PS1="${debian_chroot:+($debian_chroot)}\[\$(tput setaf 2)\]\u@\[\$(tput bold)\]\[\$(tput setaf 5)\]\h\[\$(tput sgr0)\]\[\$(tput setaf 7)\]:\[\$(tput bold)\]\[\$(tput setaf 4)\]\w\[\$(tput setaf 7)\]\\$ \[\$(tput sgr0)\]"
 
 # https://unix.stackexchange.com/questions/99325/automatically-save-bash-command-history-in-screen-session
-PROMPT_COMMAND="history -a; history -c; history -r; \${PROMPT_COMMAND}"
+PROMPT_COMMAND='history -a; history -n;'
 EOF
 
 # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
@@ -1713,7 +1713,7 @@ cat >> /etc/skel/.bashrc <<-EOF
 	PS1="${debian_chroot:+($debian_chroot)}\[\$(tput setaf 2)\]\u@\[\$(tput bold)\]\[\$(tput setaf 5)\]\h\[\$(tput sgr0)\]\[\$(tput setaf 7)\]:\[\$(tput bold)\]\[\$(tput setaf 4)\]\w\[\$(tput setaf 7)\]\\$ \[\$(tput sgr0)\]"
 	
 	# https://unix.stackexchange.com/questions/99325/automatically-save-bash-command-history-in-screen-session
-	PROMPT_COMMAND="history -a; history -c; history -r; \${PROMPT_COMMAND}"
+	PROMPT_COMMAND='history -a; history -n;'
 EOF
 
 cat >> /etc/skel/.bash_aliases <<-EOF
@@ -1728,7 +1728,7 @@ cat >> /root/.bashrc <<-"EOF"
 	PS1='\[\033[01;37m\]\[\033[01;41m\]\u@\[\033[00m\]\[$(tput bold)\]\[$(tput setaf 5)\]\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]$ '
 	
 	# https://unix.stackexchange.com/questions/99325/automatically-save-bash-command-history-in-screen-session
-	PROMPT_COMMAND="history -a; history -c; history -r; ${PROMPT_COMMAND}"
+	PROMPT_COMMAND='history -a; history -n;'
 	HISTSIZE=5000
 	export LC_ALL=en_US.UTF-8
 	export LANG=en_US.UTF-8
