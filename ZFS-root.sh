@@ -641,7 +641,8 @@ fi
 #     apt-add-repository --yes --update ppa:jonathonf/zfs
 # fi
 # NOW, install ZFS, perhaps from ppa above
-apt-get -qq --no-install-recommends --yes install libelf-dev zfs-zed zfsutils-linux
+apt-get -qq update
+apt-get --no-install-recommends --yes install libelf-dev zfsutils-linux zfs-zed
 # Logic for restarting ZFS
 #   If livecd package version != currently running module, OR
 #   If ppa requested
