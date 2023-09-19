@@ -952,7 +952,7 @@ cat > ${ZFSBUILD}/etc/netplan/01_netcfg.yaml <<-EOF
 	        name: e*
 	      dhcp4: true
 	      dhcp6: true 
-          wakeonlan: true
+	      wakeonlan: true
 	      # === With the bridge config below, set dhcp to false
 	      # dhcp4: false
 	      # dhcp6: false
@@ -964,7 +964,7 @@ cat > ${ZFSBUILD}/etc/netplan/01_netcfg.yaml <<-EOF
 	#     # addresses: [192.168.2.8/24]
 	#     dhcp4: yes
 	#     dhcp6: yes
-    #     wakeonlan: true
+	#     wakeonlan: true
 	#     # === Only need routes: or gateway4: if NOT using DHCP
 	#     # === gateway4 is deprecated, use routes instead
 	#     # gateway4: 192.168.2.4
