@@ -1848,7 +1848,7 @@ RemainAfterExit=true
 WantedBy=multi-user.target
 EOF
 
-cat > /usr/local/bin/showip.sh <<- EOF
+cat > /usr/local/bin/showip.sh <<- 'EOF'
 #!/bin/bash
 
 # Creates a normal /etc/issue file but populates the bottom with a list
