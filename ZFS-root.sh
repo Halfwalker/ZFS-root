@@ -1766,6 +1766,7 @@ chown -R ${USERNAME}.${USERNAME} /home/${USERNAME}
 # so those keys can be used in the initramfs
 # DROPBEAR can only be y if DISCENC is not NOENC (so encryption enabled)
 #
+mkdir -p /etc/cmdline.d
 if [ "${DROPBEAR}" = "y" ] ; then
   echo "------------------------------------------------------------"
   echo " Installing dropbear for remote unlocking"
@@ -1779,22 +1780,21 @@ if [ "${DROPBEAR}" = "y" ] ; then
   sed -i '/inst \"\$moddir/s/^\(.*\)$/#&/' /tmp/dracut-crypt-ssh/modules/60crypt-ssh/module-setup.sh
   cp -ri /tmp/dracut-crypt-ssh/modules/60crypt-ssh /usr/lib/dracut/modules.d
 
-  mkdir -p /etc/cmdline.d
+  echo 'install_items+=" /etc/cmdline.d/dracut-network.conf "' >  /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
+  echo 'add_dracutmodules+=" crypt-ssh "'                      >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
+  # Have dracut use main user authorized_keys for access
+  echo "dropbear_acl=/home/${USERNAME}/.ssh/authorized_keys"   >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
+
   # With rd.neednet=1 it will fail to boot if no network available
   # This can be a problem with laptops and docking stations, if the dock
   # is not connected (no ethernet) it can fail to boot. Yay dracut.
-  # Network really only needed for Dropbear/ssh access unlocking, so disable
-  # if no Dropbear ...
-  if [ "${DROPBEAR}" = "y" ] ; then
-    echo 'ip=dhcp rd.neednet=1' > /etc/cmdline.d/dracut-network.conf
-  else
-    echo 'ip=dhcp rd.neednet=0' > /etc/cmdline.d/dracut-network.conf
-  fi
-
-  echo 'add_dracutmodules+=" crypt-ssh "'                      >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
-  echo 'install_items+=" /etc/cmdline.d/dracut-network.conf "' >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
-  # Have dracut use main user authorized_keys for access
-  echo "dropbear_acl=/home/${USERNAME}/.ssh/authorized_keys"   >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
+  # Network really only needed for Dropbear/ssh access unlocking
+  # Since we chose to use Dropbear, in this block set neednet=1
+  echo 'ip=dhcp rd.neednet=1' > /etc/cmdline.d/dracut-network.conf
+else
+  # Not using Dropbear, so set neednet=0
+  echo 'install_items+=" /etc/cmdline.d/dracut-network.conf "' > /etc/zfsbootmenu/dracut.conf.d/network.conf
+  echo 'ip=dhcp rd.neednet=0' > /etc/cmdline.d/dracut-network.conf
 fi
 
 # For ZFS encryption point to the /etc/zfs/zroot.key files in the initramfs
