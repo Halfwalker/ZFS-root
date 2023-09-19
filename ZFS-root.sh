@@ -107,6 +107,7 @@ fi
 if [ "$1" = "packerci" ] ; then
     # Ensure we pick up the packerci-specific config
     if [ -e ZFS-root-packerci.conf ] ; then
+        echo "Setting ZFS-root-packerci variables"
         . ZFS-root-packerci.conf
     else
         echo "ZFS-root-packerci.conf is MISSING - cannot run packer in CI/CD"
@@ -218,6 +219,7 @@ fi # Check if POOLNAME already set
 # We need to create the symlink in /dev/disk/by-id for it
 #
 if [ "$1" = "packerci" ] ; then
+    echo "Setting single disk scsi-0QEMU_QEMU_HARDDISK_drive0"
     readarray -t zfsdisks < <(echo "scsi-0QEMU_QEMU_HARDDISK_drive0")
 else
     # Set main disk here - be sure to include the FULL path
