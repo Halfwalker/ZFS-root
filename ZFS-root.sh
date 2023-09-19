@@ -643,19 +643,22 @@ fi
 # NOW, install ZFS, perhaps from ppa above
 apt-get -qq update
 apt-get --no-install-recommends --yes install libelf-dev zfsutils-linux zfs-zed
+
+# Deprecated - not using dkms version, so new kernel/modules not built
+# Have to live with livecd zfs module version
 # Logic for restarting ZFS
 #   If livecd package version != currently running module, OR
 #   If ppa requested
 #   Then restart ZFS
-if [[ ("${ZFS_LIVECD}" = "y" && "${ZFS_INSTALLED}" != "${ZFS_MODULE}")  || "${ZFSPPA}" = "y" ]] ; then
-    echo "ZFS needs an update"
-    systemctl stop zfs-zed
-    modprobe -r zfs
-    modprobe zfs
-    systemctl start zfs-zed
-    # ensure new system uses updated ZFS
-    ZFSPPA="y"
-fi                                                                      
+# if [[ ("${ZFS_LIVECD}" = "y" && "${ZFS_INSTALLED}" != "${ZFS_MODULE}")  || "${ZFSPPA}" = "y" ]] ; then
+#     echo "ZFS needs an update"
+#     systemctl stop zfs-zed
+#     modprobe -r zfs
+#     modprobe zfs
+#     systemctl start zfs-zed
+#     # ensure new system uses updated ZFS
+#     ZFSPPA="y"
+# fi                                                                      
 
 # Create an encryption key for LUKs partitions
 if [ ${DISCENC} = "LUKS" ] ; then
