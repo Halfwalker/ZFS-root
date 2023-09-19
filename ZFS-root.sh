@@ -637,9 +637,9 @@ fi
 [ "$ZFS_LIVECD" = "y" ] && echo "ZFS installed with ${ZFS_INSTALLED}, module with ${ZFS_MODULE}"
 
 # Add ZFS ppa if requested
-if [ ${ZFSPPA} = "y" ] ; then
-    apt-add-repository --yes --update ppa:jonathonf/zfs
-fi
+# if [ ${ZFSPPA} = "y" ] ; then
+#     apt-add-repository --yes --update ppa:jonathonf/zfs
+# fi
 # NOW, install ZFS, perhaps from ppa above
 apt-get -qq --no-install-recommends --yes install libelf-dev zfs-zed zfsutils-linux
 # Logic for restarting ZFS
