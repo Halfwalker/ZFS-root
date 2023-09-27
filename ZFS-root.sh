@@ -1784,7 +1784,7 @@ if [ "${DROPBEAR}" = "y" ] ; then
 
   ##comment out references to /helper/ folder from module-setup.sh
   sed -i '/inst \"\$moddir/s/^\(.*\)$/#&/' /tmp/dracut-crypt-ssh/modules/60crypt-ssh/module-setup.sh
-  cp -ri /tmp/dracut-crypt-ssh/modules/60crypt-ssh /usr/lib/dracut/modules.d
+  cp -r /tmp/dracut-crypt-ssh/modules/60crypt-ssh /usr/lib/dracut/modules.d
 
   echo 'install_items+=" /etc/cmdline.d/dracut-network.conf "' >  /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
   echo 'add_dracutmodules+=" crypt-ssh "'                      >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
