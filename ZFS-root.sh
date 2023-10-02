@@ -1556,7 +1556,7 @@ cp /usr/share/doc/avahi-daemon/examples/ssh.service /etc/avahi/services
 # For ZFSENC we need to set up a script and systemd unit to load the keyfile
 if [ ${DISCENC} = "ZFSENC" ] ; then
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat > /usr/local/bin/zfs-multi-mount.sh <<-'EOF'
+    cat > /usr/bin/zfs-multi-mount.sh <<-'EOF'
 	#!/usr/bin/env bash
 	# https://gbyte.dev/blog/unlock-mount-several-zfs-datasets-boot-single-passphrase
 	
@@ -1641,7 +1641,7 @@ if [ ${DISCENC} = "ZFSENC" ] ; then
 	
 	exit 0
 	EOF
-  chmod 755 /usr/local/bin/zfs-multi-mount.sh
+  chmod 755 /usr/bin/zfs-multi-mount.sh
 
   cat > /etc/systemd/system/zfs-load-key.service << EOF
 [Unit]
@@ -1668,7 +1668,7 @@ After=zfs-import.target
 Type=oneshot
 RemainAfterExit=yes
 
-ExecStart=/usr/local/bin/zfs-multi-mount.sh --systemd ${POOLNAME}/home
+ExecStart=/usr/bin/zfs-multi-mount.sh --systemd ${POOLNAME}/home
 
 [Install]
 WantedBy=zfs-mount.service
