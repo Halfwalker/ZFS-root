@@ -642,7 +642,7 @@ fi
 # fi
 # NOW, install ZFS, perhaps from ppa above
 apt-get -qq update
-apt-get --no-install-recommends --yes install libelf-dev zfsutils-linux zfs-zed
+apt-get --no-install-recommends --yes install zfsutils-linux zfs-zed
 
 # Deprecated - not using dkms version, so new kernel/modules not built
 # Have to live with livecd zfs module version
@@ -1133,7 +1133,7 @@ rm /boot/vmlinuz.old /boot/initrd.img.old
 if [ ${ZFSPPA} = "y" ] ; then
     apt-add-repository --yes --update ppa:jonathonf/zfs
 fi
-apt-get -qq --no-install-recommends --yes install libelf-dev zfs-zed zfsutils-linux
+apt-get -qq --no-install-recommends --yes install zfs-zed zfsutils-linux
 
 # jammy/22.04 moved zfs from /sbin/zfs to /usr/sbin/zfs
 ZFSLOCATION=$(which zfs)
