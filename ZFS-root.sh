@@ -2179,10 +2179,10 @@ if [ "${SOF}" = "y" ]; then
     # LATESTFILE=$(ls -C1 ${LATEST}/${LATESTBASE}* | tail -1)
     # ./install.sh $LATESTFILE
 
-    wget -O /tmp/sof-bin-v2.2.4.tar.gz https://github.com/thesofproject/sof-bin/releases/download/v2.2.4/sof-bin-v2.2.4.tar.gz
-    tar -C /usr/local/share/ -xf /tmp/sof-bin-v2.2.4.tar.gz
-    cd /usr/local/share/sof-bin-v2.2.4
-    ./install.sh v2.2.4
+    wget -O /tmp/sof-bin-2023.12.tar.gz https://github.com/thesofproject/sof-bin/releases/download/v2023.12/sof-bin-2023.12.tar.gz
+    tar -C /usr/local/share/ -xf /tmp/sof-bin-2023.12.tar.gz
+    cd /usr/local/share/sof-bin-2023.12
+    ./install.sh
 fi # Sound Open Firmware
 
 # Snapshot the clean desktop(s) after base install
