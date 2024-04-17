@@ -26,7 +26,7 @@ variable "output_prefix" {
 
 variable "ubuntu_version" {
   type = string
-  default = "22.04.3"
+  default = "22.04.4"
 }
 
 # Used to select the remote dir for the live iso image
@@ -35,7 +35,7 @@ variable "ubuntu_version" {
 # Note: Make SURE this has a trailing slash when referencing an https://releases.ubuntu.com location
 variable "ubuntu_version_dir" {
   type = string
-  default = "22.04.3/"
+  default = "22.04.4/"
 }
 
 # Source for ubuntu live iso image

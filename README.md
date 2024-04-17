@@ -4,7 +4,7 @@ This script is meant to be run from an Ubuntu Live CD.  It will build an Ubuntu 
 
 ## tl;dr
 
-- Boot an Ubuntu live-cd, like [ubuntu-22.04.2-live-server-amd64.iso](https://releases.ubuntu.com/22.04.2/ubuntu-22.04.2-live-server-amd64.iso) and select *Try or install Ubuntu server*
+- Boot an Ubuntu live-cd, like [ubuntu-22.04.4-live-server-amd64.iso](https://releases.ubuntu.com/jammy/ubuntu-22.04.4-live-server-amd64.iso) and select *Try or install Ubuntu server*
 - At the language selection prompt, type in `ctrl-z` to put the installer into the background and get a root shell
 - Clone the **ZFS-root** repo
     ```
@@ -32,7 +32,7 @@ Number  Start (sector)    End (sector)  Size       Code  Name
 >     <dt>SWAP_0
 >     <dd>Swap partition for use with Hibernate/Resume - only created if Hibernate is available and selected.  Will be encrypted if using LUKS.  Hibernate/Resume only uses the first disk for resume, no matter how many disks and swap partitions there are.  This means that the swap partitions must be at least the size of ram for Hibernate/Resume to work.
 >     <dt>ZFS_0
->     <dd>Partition for main ZFS pool.  Root dataset, /home dataset etc. all go in here.  NOTE: With ZFS native encryption the whole pool is NOT encrypted, only the main /rpool/ROOT and rpool/home container datasets.  This allows for non-encrypted datasets if desired.
+>     <dd>Partition for main ZFS pool.  Root dataset, /home dataset etc. all go in here.  NOTE: With ZFS native encryption the whole pool is NOT encrypted, only the main rpool/ROOT and rpool/home container datasets.  This allows for non-encrypted datasets if desired.
 > </dl>
 
 ## Features
@@ -41,11 +41,11 @@ Number  Start (sector)    End (sector)  Size       Code  Name
 * Uses [zfsbootmenu](https://github.com/zbm-dev/zfsbootmenu/) to handle the actual booting of the ZFS pool.
 * Can optionally clone the installed ROOT dataset as a rescue dataset. This will be selectable in the **zfsbootmenu** menu in the event the main ROOT dataset ever gets corrupted.
 * When using encryption it can also optionally install [dropbear](https://matt.ucc.asn.au/dropbear/dropbear.html) to allow remote unlocking of system. `ssh -p 222 root@<ip addr>`  **NOTE:** do not enable Dropbear for laptops - it wants to see the network in place, and if it's missing (usb-ethernet etc) then it will just sit and wait.
-* Can pre-populate the main user `~.ssh/authorized_keys` with a pubkey pulled from named users from github.  This will also pre-populate the *dropbear* _authorized_keys_ if encryption is used.
+* Can pre-populate the main user `~/.ssh/authorized_keys` with a pubkey pulled from named users from github.  This will also pre-populate the *dropbear* _authorized_keys_ if encryption is used.
 * Optionally can install google_authenticator for the main user.  This will prompt for a TOTP code on login via ssh if no ssh-key is used.  The code and a QR code are displayed during initial config setup.
-* If a local *apt-cacher* system is available it will point `apt` to that to speed up package downloads.
+* If a local *apt-cacher* system is available you can point `apt` to that to speed up package downloads.
 * Memtest86+ included as a boot option.
-* Optionally can install [zrepl](https://zrepl.github.io/) with a base snapshot-only config to auto-snapshot the main and home datasets (see _/etc/zrepl_)
+* Optionally can install [zrepl](https://zrepl.github.io/) with a basic snapshot-only config to auto-snapshot the main and home datasets (see _/etc/zrepl_)
 * [Packer](https://developer.hashicorp.com/packer) config to generate a *qcow2* KVM disk image for testing or CI/CD
 
 *initramfs-tools* is NOT used, and is in fact disabled via `apt-mark hold initramfs-tools`.  Instead *dracut* is used for managing the initramfs.
@@ -69,12 +69,12 @@ The simple *zrepl* config install sets up two snapshot/prune only jobs, no repli
 
 In addition, the root dataset is only snap'd if there has been more that 120mb written to it - the idea being that we don't _really_ need mostly-empty snaps of an idle system.  Home data though, snap them all ...
 
-The snapshot config uses _/usr/local/bin/zrepl_threshold.sh_ to determine whether or not to snap.  It reads the *com.zrepl:snapshot-threshold* property for the threshold value to compare against the *written* property.
+The snapshot config uses _/usr/local/bin/zrepl_threshold.sh_ to determine whether or not to snap.  It reads the *com.zrepl:snapshot-threshold* property in a dataset for the threshold value to compare against the *written* property.
 
 For any dataset that you want a threshold set, use something similar to
 
 ```
-sudo zfs set com.zrepl:snapshot-threshold=120000000 tank/ROOT/jammy
+sudo zfs set com.zrepl:snapshot-threshold=120000000 rpool/ROOT/jammy
 ```
 
 ### Sample SSH config for Dropbear
