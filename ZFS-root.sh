@@ -1863,7 +1863,7 @@ cat > /usr/local/bin/showip.sh <<- 'EOF'
 # Exclude lo, virtual and docker interfaces - they're just messy
 
 echo -e "$(lsb_release -d -s) \\\n \l\n" > /etc/issue
-echo "$(ls -1 /sys/class/net | egrep -v 'lo|vir|docker|tap|veth|br-' | xargs -I {} echo '   {} : \4{{}}')" >> /etc/issue
+echo "$(ls -1 /sys/class/net | egrep -v 'lo|vir|docker|tap|veth|br-|zt?' | xargs -I {} echo '   {} : \4{{}}')" >> /etc/issue
 echo "" >> /etc/issue
 EOF
 
