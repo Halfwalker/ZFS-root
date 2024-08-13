@@ -343,7 +343,7 @@ if [[ ! -v ZREPL ]] || [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] 
             RESCUE "Create rescue dataset by cloning initial install" OFF \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
             HWE "Install Hardware Enablement kernel" OFF \
-            ZFSPPA "Update to latest ZFS 2.1 from PPA" ON \
+            ZFSPPA "Update to latest ZFS 2.1 from PPA" OFF \
             ZREPL "Install Zrepl zfs snapshot manager" OFF \
             DELAY "Add delay before importing root pool - for many-disk systems" OFF \
             SOF "Install Sound Open Firmware binaries ${SOF_VERSION} (for some laptops)" OFF \
@@ -357,7 +357,7 @@ if [[ ! -v ZREPL ]] || [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] 
             RESCUE "Create rescue dataset by cloning initial install" OFF \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
             HWE "Install Hardware Enablement kernel" OFF \
-            ZFSPPA "Update to latest ZFS 2.1 from PPA" ON \
+            ZFSPPA "Update to latest ZFS 2.1 from PPA" OFF \
             ZREPL "Install Zrepl zfs snapshot manager" OFF \
             HIBERNATE "Enable swap partition for hibernation" OFF \
             DELAY "Add delay before importing root pool - for many-disk systems" OFF \
