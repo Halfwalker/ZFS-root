@@ -446,8 +446,8 @@ fi
 # If DISCENC == LUKS then partition will be encrypted.  If SIZE_SWAP is not
 # defined here, then will be calculated to accomodate memory size (plus fudge factor).
 if [[ ! -v SIZE_SWAP ]] ; then
-    MEMTOTAL=$(cat /proc/meminfo | fgrep MemTotal | tr -s ' ' | cut -d' ' -f2)
-    SIZE_SWAP=$(( (${MEMTOTAL} + 20480) / 1024 ))
+    MEMTOTAL=$(cat /proc/meminfo | grep -F MemTotal | tr -s ' ' | cut -d' ' -f2)
+    SIZE_SWAP=$(( (MEMTOTAL + 20480) / 1024 ))
     # We MUST have a swap partition of at least ram size if HIBERNATE is enabled
     # So don't even prompt the user for a size. Her own silly fault if it's
     # enabled but she doesn't want a swap partition
@@ -634,7 +634,7 @@ cat /tmp/selections | debconf-set-selections
 ZFS_LIVECD=
 if [ -f /usr/sbin/zfs ] || [ -f /sbin/zfs ] ; then
     # Get currently installed version
-    ZFS_INSTALLED=$(dpkg -s zfsutils-linux | fgrep Version | cut -d' ' -f2)
+    ZFS_INSTALLED=$(dpkg -s zfsutils-linux | grep -F Version | cut -d' ' -f2)
     modprobe zfs
     ZFS_MODULE=$(cat /sys/module/zfs/version)
     ZFS_LIVECD=y
@@ -666,12 +666,12 @@ apt-get --no-install-recommends --yes install zfsutils-linux zfs-zed
 # fi                                                                      
 
 # Create an encryption key for LUKs partitions
-if [ ${DISCENC} = "LUKS" ] ; then
+if [ "${DISCENC}" = "LUKS" ] ; then
     dd if=/dev/urandom of=/etc/zfs/zroot.rawkey bs=32 count=1
 fi
 # Put zfs encryption key into place
 # We use two keys so the user can change the home dataset to something else if desired
-if [ ${DISCENC} = "ZFSENC" ] ; then
+if [ "${DISCENC}" = "ZFSENC" ] ; then
     echo "${PASSPHRASE}" > /etc/zfs/zroot.key
     echo "${PASSPHRASE}" > /etc/zfs/zroot.homekey
     chmod 000 /etc/zfs/zroot.key /etc/zfs/zroot.homekey
@@ -706,7 +706,7 @@ for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
     #
     # For laptop hibernate need swap partition, encrypted or not
     if [ "${HIBERNATE}" = "y" ] ; then
-        if [ ${DISCENC} != "NOENC" ] ; then
+        if [ "${DISCENC}" != "NOENC" ] ; then
             # ZFS or LUKS Encrypted - should be partition type 8309 (Linux LUKS)
             sgdisk -n ${PARTITION_SWAP}:0:+${SIZE_SWAP}M -c ${PARTITION_SWAP}:"SWAP_${disk}" -t ${PARTITION_SWAP}:8309 /dev/disk/by-id/${zfsdisks[${disk}]}
         else
@@ -754,15 +754,15 @@ done
 # them up, but meh, why ?
 # NOTE: Need --disable-keyring so we can pull the derived key from the encrypted partition
 #       otherwise it's in the kernel keyring
-if [ ${HIBERNATE} = "y" ] ; then
+if [ "${HIBERNATE}" = "y" ] ; then
     # Hibernate, so we need a real swap partition(s)
     for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
 
         case ${DISCENC} in
             LUKS)
                 echo "Encrypting swap partition ${disk} size ${SIZE_SWAP}M"
-                echo ${PASSPHRASE} | cryptsetup luksFormat --type luks2 --disable-keyring -c aes-xts-plain64 -s 512 -h sha256 /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} 
-                echo ${PASSPHRASE} | cryptsetup luksOpen --disable-keyring /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} swap_crypt${disk}
+                echo "${PASSPHRASE}" | cryptsetup luksFormat --type luks2 --disable-keyring -c aes-xts-plain64 -s 512 -h sha256 /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} 
+                echo "${PASSPHRASE}" | cryptsetup luksOpen --disable-keyring /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} swap_crypt${disk}
                 mkswap -f /dev/mapper/swap_crypt${disk}
 
                 if [ ${disk} -eq 0 ] ; then
@@ -772,9 +772,9 @@ if [ ${HIBERNATE} = "y" ] ; then
                     /lib/cryptsetup/scripts/decrypt_derived swap_crypt${disk} > /tmp/key
                 fi
                 # Add the derived key to all the other devices
-                echo ${PASSPHRASE} | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} /tmp/key
+                echo "${PASSPHRASE}" | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} /tmp/key
                 # Add the generated key from /etc/zfs/zroot.rawkey
-                echo ${PASSPHRASE} | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} /etc/zfs/zroot.rawkey
+                echo "${PASSPHRASE}" | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} /etc/zfs/zroot.rawkey
                 ;;
 
             ZFSENC)
@@ -798,8 +798,8 @@ if [ "${DISCENC}" = "LUKS" ] ; then
     for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
         # Encrypted LUKS root
         echo "Encrypting root ZFS ${disk}"
-        echo ${PASSPHRASE} | cryptsetup luksFormat --type luks2 -c aes-xts-plain64 -s 512 -h sha256 /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} 
-        echo ${PASSPHRASE} | cryptsetup luksOpen /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} root_crypt${disk}
+        echo "${PASSPHRASE}" | cryptsetup luksFormat --type luks2 -c aes-xts-plain64 -s 512 -h sha256 /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} 
+        echo "${PASSPHRASE}" | cryptsetup luksOpen /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} root_crypt${disk}
 
         # If no encrypted SWAP then use 1st root device as derived key
         # otherwise assume derived key was created above in "Create SWAP volume"
@@ -810,9 +810,9 @@ if [ "${DISCENC}" = "LUKS" ] ; then
         fi
 
         # Add the derived key to all the other devices
-        echo ${PASSPHRASE} | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} /tmp/key
+        echo "${PASSPHRASE}" | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} /tmp/key
         # Add the generated key from /etc/zfs/zroot.rawkey
-        echo ${PASSPHRASE} | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} /etc/zfs/zroot.rawkey
+        echo "${PASSPHRASE}" | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} /etc/zfs/zroot.rawkey
     done
 fi
 
@@ -859,7 +859,7 @@ esac
 
 echo "Creating main zfs datasets"
 # Container for root filesystems - possibly zfs native encrypted
-if [ ${DISCENC} = "ZFSENC" ] ; then
+if [ "${DISCENC}" = "ZFSENC" ] ; then
     echo "${PASSPHRASE}" | zfs create -o canmount=off -o mountpoint=none ${ZFSENC_ROOT_OPTIONS} ${POOLNAME}/ROOT
 else
     zfs create -o canmount=off -o mountpoint=none ${POOLNAME}/ROOT
@@ -872,7 +872,7 @@ zfs create -o canmount=noauto -o mountpoint=/ \
 zpool set bootfs=${POOLNAME}/ROOT/${SUITE} ${POOLNAME}
 zfs mount ${POOLNAME}/ROOT/${SUITE}
 
-if [ ${DISCENC} != "NOENC" ] ; then
+if [ "${DISCENC}" != "NOENC" ] ; then
     # Making sure we have the LUKS raw key available and/or
     # Making sure we have the non-root key used for other datasets (/home)
     mkdir -p ${ZFSBUILD}/etc/zfs
@@ -880,7 +880,7 @@ if [ ${DISCENC} != "NOENC" ] ; then
 fi
 
 # zfs create pool/home and main user home dataset - possibly zfs native encrypted
-if [ ${DISCENC} = "ZFSENC" ] ; then
+if [ "${DISCENC}" = "ZFSENC" ] ; then
     echo "${PASSPHRASE}" | zfs create -o canmount=off -o mountpoint=none -o compression=lz4 -o atime=off ${ZFSENC_HOME_OPTIONS} ${POOLNAME}/home
 else
     zfs create -o canmount=off -o mountpoint=none -o compression=lz4 -o atime=off ${POOLNAME}/home
@@ -891,7 +891,7 @@ zfs create -o canmount=on -o mountpoint=/root ${POOLNAME}/home/root
 # If no HIBERNATE partition (not laptop, no resume etc) then just create
 # a zvol for swap.  Could not create this in the block above for swap because
 # the root pool didn't exist yet.
-if [ ${HIBERNATE} = "n" ] && [ ${SIZE_SWAP} -ne 0 ] ; then
+if [ "${HIBERNATE}" = "n" ] && [ ${SIZE_SWAP} -ne 0 ] ; then
     # No Hibernate, so just use a zfs volume for swap
     echo "Creating swap zfs dataset size ${SIZE_SWAP}M"
     # zfs create -V ${SIZE_SWAP}M -b $(getconf PAGESIZE) -o compression=zle \
@@ -994,7 +994,7 @@ cat > ${ZFSBUILD}/etc/netplan/01_netcfg.yaml <<-EOF
 EOF
 
 # Google Authenticator config - put to /root to be moved to /home/${USERNAME} in setup.sh
-if [ ${GOOGLE} = "y" ] ; then
+if [ "${GOOGLE}" = "y" ] ; then
     cp /tmp/google_auth.txt ${ZFSBUILD}/root
 fi
 
@@ -1771,7 +1771,7 @@ if [[ -v SSHPUBKEY ]] ; then
     echo "${SSHPUBKEY}" >> /home/${USERNAME}/.ssh/authorized_keys 
 fi
 
-chown -R ${USERNAME}.${USERNAME} /home/${USERNAME}
+chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}
 
 #
 # Set up Dropbear - after user is created with .ssh/authorized_keys
@@ -1834,7 +1834,7 @@ if [ "${GOOGLE}" = "y" ]; then
     apt-get -qq --no-install-recommends --yes install python3-qrcode qrencode libpam-google-authenticator
     cp /root/google_auth.txt /home/${USERNAME}/.google_authenticator
     chmod 400 /home/${USERNAME}/.google_authenticator
-    chown ${USERNAME}.${USERNAME} /home/${USERNAME}/.google_authenticator
+    chown ${USERNAME}:${USERNAME} /home/${USERNAME}/.google_authenticator
 
     # Set pam to use google authenticator for ssh
     echo "auth required pam_google_authenticator.so" >> /etc/pam.d/sshd
@@ -1869,7 +1869,7 @@ cat > /usr/local/bin/showip.sh <<- 'EOF'
 # Exclude lo, virtual and docker interfaces - they're just messy
 
 echo -e "$(lsb_release -d -s) \\\n \l\n" > /etc/issue
-echo "$(ls -1 /sys/class/net | egrep -v 'lo|vir|docker|tap|veth|br-|zt?' | xargs -I {} echo '   {} : \4{{}}')" >> /etc/issue
+echo "$(ls -1 /sys/class/net | grep -E -v 'lo|vir|docker|tap|veth|br-|zt?' | xargs -I {} echo '   {} : \4{{}}')" >> /etc/issue
 echo "" >> /etc/issue
 EOF
 
