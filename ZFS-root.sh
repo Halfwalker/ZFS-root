@@ -966,35 +966,55 @@ if [ "${GOOGLE}" = "y" ] ; then
     cp /tmp/google_auth.txt ${ZFSBUILD}/root
 fi
 
-# sources
-cat > ${ZFSBUILD}/etc/apt/sources.list <<-EOF
-	deb http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse restricted
-	deb-src http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse restricted
-	
-	deb http://security.ubuntu.com/ubuntu ${SUITE}-security main multiverse restricted
-	deb-src http://security.ubuntu.com/ubuntu ${SUITE}-security main multiverse restricted
-	
-	deb http://archive.ubuntu.com/ubuntu ${SUITE}-updates main multiverse restricted
-	deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-updates main multiverse restricted
-	
-	deb http://archive.ubuntu.com/ubuntu ${SUITE}-backports main multiverse restricted
-	deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-backports main multiverse restricted
-EOF
+# sources - NOTE: MUST have actual TABs for each line
+case ${SUITE} in
+    focal | jammy | noble)
+        cat > ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu.sources <<-EOF
+		Types: deb
+		URIs: http://us.archive.ubuntu.com/ubuntu/
+		Suites: ${SUITE} ${SUITE}-updates ${SUITE}-backports
+		Components: main restricted universe multiverse
+		Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+		
+		Types: deb
+		URIs: http://security.ubuntu.com/ubuntu/
+		Suites: ${SUITE}-security
+		Components: main restricted universe multiverse
+		Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+		EOF
+        ;;
+    bionic)
+        # Old sources setup before deb822
+        cat > ${ZFSBUILD}/etc/apt/sources.list <<-EOF
+			deb http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse restricted
+			deb-src http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse restricted
+			
+			deb http://security.ubuntu.com/ubuntu ${SUITE}-security main multiverse restricted
+			deb-src http://security.ubuntu.com/ubuntu ${SUITE}-security main multiverse restricted
+			
+			deb http://archive.ubuntu.com/ubuntu ${SUITE}-updates main multiverse restricted
+			deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-updates main multiverse restricted
+			
+			deb http://archive.ubuntu.com/ubuntu ${SUITE}-backports main multiverse restricted
+			deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-backports main multiverse restricted
+		EOF
 
-# We put universe into its own .list file so ansible apt_repository will match 
-cat > ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu_universe.list <<-EOF
-	deb http://archive.ubuntu.com/ubuntu ${SUITE} universe
-	deb-src http://archive.ubuntu.com/ubuntu ${SUITE} universe
-
-	deb http://security.ubuntu.com/ubuntu ${SUITE}-security universe
-	deb-src http://security.ubuntu.com/ubuntu ${SUITE}-security universe
-
-	deb http://archive.ubuntu.com/ubuntu ${SUITE}-updates universe
-	deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-updates universe
-
-	deb http://archive.ubuntu.com/ubuntu ${SUITE}-backports universe
-	deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-backports universe
-EOF
+        # We put universe into its own .list file so ansible apt_repository will match 
+        cat > ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu_universe.list <<-EOF
+			deb http://archive.ubuntu.com/ubuntu ${SUITE} universe
+			deb-src http://archive.ubuntu.com/ubuntu ${SUITE} universe
+		
+			deb http://security.ubuntu.com/ubuntu ${SUITE}-security universe
+			deb-src http://security.ubuntu.com/ubuntu ${SUITE}-security universe
+		
+			deb http://archive.ubuntu.com/ubuntu ${SUITE}-updates universe
+			deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-updates universe
+		
+			deb http://archive.ubuntu.com/ubuntu ${SUITE}-backports universe
+			deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-backports universe
+		EOF
+        ;;
+esac
 
 # Copy logo for rEFInd
 [ -e logo_sm.jpg ] && cp logo_sm.jpg ${ZFSBUILD}/root/logo_sm.jpg
@@ -1061,6 +1081,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
 [ "$1" = "-d" ] && set -x
 [ "$1" = "packerci" ] && set -x
+
+# Make sure we're using a tmpfs for /tmp
+systemctl enable /usr/share/systemd/tmp.mount
 
 ln -s /proc/self/mounts /etc/mtab
 apt-get -qq update
@@ -1153,6 +1176,16 @@ apt-mark hold zfs-initramfs initramfs-tools grub-efi-amd64 grub-efi-amd64-signed
 #
 # Install rEFInd and syslinux
 #
+
+# First check for efivars and mount if necessary
+# LiveCD on Lenovo laptops for some reason don't always mount it ...
+# efibootmgr results in 'EFI variables are not supported on this system'
+EFIVARS_CNT=$(ls -1 /sys/firmware/efi/efivars | wc -l)
+if [ ${EFIVARS_CNT} -eq 0 ] ; then
+  echo "Need to mount EFIVARS"
+  mount -t efivarfs efivarfs /sys/firmware/efi/efivars
+fi
+
 mount /boot/efi
 DEBIAN_FRONTEND=noninteractive apt-get --yes install refind
 refind-install --yes
