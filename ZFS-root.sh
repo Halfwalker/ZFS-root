@@ -115,6 +115,11 @@ if [ "$1" = "packerci" ] ; then
     fi
 fi
 
+# For SOF binaries, default to 2024.06
+if [[ ! -v $SOF_VERSION ]] ; then
+    SOF_VERSION=2024.06
+fi
+
 # No magenta overrides for whiptail dialogs please
 export NEWT_COLORS="none"
 
@@ -341,7 +346,7 @@ if [[ ! -v ZREPL ]] || [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] 
             ZFSPPA "Update to latest ZFS 2.1 from PPA" ON \
             ZREPL "Install Zrepl zfs snapshot manager" OFF \
             DELAY "Add delay before importing root pool - for many-disk systems" OFF \
-            SOF "Install Sound Open Firmware binaries (for some laptops)" OFF \
+            SOF "Install Sound Open Firmware binaries ${SOF_VERSION} (for some laptops)" OFF \
             GNOME "Install Ubuntu Gnome desktop" OFF \
             XFCE "Install Ubuntu xfce4 desktop with goodies" OFF \
             KDE "Install Ubuntu KDE Plasma desktop" OFF \
@@ -356,7 +361,7 @@ if [[ ! -v ZREPL ]] || [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] 
             ZREPL "Install Zrepl zfs snapshot manager" OFF \
             HIBERNATE "Enable swap partition for hibernation" OFF \
             DELAY "Add delay before importing root pool - for many-disk systems" OFF \
-            SOF "Install Sound Open Firmware binaries (for some laptops)" OFF \
+            SOF "Install Sound Open Firmware binaries ${SOF_VERSION} (for some laptops)" OFF \
             GNOME "Install Ubuntu Gnome desktop" OFF \
             XFCE "Install Ubuntu xfce4 desktop with goodies" OFF \
             KDE "Install Ubuntu KDE Plasma desktop" OFF \
@@ -595,7 +600,7 @@ if [ "$1" != "packerci" ] ; then
         KDE       = $(echo $KDE)  : Install Ubuntu KDE Plasma desktop\n \
         NEON      = $(echo $NEON)  : Install Neon KDE Plasma desktop\n \
         NVIDIA    = $(echo $NVIDIA)  : Install Nvidia drivers\n \
-        SOF       = $(echo $SOF)  : Install Sound Open Firmware binaries\n \
+        SOF       = $(echo $SOF)  : Install Sound Open Firmware ${SOF_VERSION} binaries\n \
         HIBERNATE = $(echo $HIBERNATE)  : Enable SWAP disk partition for hibernation\n \
         DISCENC   = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
         DROPBEAR  = $(echo $DROPBEAR)  : Enable Dropbear unlocking of encrypted disks\n \
@@ -1049,6 +1054,7 @@ cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
     export ZREPL=${ZREPL}
 	export GOOGLE=${GOOGLE}
 	export SOF=${SOF}
+	export SOF_VERSION=${SOF_VERSION}
 	export PROXY=${PROXY}
 	export HWE=${HWE}
 	export GNOME=${GNOME}
@@ -2179,9 +2185,10 @@ if [ "${SOF}" = "y" ]; then
     # LATESTFILE=$(ls -C1 ${LATEST}/${LATESTBASE}* | tail -1)
     # ./install.sh $LATESTFILE
 
-    wget -O /tmp/sof-bin-2023.12.tar.gz https://github.com/thesofproject/sof-bin/releases/download/v2023.12/sof-bin-2023.12.tar.gz
-    tar -C /usr/local/share/ -xf /tmp/sof-bin-2023.12.tar.gz
-    cd /usr/local/share/sof-bin-2023.12
+    wget --quiet -O /tmp/sof-bin-${SOF_VERSION}.tar.gz https://github.com/thesofproject/sof-bin/releases/download/v${SOF_VERSION}/sof-bin-${SOF_VERSION}.tar.gz
+    tar -C /usr/local/share/ -xf /tmp/sof-bin-${SOF_VERSION}.tar.gz
+    chown -R ${USERNAME}:${USERNAME} /usr/local/share/sof-bin-${SOF_VERSION}
+    cd /usr/local/share/sof-bin-${SOF_VERSION}
     ./install.sh
 fi # Sound Open Firmware
 

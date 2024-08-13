@@ -95,6 +95,10 @@ XFCE=n
 # 530 for current latest, or whatever version you prefer
 NVIDIA=none
 
+# If installing Sound Open Firmware binaries (mostly for laptops) choose
+# the version here.  Defaults to 2024.06
+SOF_VERSION=2024.06
+
 #
 # Below are additional options that can be set that do NOT have a menu process
 # to ask for their values.  Less-likely to be used, and larger ones that are not
