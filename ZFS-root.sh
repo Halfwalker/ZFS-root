@@ -492,15 +492,7 @@ case ${SUITE} in
         # Gets tacked on to various packages below
         [ "${HWE}" = "y" ] && HWE="-hwe-${SUITE_NUM}" || HWE=
         # Specific zpool features available in jammy
-        # Depends on what suite this script is running under
-        case ${SCRIPT_SUITE} in
-            bionic | focal | jammy)
-                SUITE_ROOT_POOL="-O dnodesize=auto"
-                ;;
-            xenial)
-                SUITE_ROOT_POOL=""
-                ;;
-        esac
+        SUITE_ROOT_POOL="-O dnodesize=auto"
         # If ZFSPPA is off (not using latest zfs) must set dnodesize=legacy
         # otherwise cannot set bootfs property on pool
         if [ "${ZFSPPA}" = "n" ] ; then
@@ -515,15 +507,7 @@ case ${SUITE} in
         # Gets tacked on to various packages below
         [ "${HWE}" = "y" ] && HWE="-hwe-${SUITE_NUM}" || HWE=
         # Specific zpool features available in focal
-        # Depends on what suite this script is running under
-        case ${SCRIPT_SUITE} in
-            bionic | focal | jammy)
-                SUITE_ROOT_POOL="-O dnodesize=auto"
-                ;;
-            xenial)
-                SUITE_ROOT_POOL=""
-                ;;
-        esac
+        SUITE_ROOT_POOL="-O dnodesize=auto"
         # If ZFSPPA is off (not using latest zfs) must set dnodesize=legacy
         # otherwise cannot set bootfs property on pool
         if [ "${ZFSPPA}" = "n" ] ; then
@@ -538,15 +522,7 @@ case ${SUITE} in
         # Gets tacked on to various packages below
         [ "${HWE}" = "y" ] && HWE="-hwe-${SUITE_NUM}" || HWE=
         # Specific zpool features available in bionic
-        # Depends on what suite this script is running under
-        case ${SCRIPT_SUITE} in
-            bionic | focal | jammy)
-                SUITE_ROOT_POOL="-O dnodesize=legacy"
-                ;;
-            xenial)
-                SUITE_ROOT_POOL=""
-                ;;
-        esac
+        SUITE_ROOT_POOL="-O dnodesize=legacy"
         ;;
     # Default to focal 20.04
     *)
@@ -557,15 +533,7 @@ case ${SUITE} in
         # Gets tacked on to various packages below
         [ "${HWE}" = "y" ] && HWE="-hwe-${SUITE_NUM}" || HWE=
         # Specific zpool features available in focal
-        # Depends on what suite this script is running under
-        case ${SCRIPT_SUITE} in
-            bionic | focal)
-                SUITE_ROOT_POOL="-O dnodesize=auto"
-                ;;
-            xenial)
-                SUITE_ROOT_POOL=""
-                ;;
-        esac
+        SUITE_ROOT_POOL="-O dnodesize=auto"
         # If ZFSPPA is off (not using latest zfs) must set dnodesize=legacy
         # otherwise cannot set bootfs property on pool
         if [ "${ZFSPPA}" = "n" ] ; then
