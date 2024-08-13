@@ -4,7 +4,7 @@ This script is meant to be run from an Ubuntu Live CD.  It will build an Ubuntu 
 
 ## tl;dr
 
-- Boot an Ubuntu live-cd, like [ubuntu-22.04.4-live-server-amd64.iso](https://releases.ubuntu.com/jammy/ubuntu-22.04.4-live-server-amd64.iso) and select *Try or install Ubuntu server*
+- Boot an Ubuntu live-cd, like [ubuntu-24.04-live-server-amd64.iso](https://releases.ubuntu.com/noble/ubuntu-24.04-live-server-amd64.iso) and select *Try or install Ubuntu server*
 - At the language selection prompt, type in `ctrl-z` to put the installer into the background and get a root shell
 - Clone the **ZFS-root** repo
     ```
@@ -74,7 +74,7 @@ The snapshot config uses _/usr/local/bin/zrepl_threshold.sh_ to determine whethe
 For any dataset that you want a threshold set, use something similar to
 
 ```
-sudo zfs set com.zrepl:snapshot-threshold=120000000 rpool/ROOT/jammy
+sudo zfs set com.zrepl:snapshot-threshold=120000000 rpool/ROOT/noble
 ```
 
 ### Sample SSH config for Dropbear

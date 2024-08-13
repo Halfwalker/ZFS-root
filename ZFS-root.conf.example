@@ -29,9 +29,9 @@ POOLNAME="test"
 
 #
 # What version of Ubuntu to install
-# jammy, focal, bionic
+# noble, jammy, focal, bionic
 #
-SUITE="jammy"
+SUITE="noble"
 
 #
 # If multidisk, select main pool raid level
@@ -73,10 +73,10 @@ DROPBEAR=n
 # See script for descriptions
 # Be sure to set ALL vars here to y or n, otherwise script will prompt for them
 #
-RESCUE=n
+RESCUE=y
 GOOGLE=n
 HWE=y
-ZFSPPA=y
+ZFSPPA=n
 ZREPL=n
 HIBERNATE=n
 DELAY=n
@@ -92,7 +92,7 @@ XFCE=n
 #
 # none for no driver
 # 390 or 470 for legacy driver
-# 530 for current latest, or whatever version you prefer
+# 550 for current latest, or whatever version you prefer
 NVIDIA=none
 
 # If installing Sound Open Firmware binaries (mostly for laptops) choose

@@ -49,7 +49,7 @@
 
 #
 # This will set up a single-disk system with root-on-zfs, using
-# bionic/18.04 or focal/20.04 or jammy/22.04.
+# bionic/18.04 or focal/20.04 or jammy/22.04 or noble/24.04.
 #
 # >>>>>>>>>> NOTE: This will totally overwrite the disk(s) chosen <<<<<<<<<<<<<
 #
@@ -339,7 +339,7 @@ if [[ ! -v ZREPL ]] || [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] 
     # Hibernate can only resume from a single disk, and currently not available for ZFS encryption
     if [ "${DISCENC}" == "ZFSENC" ] || [ ${#zfsdisks[@]} -gt 1 ] || [ ${HIBERNATE_AVAIL} -ne 0 ] ; then
         # Set basic options for install - ZFSENC so no Hibernate available (yet)
-        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 22 83 11 \
+        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 22 89 11 \
             RESCUE "Create rescue dataset by cloning initial install" OFF \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
             HWE "Install Hardware Enablement kernel" OFF \
@@ -353,7 +353,7 @@ if [[ ! -v ZREPL ]] || [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] 
             NEON "Install Neon KDE Plasma desktop" OFF 2>"${TMPFILE}"
     else
         # Set basic options for install - ZFSENC so no Hibernate available (yet)
-        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 23 83 12 \
+        whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 23 89 12 \
             RESCUE "Create rescue dataset by cloning initial install" OFF \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
             HWE "Install Hardware Enablement kernel" OFF \
@@ -383,6 +383,7 @@ fi # Check ALL options from ZFS-root.conf
 
 # See if we need to install Nvidia drivers, notify if so
 if [[ ! -v NVIDIA ]] ; then
+    NVIDIA=none
     if [ ${GNOME} = "y" ] || [ ${KDE} = "y" ] || [ ${NEON} = "y" ] || [ ${XFCE} = "y" ] ; then
         if [ $(lspci | fgrep -i nvidia | wc -l) -gt 0 ] ; then
             # Installing Nvidia PPA here just so we can search for versions
@@ -469,9 +470,10 @@ USE_ZSWAP="\"zswap.enabled=1 zswap.compressor=lz4 zswap.max_pool_percent=25\""
 # is bionic.  Pool can be upgraded after booting into the target.
 SCRIPT_SUITE=$(lsb_release -cs)
 
-# Suite to install - bionic focal jammy
+# Suite to install - bionic focal jammy noble
 if [[ ! -v SUITE ]] ; then
-    SUITE=$(whiptail --title "Select Ubuntu distribtion" --radiolist "Choose distro" 11 50 5 \
+    SUITE=$(whiptail --title "Select Ubuntu distribtion" --radiolist "Choose distro" 12 50 6 \
+        noble"24.04 noble" ON \
         jammy "22.04 jammy" ON \
         focal "20.04 focal" OFF \
         bionic "18.04 Bionic" OFF \
@@ -484,6 +486,16 @@ fi # Check for Ubuntu suite to install
 # TODO: Make use of SUITE_EXTRAS maybe
 #
 case ${SUITE} in
+    noble)
+        SUITE_NUM="24.04"
+        SUITE_EXTRAS="netplan.io expect"
+        SUITE_BOOTSTRAP="wget,whois,rsync,gdisk,netplan.io,gpg-agent"
+        # Install HWE packages - set to blank or to "-hwe-24.04"
+        # Gets tacked on to various packages below
+        [ "${HWE}" = "y" ] && HWE="-hwe-${SUITE_NUM}" || HWE=
+        # Specific zpool features available in jammy
+        SUITE_ROOT_POOL="-O dnodesize=auto"
+        ;;
     jammy)
         SUITE_NUM="22.04"
         SUITE_EXTRAS="netplan.io expect"
@@ -553,7 +565,7 @@ if [ "$1" != "packerci" ] ; then
         Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
         $(echo $SUITE $SUITE_NUM) $([ ${HWE} ] && echo WITH || echo without) $(echo hwe kernel ${HWE})\n \
         Disk $(for disk in $(seq 0 $(( ${#zfsdisks[@]}-1)) ) ; do \
-          if [ ${disk} -ne 0 ] ; then echo -n "          " ; fi ; echo ${zfsdisks[${disk}]} ; done)\n \
+          if [ ${disk} -ne 0 ] ; then echo -n "              " ; fi ; echo ${zfsdisks[${disk}]} ; done)\n \
         Raid $([ ${RAIDLEVEL} ] && echo ${RAIDLEVEL} || echo vdevs)\n \
         Hostname $(echo $MYHOSTNAME)\n \
         Poolname $(echo $POOLNAME)\n \
@@ -573,7 +585,7 @@ if [ "$1" != "packerci" ] ; then
         DISCENC   = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
         DROPBEAR  = $(echo $DROPBEAR)  : Enable Dropbear unlocking of encrypted disks\n \
         Swap size = $(echo $SIZE_SWAP)M $([ ${SIZE_SWAP} -eq 0 ] && echo ': DISABLED')\n" \
-        ${box_height} 74
+        ${box_height} 76
     RET=${?}
     [[ ${RET} = 1 ]] && exit 1
 fi # Check for packerci
@@ -2054,9 +2066,9 @@ fi
 
 # Install main ubuntu gnome desktop, plus maybe HWE packages
 if [ "${GNOME}" = "y" ] ; then
-    # NOTE: 18.04 has an xserver-xorg-hwe-18.04 package, 20.04 does NOT
+    # NOTE: bionic has an xserver-xorg-hwe-<distro> package, focal does NOT
     case ${SUITE} in 
-        focal | jammy)
+        focal | jammy | noble)
             apt-get -qq --yes install ubuntu-desktop vulkan-tools
             ;;
         bionic)
