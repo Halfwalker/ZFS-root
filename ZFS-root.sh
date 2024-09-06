@@ -1369,6 +1369,15 @@ PROMPT 0
 MENU BACKGROUND logo_sm.jpg
 MENU TITLE Boot Menu
 TIMEOUT 50
+
+EOF
+
+# Syslinux hardware info
+cat > /boot/efi/snippets/06_hardware << EOF
+LABEL hdt
+MENU LABEL Hardware Info
+COM32 hdt.c32
+
 EOF
 
 # Download and install memtest86
