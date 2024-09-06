@@ -1199,13 +1199,16 @@ if [ ${EFIVARS_CNT} -eq 0 ] ; then
 fi
 
 mount /boot/efi
-DEBIAN_FRONTEND=noninteractive apt-get --yes install refind
+DEBIAN_FRONTEND=noninteractive apt-get --yes install refind efi-shell-x64
 refind-install --yes
 
 mkdir -p /boot/efi/EFI/zfsbootmenu
 cat <<- END > /boot/efi/EFI/zfsbootmenu/refind_linux.conf
 "Boot to ZFSbootMenu" "zbm.prefer=${POOLNAME} ro quiet loglevel=0"
 END
+
+# Copy UEFI shell to EFI system
+[ -e /usr/share/efi-shell-x64/shellx64.efi ] && cp /usr/share/efi-shell-x64/shellx64.efi /boot/efi/EFI
 
 # If we're running under legacy bios then rEFInd will be installed
 # to /boot/efi/EFI/BOOT - we want it in /boot/efi/EFI/refind
