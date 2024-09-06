@@ -104,6 +104,17 @@ if [ -e ZFS-root.conf ] ; then
     . ZFS-root.conf
 fi
 
+# ZFSBOOTMENU_BINARY_TYPE - use a downloaded binary or build locally
+# = EFI    (use EFI binary - NOTE: precludes syslinux from working)
+# = KERNEL (use vmlinuz/initrd pair from downloaded binary)
+# = LOCAL  (built locally)
+[[ ! -v ZFSBOOTMENU_BINARY_TYPE ]] && ZFSBOOTMENU_BINARY_TYPE=KERNEL
+
+# ZFSBOOTMENU_REPO_TYPE - use the tagged git release or latest git clone
+# = TAGGED
+# = GIT
+[[ ! -v ZFSBOOTMENU_REPO_TYPE ]] && ZFSBOOTMENU_REPO_TYPE=TAGGED
+
 if [ "$1" = "packerci" ] ; then
     # Ensure we pick up the packerci-specific config
     if [ -e ZFS-root-packerci.conf ] ; then
@@ -1067,6 +1078,8 @@ cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
 	export PARTITION_BOOT=${PARTITION_BOOT}
 	export PARTITION_SWAP=${PARTITION_SWAP}
 	export PARTITION_DATA=${PARTITION_DATA}
+    export ZFSBOOTMENU_BINARY_TYPE=${ZFSBOOTMENU_BINARY_TYPE}
+    export ZFSBOOTMENU_REPO_TYPE=${ZFSBOOTMENU_REPO_TYPE}
 EOF
 
 for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
@@ -1284,85 +1297,121 @@ zfs set canmount=noauto ${POOLNAME}/ROOT/${SUITE}
 #
 # Install the ZFSBootMenu package directly
 #
-mkdir -p  /boot/efi/EFI/zfsbootmenu
 
-## Using the zfsbootmenu image directly
-# curl -L https://get.zfsbootmenu.org/zfsbootmenu.EFI -o /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
-# curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v1.11.0/zfsbootmenu-x86_64-v1.11.0.EFI -o /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
-##  curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v2.0.0/zfsbootmenu-release-x86_64-v2.0.0.tar.gz -o /tmp/zfsbootmenu.tar.gz
-##  tar xvzf /tmp/zfsbootmenu.tar.gz --strip-components=1 -C /boot/efi/EFI/zfsbootmenu
-##  cp /boot/efi/EFI/refind/icons/os_linux.png /boot/efi/EFI/zfsbootmenu/zfsbootmenu.png
+# If this is NOT a UEFI system then we'll be using syslinux to boot.
+# And that won't work with an EFI image, it needs the vmlinuz/initrd set
+# So if it was trying for an EFI image we force it to the KERNEL version
+# If it was trying for LOCAL then that's fine and leave it be.
+if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "EFI" ] ; then
+    [[ ! -d /sys/firmware/efi ]] && ZFSBOOTMENU_BINARY_TYPE=KERNEL
+fi
 
-##  cat > /boot/efi/syslinux/syslinux.cfg << EOF
-##  UI vesamenu.c32
-##  PROMPT 0
-##  
-##  MENU BACKGROUND logo_sm.jpg
-##  MENU TITLE Boot Menu
-##  TIMEOUT 50
-##  DEFAULT ZFSBootMenu-2.0.0_1
-##  
-##  LABEL ZFSBootMenu-2.0.0_1
-##  MENU LABEL ZFSBootMenu 2.0.0_1
-##  KERNEL /EFI/zfsbootmenu/vmlinuz-bootmenu
-##  INITRD /EFI/zfsbootmenu/initramfs-bootmenu.img
-##  APPEND zbm.prefer=test ro quiet loglevel=0
-##  EOF
+echo "ZFSBOOTMENU_BINARY_TYPE = $ZFSBOOTMENU_BINARY_TYPE  ZFSBOOTMENU_REPO_TYPE = $ZFSBOOTMENU_REPO_TYPE"
 
-# OR install the git repo and build locally
+## Either the actual zfsbootmenu EFI image
+## NOTE: syslinux requires the KERNEL version since it needs to use the
+##       vmlinuz/initrd files to boot with
+if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "EFI" ] ; then
+    echo "--- Using zfsbootmenu EFI image"
+    curl -L https://get.zfsbootmenu.org/efi/recovery -o /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
+fi
+##  or the unpacked EFI image (vmlinux/initrd)
+if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "KERNEL" ] ; then
+    echo "--- Using zfsbootmenu KERNEL files"
+    curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v2.3.0/zfsbootmenu-recovery-x86_64-v2.3.0.tar.gz -o /tmp/zfsbootmenu.tar.gz
+    tar xvzf /tmp/zfsbootmenu.tar.gz --strip-components=1 -C /boot/efi/EFI/zfsbootmenu
+fi
 
-rm -rf /tmp/zfsbootmenu && mkdir -p /tmp/zfsbootmenu
+# For a binary release setup we still need the syslinux-update.sh script from the repo
+# NOTE: This is in /usr/local/bin so it can be run ad-hoc to update the syslinux config
+#       For a LOCAL install it is in /etc/zfsbootmenu/generate-zbm.post.d/syslinux-update.sh
+#       and run via generate-zbm.sh
+if [ "${ZFSBOOTMENU_BINARY_TYPE}" != "LOCAL" ] ; then
+    curl -L https://raw.githubusercontent.com/zbm-dev/zfsbootmenu/master/contrib/syslinux-update.sh -o /boot/efi/syslinux-update.sh
+     chmod +x /boot/efi/syslinux-update.sh
+    sed -i '
+      s/^SYSLINUX_ROOT.*/SYSLINUX_ROOT="\/boot\/efi"/
+      s/^KERNEL_PATH.*/KERNEL_PATH="EFI\/zfsbootmenu"/
+      s/^SYSLINUX_CONFD.*/SYSLINUX_CONFD="\/boot\/efi\/snippets"/
+      s/^cp .*/cp "\${SYSLINUX_CFG}" "\${SYSLINUX_ROOT}\/syslinux\/syslinux.cfg"/
+     ' /boot/efi/syslinux-update.sh
+fi
+
+#### OR install the git repo and build locally
+
+### Two choices - tagged release or latest git
+
 # Get latest tagged release, sure to work. Base git repo may be in flux
-cd /tmp/zfsbootmenu && curl -L https://get.zfsbootmenu.org/source | tar xz --strip=1 && make install
+if [ "${ZFSBOOTMENU_REPO_TYPE}" = "TAGGED" ] ; then
+    echo "--- Using zfsbootmenu TAGGED repo"
+    rm -rf /tmp/zfsbootmenu && mkdir -p /tmp/zfsbootmenu
+    curl -L https://get.zfsbootmenu.org/source | tar xz --strip=1 --directory /tmp/zfsbootmenu
+fi
 
-# This seems to fail sometimes - gets killed during install
-# PERL_MM_USE_DEFAULT=1 cpan 'YAML::PP'
-# So try the ubuntu package
-apt-get -qq --yes --no-install-recommends install libyaml-pp-perl
+#### OR For latest just clone
 
-#
-# Configure ZFSBootMenu
-#
-cat <<-END > /etc/zfsbootmenu/config.yaml
-Global:
-  ManageImages: true
-  BootMountPoint: /boot/efi
-  DracutConfDir: /etc/zfsbootmenu/dracut.conf.d
-  PreHooksDir: /etc/zfsbootmenu/generate-zbm.pre.d
-  PostHooksDir: /etc/zfsbootmenu/generate-zbm.post.d
-  InitCPIO: false
-  InitCPIOConfig: /etc/zfsbootmenu/mkinitcpio.conf
-Components:
-  ImageDir: /boot/efi/EFI/zfsbootmenu
-  Versions: 3
-  Enabled: true
-  syslinux:
-    Config: /boot/efi/syslinux/syslinux.cfg
-    Enabled: false
-EFI:
-  ImageDir: /boot/efi/EFI/zfsbootmenu
-  Versions: 2
-  Enabled: false
-Kernel:
-  CommandLine: zbm.prefer=${POOLNAME} ro quiet loglevel=0
-END
+if [ "${ZFSBOOTMENU_REPO_TYPE}" = "GIT" ] ; then
+    echo "--- Using zfsbootmenu GIT repo"
+    rm -rf /tmp/zfsbootmenu
+    git clone https://github.com/zbm-dev/zfsbootmenu.git
+fi
 
-# Create pre and post hooks dirs and syslinux snippets dir
-mkdir -p /etc/zfsbootmenu/generate-zbm.pre.d
-mkdir -p /etc/zfsbootmenu/generate-zbm.post.d
-mkdir /boot/efi/snippets
+## Now intall - ONLY if using git repo
+if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "LOCAL" ] ; then
+    echo "--- zfsbootmenu building LOCAL"
+    cd /tmp/zfsbootmenu
+    make install
 
-# Copy syslinux-update.sh script and modify to suit
-# This makes generate-zbm create a valid syslinux.cfg that can
-# also include memtest86 snippet
-cp /tmp/zfsbootmenu/contrib/syslinux-update.sh /etc/zfsbootmenu/generate-zbm.post.d
-chmod +x /etc/zfsbootmenu/generate-zbm.post.d/syslinux-update.sh
-sed -i '
-  s/^SYSLINUX_ROOT.*/SYSLINUX_ROOT="\/boot\/efi"/
-  s/^KERNEL_PATH.*/KERNEL_PATH="EFI\/zfsbootmenu"/
-  s/^SYSLINUX_CONFD.*/SYSLINUX_CONFD="\/boot\/efi\/snippets"/
-  s/^cp .*/cp "\${SYSLINUX_CFG}" "\${SYSLINUX_ROOT}\/syslinux\/syslinux.cfg"/
- ' /etc/zfsbootmenu/generate-zbm.post.d/syslinux-update.sh
+    # This seems to fail sometimes - gets killed during install
+    # PERL_MM_USE_DEFAULT=1 cpan 'YAML::PP'
+    # So try the ubuntu package
+    apt-get -qq --yes --no-install-recommends install libyaml-pp-perl
+    
+    #
+    # Configure ZFSBootMenu
+    #
+    cat <<-END > /etc/zfsbootmenu/config.yaml
+	Global:
+	  ManageImages: true
+	  BootMountPoint: /boot/efi
+	  DracutConfDir: /etc/zfsbootmenu/dracut.conf.d
+	  PreHooksDir: /etc/zfsbootmenu/generate-zbm.pre.d
+	  PostHooksDir: /etc/zfsbootmenu/generate-zbm.post.d
+	  InitCPIO: false
+	  InitCPIOConfig: /etc/zfsbootmenu/mkinitcpio.conf
+	Components:
+	  ImageDir: /boot/efi/EFI/zfsbootmenu
+	  Versions: 3
+	  Enabled: true
+	  syslinux:
+	    Config: /boot/efi/syslinux/syslinux.cfg
+	    Enabled: false
+	EFI:
+	  ImageDir: /boot/efi/EFI/zfsbootmenu
+	  Versions: 2
+	  Enabled: false
+	Kernel:
+	  CommandLine: zbm.prefer=${POOLNAME} ro quiet loglevel=0
+	END
+    
+    # Create pre and post hooks dirs and syslinux snippets dir
+    mkdir -p /etc/zfsbootmenu/generate-zbm.pre.d
+    mkdir -p /etc/zfsbootmenu/generate-zbm.post.d
+    
+    # Copy syslinux-update.sh script and modify to suit
+    # This makes generate-zbm create a valid syslinux.cfg that can
+    # also include memtest86 snippet
+    cp /tmp/zfsbootmenu/contrib/syslinux-update.sh /etc/zfsbootmenu/generate-zbm.post.d
+    chmod +x /etc/zfsbootmenu/generate-zbm.post.d/syslinux-update.sh
+    sed -i '
+      s/^SYSLINUX_ROOT.*/SYSLINUX_ROOT="\/boot\/efi"/
+      s/^KERNEL_PATH.*/KERNEL_PATH="EFI\/zfsbootmenu"/
+      s/^SYSLINUX_CONFD.*/SYSLINUX_CONFD="\/boot\/efi\/snippets"/
+      s/^cp .*/cp "\${SYSLINUX_CFG}" "\${SYSLINUX_ROOT}\/syslinux\/syslinux.cfg"/
+     ' /etc/zfsbootmenu/generate-zbm.post.d/syslinux-update.sh
+fi # LOCAL
+
+mkdir -p /boot/efi/snippets
 
 # Header for syslinux.cfg
 cat > /boot/efi/snippets/01_header << EOF
@@ -1384,7 +1433,7 @@ COM32 hdt.c32
 EOF
 
 # Download and install memtest86
-# EFI version is latest v10, syslinux version is v4
+# EFI version is latest v11, syslinux version is v4
 rm -rf /tmp/memtest86 && mkdir -p /tmp/memtest86/mnt
 mkdir -p /boot/efi/EFI/tools/memtest86
 curl -L https://www.memtest86.com/downloads/memtest86-usb.zip -o /tmp/memtest86/memtest86-usb.zip
@@ -1404,9 +1453,9 @@ curl -L https://www.memtest86.com/downloads/memtest86-4.3.7-iso.zip -o /tmp/memt
 
 # Syslinux entry for memtest86+
 cat > /boot/efi/snippets/05_memtest86 << EOF
-
 LABEL Memtest86+
 KERNEL /EFI/tools/memtest86/memtest86.syslinux
+
 EOF
 
 #
@@ -1847,8 +1896,14 @@ if [ "${DISCENC}" = "LUKS" ] ; then
 fi
 
 dracut -v -f --regenerate-all
-# generate-zbm only there if we built from scratch, not using downloaded image
-[ -e /usr/bin/generate-zbm ] && generate-zbm --debug
+
+if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "LOCAL" ] ; then
+    # generate-zbm only there if we built from scratch, not using downloaded image
+    [ -e /usr/bin/generate-zbm ] && generate-zbm --debug
+else
+    # Otherwise use syslinux-update.sh to create/update the syslinux.cfg
+    [ -e /boot/efi/syslinux-update.sh ] && /boot/efi/syslinux-update.sh 
+fi
 
 
 # Allow read-only zfs commands with no sudo password

@@ -69,6 +69,24 @@ PASSPHRASE="password"
 DROPBEAR=n
 
 #
+# For zfsbootmenu there are 3 different ways to install
+#   EFI    : Uses a single EFI image
+#   KERNEL : Same binary but with the vmlinuz/initrd extracted
+#   LOCAL  : Built and install from the git repo
+#
+# The EFI image precludes a working syslinux config though - that requires
+# a vmlunuz/initrd set to work.  In general the KERNEL option is most flexible
+#
+ZFSBOOTMENU_BINARY_TYPE=KERNEL
+
+#
+# For the zfsbootmenu repo type you can choose
+#   TAGGED : Pulls the latest stable tagged release
+#   GIT    : Pulls the latest full repo, which may be in flux
+#
+ZFSBOOTMENU_REPO_TYPE=TAGGED
+
+#
 # Basic options for install
 # See script for descriptions
 # Be sure to set ALL vars here to y or n, otherwise script will prompt for them
