@@ -4,7 +4,7 @@ This script is meant to be run from an Ubuntu Live CD.  It will build an Ubuntu 
 
 ## tl;dr
 
-- Boot an Ubuntu live-cd, like [ubuntu-24.04-live-server-amd64.iso](https://releases.ubuntu.com/noble/ubuntu-24.04-live-server-amd64.iso) and select *Try or install Ubuntu server*
+- Boot an Ubuntu live-cd, like [ubuntu-24.04.1-live-server-amd64.iso](https://releases.ubuntu.com/noble/ubuntu-24.04.1-live-server-amd64.iso) and select *Try or install Ubuntu server*
 - At the language selection prompt, type in `ctrl-z` to put the installer into the background and get a root shell
 - Clone the **ZFS-root** repo
     ```
