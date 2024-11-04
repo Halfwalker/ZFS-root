@@ -607,6 +607,43 @@ exec > >(tee -a "/root/ZFS-setup.log") 2>&1
 [ "$1" = "-d" ] && set -x
 [ "$1" = "packerci" ] && set -x
 
+# Log all the variables used
+cat << EOF
+==========================================================================
+   MYHOSTNAME              = ${MYHOSTNAME}
+   RESCUE                  = ${RESCUE}
+   BOOTDEVRAW              = ${BOOTDEVRAW}
+   DELAY                   = ${DELAY}
+   SUITE                   = ${SUITE}
+   POOLNAME                = ${POOLNAME}
+   USERNAME                = ${USERNAME}
+   UCOMMENT                = "${UCOMMENT}"
+   AUTHKEYS                = ${AUTHKEYS}
+   DISCENC                 = ${DISCENC}
+   DROPBEAR                = ${DROPBEAR}
+   ZFSPPA                  = ${ZFSPPA}
+   ZREPL                   = ${ZREPL}
+   GOOGLE                  = ${GOOGLE}
+   SOF                     = ${SOF}
+   SOF_VERSION             = ${SOF_VERSION}
+   PROXY                   = ${PROXY}
+   HWE                     = ${HWE}
+   GNOME                   = ${GNOME}
+   XFCE                    = ${XFCE}
+   NEON                    = ${NEON}
+   KDE                     = ${KDE}
+   NVIDIA                  = ${NVIDIA}
+   HIBERNATE               = ${HIBERNATE}
+   SIZE_SWAP               = ${SIZE_SWAP}
+   PARTITION_BOOT          = ${PARTITION_BOOT}
+   PARTITION_SWAP          = ${PARTITION_SWAP}
+   PARTITION_DATA          = ${PARTITION_DATA}
+   ZFSBOOTMENU_BINARY_TYPE = ${ZFSBOOTMENU_BINARY_TYPE}
+   ZFSBOOTMENU_REPO_TYPE   = ${ZFSBOOTMENU_REPO_TYPE}
+==========================================================================
+
+EOF
+
 # Pre-OK the zfs-dkms licenses notification
 cat > /tmp/selections <<-EOFPRE
 	# zfs-dkms license notification
@@ -1991,7 +2028,9 @@ if [ "${ZREPL}" = "y" ]; then
 	    snapshotting:
 	      type: periodic
 	      interval: 15m
-	      timestamp_format: human
+          # "human" format has colons in the time, makes selecting/copying a snapshot
+          # name a hassle.  Using dashes makes it a single double-click of the mouse
+	      timestamp_format: "2006-01-02_15-04-05"
 	      prefix: zrepl_
 	      hooks:
 	        # threshold script only allows snaps if amount of data written is greater
@@ -2121,7 +2160,7 @@ EOF
 zfs snapshot ${POOLNAME}/ROOT/${SUITE}@base_install
 
 # Optionally create a clone of the new system as a rescue dataset.
-# This wlil show up in zfsbootmenu as a bootable dataset just in
+# This will show up in zfsbootmenu as a bootable dataset just in
 # case the main dataset gets corrupted during an update or something.
 # As the system is upgraded, the clone should periodically be replaced
 # with a clone of a newer snapshot.
