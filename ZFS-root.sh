@@ -1026,9 +1026,10 @@ if [ "${GOOGLE}" = "y" ] ; then
     cp /tmp/google_auth.txt ${ZFSBUILD}/root
 fi
 
-# sources - NOTE: MUST have actual TABs for each line
+# sources - NOTE: MUST have actual TABs for each heredoc line because of <<-
 case ${SUITE} in
     focal | jammy | noble)
+        # TABs for this
         cat > ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu.sources <<-EOF
 		Types: deb
 		URIs: http://us.archive.ubuntu.com/ubuntu/
@@ -1042,9 +1043,22 @@ case ${SUITE} in
 		Components: main restricted universe multiverse
 		Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
 		EOF
+
+        # Backup any existing sources.list
+        [ -e ${ZFSBUILD}/etc/apt/sources.list ] && mv ${ZFSBUILD}/etc/apt/sources.list ${ZFSBUILD}/etc/apt/sources.list.orig
+
+        # Create new empty sources.list
+        # TABs for this
+        cat > ${ZFSBUILD}/etc/apt/sources.list <<-EOF
+		# Ubuntu sources have moved to the /etc/apt/sources.list.d/ubuntu.sources
+		# file, which uses the deb822 format. Use deb822-formatted .sources files
+		# to manage package sources in the /etc/apt/sources.list.d/ directory.
+		# See the sources.list(5) manual page for details.
+		EOF
         ;;
     bionic)
         # Old sources setup before deb822
+        # TABs for this
         cat > ${ZFSBUILD}/etc/apt/sources.list <<-EOF
 			deb http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse restricted
 			deb-src http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse restricted
@@ -1060,6 +1074,7 @@ case ${SUITE} in
 		EOF
 
         # We put universe into its own .list file so ansible apt_repository will match 
+        # TABs for this
         cat > ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu_universe.list <<-EOF
 			deb http://archive.ubuntu.com/ubuntu ${SUITE} universe
 			deb-src http://archive.ubuntu.com/ubuntu ${SUITE} universe
