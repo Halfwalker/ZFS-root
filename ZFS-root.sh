@@ -182,6 +182,8 @@ fi # PROXY
 apt-get -qq update
 apt-get -qq --no-install-recommends --yes install software-properties-common
 apt-add-repository -y universe
+# Need universe for debconf-utils
+apt-get -qq --no-install-recommends --yes install debconf-utils
 
 # Get userid and full name of main user
 # First see if USERNAME or UCOMMENT are already set in ZFS-root.conf
@@ -1164,6 +1166,7 @@ systemctl enable /usr/share/systemd/tmp.mount
 
 ln -s /proc/self/mounts /etc/mtab
 apt-get -qq update
+apt-get -qq --yes --no-install-recommends install software-properties-common debconf-utils
 
 # Preseed a few things
 cat > /tmp/selections << EOFPRE
@@ -1195,7 +1198,6 @@ ln -fs /usr/share/zoneinfo/US/Eastern /etc/localtime
 dpkg-reconfigure -f noninteractive tzdata
 
 # Make sure the kernel is installed and configured before ZFS
-apt-get -qq --yes --no-install-recommends install software-properties-common debconf-utils
 apt-get -qq --yes --no-install-recommends install linux-generic${HWE} linux-headers-generic${HWE} linux-image-generic${HWE}
 
 #
