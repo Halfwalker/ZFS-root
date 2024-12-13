@@ -1671,7 +1671,7 @@ if [ ${DELAY} = "y" ] ; then
     grep -qxF 'ZFS_INITRD_POST_MODPROBE_SLEEP' /etc/default/zfs || echo "ZFS_INITRD_POST_MODPROBE_SLEEP='10'" >> /etc/default/zfs
     grep -qxF 'ZFS_INITRD_PRE_MOUNTROOT_SLEEP' /etc/default/zfs || echo "ZFS_INITRD_PRE_MOUNTROOT_SLEEP='10'" >> /etc/default/zfs
     sed -i "s/ZFS_INITRD_POST_MODPROBE_SLEEP=.*/ZFS_INITRD_POST_MODPROBE_SLEEP='10'/" /etc/default/zfs
-    sed -i "s/ZFS_INITRD_PRE_MOUNTROOT_SLEEP=.*/ZFS_INITRD_PRE_MOUNTROOT_SLEEP='10'10/" /etc/default/zfs
+    sed -i "s/ZFS_INITRD_PRE_MOUNTROOT_SLEEP=.*/ZFS_INITRD_PRE_MOUNTROOT_SLEEP='10'/" /etc/default/zfs
 fi
 
 
