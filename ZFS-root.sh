@@ -1643,7 +1643,7 @@ if [ ${HIBERNATE} = "y" ] ; then
 
     # If using zswap enable lz4 compresstion
     if [ "ZZ${USE_ZSWAP}" != "ZZ" ]; then
-        echo "lz4" >> /etc/modules
+        echo "lz4" >> /etc/modules-load.d/zfs-lz4.conf
     fi
 
 else
