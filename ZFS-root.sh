@@ -1134,6 +1134,7 @@ cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
 	export PARTITION_DATA=${PARTITION_DATA}
     export ZFSBOOTMENU_BINARY_TYPE=${ZFSBOOTMENU_BINARY_TYPE}
     export ZFSBOOTMENU_REPO_TYPE=${ZFSBOOTMENU_REPO_TYPE}
+    export USE_ZSWAP=${USE_ZSWAP}
 EOF
 
 for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
@@ -1326,20 +1327,23 @@ apt-get --yes install libconfig-inifiles-perl libsort-versions-perl libboolean-p
 # ZFS native encryption and non-encrypted can use SWAP partition directly
 # LUKS encryption uses the 1st swap_crypt0 device
 if [ ${HIBERNATE} = "y" ] ; then
+    # NOTE: be sure to use real TABS for this heredoc
     cat <<-END > /etc/dracut.conf.d/resume-from-hibernate.conf
 	add_dracutmodules+=" resume "
 	END
 
     if [ ${DISCENC} = "LUKS" ] ; then
-        zfs set org.zfsbootmenu:commandline="rw quiet resume=/dev/mapper/swap_crypt0" ${POOLNAME}/ROOT
-        zfs set org.zfsbootmenu:commandline="rw quiet resume=/dev/mapper/swap_crypt0" ${POOLNAME}/ROOT/${SUITE}
+        zfs set org.zfsbootmenu:commandline="rw quiet ${USE_ZSWAP} resume=/dev/mapper/swap_crypt0" ${POOLNAME}/ROOT
+        zfs set org.zfsbootmenu:commandline="rw quiet ${USE_ZSWAP} resume=/dev/mapper/swap_crypt0" ${POOLNAME}/ROOT/${SUITE}
+
+        # NOTE: be sure to use real TABS for this heredoc
         cat <<-END > /etc/dracut.conf.d/resume-swap-uuid.conf
 		# add_device+=" UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP}) "
 		add_device+=" /dev/mapper/swap_crypt0 "
 		END
     else
-        zfs set org.zfsbootmenu:commandline="rw quiet resume=UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP})" ${POOLNAME}/ROOT
-        zfs set org.zfsbootmenu:commandline="rw quiet resume=UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP})" ${POOLNAME}/ROOT/${SUITE}
+        zfs set org.zfsbootmenu:commandline="rw quiet ${USE_ZSWAP} resume=UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP})" ${POOLNAME}/ROOT
+        zfs set org.zfsbootmenu:commandline="rw quiet ${USE_ZSWAP} resume=UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP})" ${POOLNAME}/ROOT/${SUITE}
     fi
 else
     zfs set org.zfsbootmenu:commandline="rw quiet" ${POOLNAME}/ROOT
