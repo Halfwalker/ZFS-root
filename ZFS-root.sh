@@ -475,7 +475,7 @@ fi # Check for Swap size in ZFS-root.conf
 
 # Use zswap compressed page cache in front of swap ? https://wiki.archlinux.org/index.php/Zswap
 # Only used for swap partition (encrypted or not)
-USE_ZSWAP="\"zswap.enabled=1 zswap.compressor=lz4 zswap.max_pool_percent=25\""
+USE_ZSWAP="zswap.enabled=1 zswap.compressor=lz4 zswap.max_pool_percent=25"
 
 # What suite is this script running under ?  bionic or focal
 # Xenial does not support a couple of zfs feature flags, so have to
