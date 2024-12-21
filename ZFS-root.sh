@@ -1276,7 +1276,10 @@ cat <<- END > /boot/efi/EFI/zfsbootmenu/refind_linux.conf
 END
 
 # Copy UEFI shell to EFI system
-[ -e /usr/share/efi-shell-x64/shellx64.efi ] && cp /usr/share/efi-shell-x64/shellx64.efi /boot/efi/EFI
+if [ -e /usr/share/efi-shell-x64/shellx64.efi ] ; then
+    mkdir -p /boot/efi/EFI/tools
+    cp /usr/share/efi-shell-x64/shellx64.efi /boot/efi/EFI/tools
+fi
 
 # If we're running under legacy bios then rEFInd will be installed
 # to /boot/efi/EFI/BOOT - we want it in /boot/efi/EFI/refind
@@ -1386,7 +1389,7 @@ fi
 #       and run via generate-zbm.sh
 if [ "${ZFSBOOTMENU_BINARY_TYPE}" != "LOCAL" ] ; then
     curl -L https://raw.githubusercontent.com/zbm-dev/zfsbootmenu/master/contrib/syslinux-update.sh -o /boot/efi/syslinux-update.sh
-     chmod +x /boot/efi/syslinux-update.sh
+    chmod +x /boot/efi/syslinux-update.sh
     sed -i '
       s/^SYSLINUX_ROOT.*/SYSLINUX_ROOT="\/boot\/efi"/
       s/^KERNEL_PATH.*/KERNEL_PATH="EFI\/zfsbootmenu"/
