@@ -1425,8 +1425,8 @@ if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "LOCAL" ] ; then
 
     # This seems to fail sometimes - gets killed during install
     # PERL_MM_USE_DEFAULT=1 cpan 'YAML::PP'
-    # So try the ubuntu package
-    apt-get -qq --yes --no-install-recommends install libyaml-pp-perl
+    # So try the ubuntu package - also need dhcpclient
+    apt-get -qq --yes --no-install-recommends install libyaml-pp-perl isc-dhcp-client
     
     #
     # Configure ZFSBootMenu
