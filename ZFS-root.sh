@@ -142,6 +142,8 @@ ZFSBUILD=/mnt/builder
 PARTITION_BOOT=1
 PARTITION_SWAP=2
 PARTITION_DATA=3
+PARTITION_WIND=4
+PARTITION_RCVR=5
 
 # ZFS encryption options
 ZFSENC_ROOT_OPTIONS="-o encryption=aes-256-gcm -o keylocation=prompt -o keyformat=passphrase"
@@ -486,7 +488,7 @@ SCRIPT_SUITE=$(lsb_release -cs)
 # Suite to install - bionic focal jammy noble
 if [[ ! -v SUITE ]] ; then
     SUITE=$(whiptail --title "Select Ubuntu distribtion" --radiolist "Choose distro" 12 50 6 \
-        noble"24.04 noble" ON \
+        noble "24.04 noble" ON \
         jammy "22.04 jammy" ON \
         focal "20.04 focal" OFF \
         bionic "18.04 Bionic" OFF \
@@ -640,6 +642,8 @@ cat << EOF
    PARTITION_BOOT          = ${PARTITION_BOOT}
    PARTITION_SWAP          = ${PARTITION_SWAP}
    PARTITION_DATA          = ${PARTITION_DATA}
+   PARTITION_WIND          = ${PARTITION_WIND}
+   PARTITION_RCVR          = ${PARTITION_RCVR}
    ZFSBOOTMENU_BINARY_TYPE = ${ZFSBOOTMENU_BINARY_TYPE}
    ZFSBOOTMENU_REPO_TYPE   = ${ZFSBOOTMENU_REPO_TYPE}
 ==========================================================================
@@ -713,6 +717,7 @@ apt-get -qq --no-install-recommends --yes install openssh-server debootstrap gdi
 # Stop all found mdadm arrays - again, just in case.  Sheesh.
 find /dev -iname md* -type b -exec bash -c "umount {} > /dev/null 2>&1 ; mdadm --stop --force {} > /dev/null 2>&1 ; mdadm --remove {} > /dev/null 2>&1" \;
 
+### Partition layout
 for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
     zpool labelclear -f /dev/disk/by-id/${zfsdisks[${disk}]}
 
@@ -755,7 +760,14 @@ for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
     # Unencrypted or ZFS encrypted
         sgdisk -n ${PARTITION_DATA}:0:0 -c ${PARTITION_DATA}:"ZFS_${disk}" -t ${PARTITION_DATA}:BF00 /dev/disk/by-id/${zfsdisks[${disk}]}
     fi # DISCENC for LUKS
+
+    #
+    # Example partition creation for Windows - be sure to change :0:0 above to :0:+<some size> and +500G here to appropriate
+    #
+    # sgdisk -n ${PARTITION_WIND}:0:+500G -c ${PARTITION_WIND}:"WIN11_${disk}" -t ${PARTITION_WIND}:C12A /dev/disk/by-id/${zfsdisks[${disk}]}
+    # sgdisk -n ${PARTITION_RCVR}:0:0     -c ${PARTITION_RCVR}:"RCVR_${disk}"  -t ${PARTITION_RCVR}:2700 /dev/disk/by-id/${zfsdisks[${disk}]}
 done
+
 # Refresh partition information
 partprobe
 

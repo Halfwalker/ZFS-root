@@ -16,6 +16,8 @@ This script is meant to be run from an Ubuntu Live CD.  It will build an Ubuntu 
     ./ZFS-root.sh
     ```
 
+## Partition layout
+
 The partition layout will look similar to this, depending on if a SWAP partition is needed for Hibernation and if encryption is selected.  The **_0** refers to the disk number.  **_0** for first disk, **_1** for second and so on.
 
 ```
@@ -27,13 +29,28 @@ Number  Start (sector)    End (sector)  Size       Code  Name
 ```
 
 > <dl>
->     <dt>BOOT_0
+>     <dt>BOOT_EFI_0
 >     <dd>Used for EFI and Syslinux booting.  Mounted at `/boot/efi`
 >     <dt>SWAP_0
 >     <dd>Swap partition for use with Hibernate/Resume - only created if Hibernate is available and selected.  Will be encrypted if using LUKS.  Hibernate/Resume only uses the first disk for resume, no matter how many disks and swap partitions there are.  This means that the swap partitions must be at least the size of ram for Hibernate/Resume to work.
 >     <dt>ZFS_0
 >     <dd>Partition for main ZFS pool.  Root dataset, /home dataset etc. all go in here.  NOTE: With ZFS native encryption the whole pool is NOT encrypted, only the main rpool/ROOT and rpool/home container datasets.  This allows for non-encrypted datasets if desired.
 > </dl>
+
+### Additional partitions
+
+To add additional partitions, see the `ZFS-root.sh` script and search for 'Partition layout'.  Note that the last partition created (Main data partition for root) uses **:0:0** to tell `sgdisk` to use the rest of the space on the disk.  You will have to change that to **:0:+500G** for example to create a 500G partition.  Use whatever size you deem fit.
+
+There is already **PARTITION_WIND** and **PARTITION_RCVR** variables defined to correctly number extra partitions, so use them to create the partitions.  Use **:0:0** to utilize the rest of the disk for the last partition.
+
+For example, to create Window partitions for data (500G) and recovery (rest of disk), add these lines to the _Partition layout_ section after the _Main data partition for root_ lines.  Adjust the _Main data partition for root_ size as mentioned above, and set the Window partition size in the sample line below.
+
+```
+sgdisk -n ${PARTITION_WIND}:0:+500G -c ${PARTITION_WIND}:"WIN11_${disk}" -t ${PARTITION_WIND}:C12A /dev/disk/by-id/${zfsdisks[${disk}]}
+sgdisk -n ${PARTITION_RCVR}:0:0     -c ${PARTITION_RCVR}:"RCVR_${disk}"  -t ${PARTITION_RCVR}:2700 /dev/disk/by-id/${zfsdisks[${disk}]}
+```
+
+NOTE: There may be problems with Secure Boot.  Your mileage may vary.
 
 ## Features
 
