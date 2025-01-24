@@ -22,9 +22,9 @@ The partition layout will look similar to this, depending on if a SWAP partition
 
 ```
 Number  Start (sector)    End (sector)  Size       Code  Name
-   1            2048        2050047    1000.0 MiB  EF00  BOOT_0
-   2         2050048        ram size   x.x GiB     8200  SWAP_0  non-LUKS encrypted - OR
-   2         2050048        ram size   x.x GiB     8309  SWAP_0  LUKS encrypted
+   1            2048        2050047    1000.0 MiB  EF00  BOOT_EFI_0
+   2         2050048        ram size   x.x GiB     8200  SWAP_0      non-LUKS encrypted - OR
+   2         2050048        ram size   x.x GiB     8309  SWAP_0      LUKS encrypted
    3        11290624        53052222   19.9 GiB    BF00  ZFS_0
 ```
 
