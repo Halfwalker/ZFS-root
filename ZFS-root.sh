@@ -1391,7 +1391,7 @@ fi
 ##  or the unpacked EFI image (vmlinux/initrd)
 if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "KERNEL" ] ; then
     echo "--- Using zfsbootmenu KERNEL files"
-    curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v2.3.0/zfsbootmenu-recovery-x86_64-v2.3.0.tar.gz -o /tmp/zfsbootmenu.tar.gz
+    curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v3.0.1/zfsbootmenu-recovery-x86_64-v3.0.1-linux6.12.tar.gz -o /tmp/zfsbootmenu.tar.gz
     tar xvzf /tmp/zfsbootmenu.tar.gz --strip-components=1 -C /boot/efi/EFI/zfsbootmenu
 fi
 
