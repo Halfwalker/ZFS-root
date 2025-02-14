@@ -115,6 +115,11 @@ fi
 # = GIT
 [[ ! -v ZFSBOOTMENU_REPO_TYPE ]] && ZFSBOOTMENU_REPO_TYPE=TAGGED
 
+# ZFSBOOTMENU_CMDLINE - any additional cmdline options for zfsbootmenu
+# May need options to skip xhci-unbind - see ZFS-root.conf.example
+# See https://docs.zfsbootmenu.org/en/v3.0.x/man/zfsbootmenu.7.html
+[[ ! -v ZFSBOOTMENU_CMDLINE ]] && ZFSBOOTMENU_CMDLINE=""
+
 if [ "$1" = "packerci" ] ; then
     # Ensure we pick up the packerci-specific config
     if [ -e ZFS-root-packerci.conf ] ; then
@@ -646,6 +651,7 @@ cat << EOF
    PARTITION_RCVR          = ${PARTITION_RCVR}
    ZFSBOOTMENU_BINARY_TYPE = ${ZFSBOOTMENU_BINARY_TYPE}
    ZFSBOOTMENU_REPO_TYPE   = ${ZFSBOOTMENU_REPO_TYPE}
+   ZFSBOOTMENU_CMDLINE     = ${ZFSBOOTMENU_CMDLINE}
 ==========================================================================
 
 EOF
@@ -1146,6 +1152,7 @@ cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
 	export PARTITION_DATA=${PARTITION_DATA}
     export ZFSBOOTMENU_BINARY_TYPE=${ZFSBOOTMENU_BINARY_TYPE}
     export ZFSBOOTMENU_REPO_TYPE=${ZFSBOOTMENU_REPO_TYPE}
+    export ZFSBOOTMENU_CMDLINE=${ZFSBOOTMENU_CMDLINE}
     export USE_ZSWAP=${USE_ZSWAP}
 EOF
 
@@ -1284,7 +1291,10 @@ refind-install --yes
 
 mkdir -p /boot/efi/EFI/zfsbootmenu
 cat <<- END > /boot/efi/EFI/zfsbootmenu/refind_linux.conf
-"Boot to ZFSbootMenu" "zbm.prefer=${POOLNAME} ro quiet loglevel=0"
+# NOTE: The xhci Tearing down USB controller tends to disable USB controllers
+#       on Supermicro X10DHR motherboards, so we disable that hook here.
+#       See https://docs.zfsbootmenu.org/en/v3.0.x/man/zfsbootmenu.7.html
+"Boot to ZFSbootMenu" "zbm.prefer=${POOLNAME} ro quiet loglevel=0 ${ZFSBOOTMENU_CMDLINE}"
 END
 
 # Copy UEFI shell to EFI system
@@ -1379,7 +1389,7 @@ if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "EFI" ] ; then
     [[ ! -d /sys/firmware/efi ]] && ZFSBOOTMENU_BINARY_TYPE=KERNEL
 fi
 
-echo "ZFSBOOTMENU_BINARY_TYPE = $ZFSBOOTMENU_BINARY_TYPE  ZFSBOOTMENU_REPO_TYPE = $ZFSBOOTMENU_REPO_TYPE"
+echo "ZFSBOOTMENU_BINARY_TYPE = $ZFSBOOTMENU_BINARY_TYPE  ZFSBOOTMENU_REPO_TYPE = $ZFSBOOTMENU_REPO_TYPE ZFSBOOTMENU_CMDLINE = $ZFSBOOTMENU_CMDLINE"
 
 ## Either the actual zfsbootmenu EFI image
 ## NOTE: syslinux requires the KERNEL version since it needs to use the
