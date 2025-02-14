@@ -10,6 +10,7 @@ This script is meant to be run from an Ubuntu Live CD.  It will build an Ubuntu 
     ```
     git clone https://github.com/Halfwalker/ZFS-root.git
     ```
+- Optionally copy the `ZFS-root.conf.example` to `ZFS-root.conf` and edit to suit.
 - Run the `ZFS-root.sh` script - it will prompt for everything it needs.
     ```
     cd ZFS-root
@@ -21,11 +22,11 @@ This script is meant to be run from an Ubuntu Live CD.  It will build an Ubuntu 
 The partition layout will look similar to this, depending on if a SWAP partition is needed for Hibernation and if encryption is selected.  The **_0** refers to the disk number.  **_0** for first disk, **_1** for second and so on.
 
 ```
-Number  Start (sector)    End (sector)  Size       Code  Name
-   1            2048        2050047    1000.0 MiB  EF00  BOOT_EFI_0
-   2         2050048        ram size   x.x GiB     8200  SWAP_0      non-LUKS encrypted - OR
-   2         2050048        ram size   x.x GiB     8309  SWAP_0      LUKS encrypted
-   3        11290624        53052222   19.9 GiB    BF00  ZFS_0
+Number  Start (sector)  End        Size        Code  Name
+   1          2048      2050047    1000.0 MiB  EF00  BOOT_EFI_0
+   2       2050048      ram size   x.x GiB     8200  SWAP_0      non-LUKS encrypted - OR
+   2       2050048      ram size   x.x GiB     8309  SWAP_0      LUKS encrypted
+   3      11290624      53052222   19.9 GiB    BF00  ZFS_0
 ```
 
 > <dl>
