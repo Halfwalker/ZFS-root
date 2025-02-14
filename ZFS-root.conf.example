@@ -102,8 +102,7 @@ ZFSBOOTMENU_CMDLINE="zbm.skip_hooks=90-xhci-unbind.sh"
 RESCUE=y
 GOOGLE=n
 HWE=y
-ZFSPPA=n
-ZREPL=n
+ZREPL=y
 HIBERNATE=n
 DELAY=n
 SOF=n

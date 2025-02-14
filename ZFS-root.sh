@@ -355,7 +355,7 @@ HIBERNATE_AVAIL=${?}
 #
 # Slightly fugly - have to check if ANY of these are not set
 #
-if [[ ! -v ZREPL ]] || [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v ZFSPPA ]] || [[ ! -v HIBERNATE ]] || [[ ! -v DELAY ]] || [[ ! -v SOF ]] || [[ ! -v GNOME ]] || [[ ! -v KDE ]] || [[ ! -v NEON ]] || [[ ! -v XFCE ]] ; then
+if [[ ! -v ZREPL ]] || [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v HIBERNATE ]] || [[ ! -v DELAY ]] || [[ ! -v SOF ]] || [[ ! -v GNOME ]] || [[ ! -v KDE ]] || [[ ! -v NEON ]] || [[ ! -v XFCE ]] ; then
     # Hibernate can only resume from a single disk, and currently not available for ZFS encryption
     if [ "${DISCENC}" == "ZFSENC" ] || [ ${#zfsdisks[@]} -gt 1 ] || [ ${HIBERNATE_AVAIL} -ne 0 ] ; then
         # Set basic options for install - ZFSENC so no Hibernate available (yet)
@@ -363,7 +363,6 @@ if [[ ! -v ZREPL ]] || [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] 
             RESCUE "Create rescue dataset by cloning initial install" OFF \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
             HWE "Install Hardware Enablement kernel" OFF \
-            ZFSPPA "Update to latest ZFS 2.1 from PPA" OFF \
             ZREPL "Install Zrepl zfs snapshot manager" OFF \
             DELAY "Add delay before importing root pool - for many-disk systems" OFF \
             SOF "Install Sound Open Firmware binaries ${SOF_VERSION} (for some laptops)" OFF \
@@ -377,7 +376,6 @@ if [[ ! -v ZREPL ]] || [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] 
             RESCUE "Create rescue dataset by cloning initial install" OFF \
             GOOGLE "Add google authenticator via pam for ssh logins" OFF \
             HWE "Install Hardware Enablement kernel" OFF \
-            ZFSPPA "Update to latest ZFS 2.1 from PPA" OFF \
             ZREPL "Install Zrepl zfs snapshot manager" OFF \
             HIBERNATE "Enable swap partition for hibernation" OFF \
             DELAY "Add delay before importing root pool - for many-disk systems" OFF \
@@ -396,7 +394,7 @@ if [[ ! -v ZREPL ]] || [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] 
     done < "${TMPFILE}"
 
     # Any options not enabled in the basic options menu we now set to 'n'
-    for option in ZREPL RESCUE GNOME XFCE NEON KDE HWE HIBERNATE ZFSPPA DELAY SOF GOOGLE; do
+    for option in ZREPL RESCUE GNOME XFCE NEON KDE HWE HIBERNATE DELAY SOF GOOGLE; do
         [ ${!option} ] || eval "${option}"='n'
     done
 fi # Check ALL options from ZFS-root.conf
@@ -525,11 +523,6 @@ case ${SUITE} in
         [ "${HWE}" = "y" ] && HWE="-hwe-${SUITE_NUM}" || HWE=
         # Specific zpool features available in jammy
         SUITE_ROOT_POOL="-O dnodesize=auto"
-        # If ZFSPPA is off (not using latest zfs) must set dnodesize=legacy
-        # otherwise cannot set bootfs property on pool
-        if [ "${ZFSPPA}" = "n" ] ; then
-            SUITE_ROOT_POOL="-O dnodesize=legacy"
-        fi
         ;;
     focal)
         SUITE_NUM="20.04"
@@ -540,11 +533,6 @@ case ${SUITE} in
         [ "${HWE}" = "y" ] && HWE="-hwe-${SUITE_NUM}" || HWE=
         # Specific zpool features available in focal
         SUITE_ROOT_POOL="-O dnodesize=auto"
-        # If ZFSPPA is off (not using latest zfs) must set dnodesize=legacy
-        # otherwise cannot set bootfs property on pool
-        if [ "${ZFSPPA}" = "n" ] ; then
-            SUITE_ROOT_POOL="-O dnodesize=legacy"
-        fi
         ;;
     bionic)
         SUITE_NUM="18.04"
@@ -566,11 +554,6 @@ case ${SUITE} in
         [ "${HWE}" = "y" ] && HWE="-hwe-${SUITE_NUM}" || HWE=
         # Specific zpool features available in focal
         SUITE_ROOT_POOL="-O dnodesize=auto"
-        # If ZFSPPA is off (not using latest zfs) must set dnodesize=legacy
-        # otherwise cannot set bootfs property on pool
-        if [ "${ZFSPPA}" = "n" ] ; then
-            SUITE_ROOT_POOL="-O dnodesize=legacy"
-        fi
         ;;
 esac
 
@@ -592,7 +575,6 @@ if [ "$1" != "packerci" ] ; then
         User $(echo $USERNAME $UCOMMENT)\n\n \
         RESCUE    = $(echo $RESCUE)  : Create rescue dataset by cloning install\n \
         DELAY     = $(echo $DELAY)  : Enable delay before importing zpool\n \
-        ZFS ver   = $(echo $ZFSPPA)  : Update to latest ZFS 2.1 via PPA\n \
         ZREPL     = $(echo $ZREPL)  : Install Zrepl zfs snapshot manager\n \
         GOOGLE    = $(echo $GOOGLE)  : Install google authenticator\n \
         GNOME     = $(echo $GNOME)  : Install Ubuntu Gnome desktop\n \
@@ -630,7 +612,6 @@ cat << EOF
    AUTHKEYS                = ${AUTHKEYS}
    DISCENC                 = ${DISCENC}
    DROPBEAR                = ${DROPBEAR}
-   ZFSPPA                  = ${ZFSPPA}
    ZREPL                   = ${ZREPL}
    GOOGLE                  = ${GOOGLE}
    SOF                     = ${SOF}
@@ -681,29 +662,8 @@ if [ -f /usr/sbin/zfs ] || [ -f /sbin/zfs ] ; then
 fi
 [ "$ZFS_LIVECD" = "y" ] && echo "ZFS installed with ${ZFS_INSTALLED}, module with ${ZFS_MODULE}"
 
-# Add ZFS ppa if requested
-# if [ ${ZFSPPA} = "y" ] ; then
-#     apt-add-repository --yes --update ppa:jonathonf/zfs
-# fi
-# NOW, install ZFS, perhaps from ppa above
 apt-get -qq update
 apt-get --no-install-recommends --yes install zfsutils-linux zfs-zed
-
-# Deprecated - not using dkms version, so new kernel/modules not built
-# Have to live with livecd zfs module version
-# Logic for restarting ZFS
-#   If livecd package version != currently running module, OR
-#   If ppa requested
-#   Then restart ZFS
-# if [[ ("${ZFS_LIVECD}" = "y" && "${ZFS_INSTALLED}" != "${ZFS_MODULE}")  || "${ZFSPPA}" = "y" ]] ; then
-#     echo "ZFS needs an update"
-#     systemctl stop zfs-zed
-#     modprobe -r zfs
-#     modprobe zfs
-#     systemctl start zfs-zed
-#     # ensure new system uses updated ZFS
-#     ZFSPPA="y"
-# fi                                                                      
 
 # Create an encryption key for LUKs partitions
 if [ "${DISCENC}" = "LUKS" ] ; then
@@ -1133,7 +1093,6 @@ cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
 	export DISCENC=${DISCENC}
 	export DROPBEAR=${DROPBEAR}
 	export AUTHKEYS=${AUTHKEYS}
-	export ZFSPPA=${ZFSPPA}
     export ZREPL=${ZREPL}
 	export GOOGLE=${GOOGLE}
 	export SOF=${SOF}
@@ -1226,9 +1185,6 @@ apt-get -qq --yes --no-install-recommends install linux-generic${HWE} linux-head
 #
 rm /boot/vmlinuz.old /boot/initrd.img.old
 
-if [ ${ZFSPPA} = "y" ] ; then
-    apt-add-repository --yes --update ppa:jonathonf/zfs
-fi
 apt-get -qq --no-install-recommends --yes install zfs-zed zfsutils-linux
 
 # jammy/22.04 moved zfs from /sbin/zfs to /usr/sbin/zfs
