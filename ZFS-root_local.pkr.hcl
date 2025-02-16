@@ -114,8 +114,8 @@ build {
   }
 
   provisioner "file" {
-    source      = "ZFS-root-packerci.conf"
-    destination = "/tmp/ZFS-root-packerci.conf"
+    source      = "ZFS-root.conf.packerci"
+    destination = "/tmp/ZFS-root.conf.packerci"
   }
 
   # Actually run the ZFS-root.sh script to build the system as root

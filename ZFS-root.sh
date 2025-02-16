@@ -59,7 +59,7 @@
 # 4) Make it executable (chmod +x ZFS-root.sh)
 # 5) Run it (./ZFS-root.sh)
 # 6) Add -d to enable set -x debugging (./ZFS-root.sh -d)
-# 7) Add packerci to run in a CI/CD pipeline using ZFS-root-packerci.conf
+# 7) Add packerci to run in a CI/CD pipeline using ZFS-root.conf.packerci
 #
 # It will ask a few questions (username, which disk, bionic/focal etc)
 # and then fully install a minimal Ubuntu system. Depending on the choices
@@ -122,11 +122,11 @@ fi
 
 if [ "$1" = "packerci" ] ; then
     # Ensure we pick up the packerci-specific config
-    if [ -e ZFS-root-packerci.conf ] ; then
-        echo "Setting ZFS-root-packerci variables"
-        . ZFS-root-packerci.conf
+    if [ -e ZFS-root.conf.packerci ] ; then
+        echo "Setting ZFS-root packerci variables"
+        . ZFS-root.conf.packerci
     else
-        echo "ZFS-root-packerci.conf is MISSING - cannot run packer in CI/CD"
+        echo "ZFS-root.conf.packerci is MISSING - cannot run packer in CI/CD"
         exit 1
     fi
 fi
