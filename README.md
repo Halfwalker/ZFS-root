@@ -181,9 +181,6 @@ headless            = false
 
 ubuntu_version      = "24.04.1"
 
-# Usually set to "" as the entire src dir is specified in ubuntu_live_iso_src
-ubuntu_version_dir  = ""
-
 # Where to find ISOs - can be a local dir or URL
 ubuntu_live_iso_src = "file:///home/myuser/ISOs"
 ubuntu_live_iso_src = "https://releases.ubuntu.com"

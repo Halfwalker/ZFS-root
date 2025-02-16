@@ -10,6 +10,4 @@ output_prefix       = "/home/deano/VirtualBox/qemu/"
 headless            = false
 
 ubuntu_version      = "24.04.1"
-# Usually set to "" as the entire src dir is specified in ubuntu_live_iso_src
-ubuntu_version_dir  = ""
 ubuntu_live_iso_src = "file:///home/deano/VirtualBox/ISOs"

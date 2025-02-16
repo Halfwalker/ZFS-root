@@ -33,28 +33,19 @@ variable "ubuntu_version" {
   default = "24.04.1"
 }
 
-# Used to select the remote dir for the live iso image
-# For https://releases.ubuntu.com it will be the actual version
-# For local iso image it can be any additional dir to add to ubuntu_live_iso_src
-# Note: Make SURE this has a trailing slash when referencing an https://releases.ubuntu.com location
-variable "ubuntu_version_dir" {
-  type = string
-  default = "24.04.1/"
-}
-
-# Source for ubuntu live iso image
+# Full path/source for ubuntu live iso image
 # Can be pulled from Ubuntu, or reference a local copy in some local dir
 # For example  file:///home/myuser/ISOs
 variable "ubuntu_live_iso_src" {
   description = "URI for the live ISO - can be a URL or local file:/// location"
   type = string
-  default = "https://releases.ubuntu.com"
+  default = "https://releases.ubuntu.com/24.04.1"
 }
 
 locals {
   output_dir = "packer_zfsroot_${local.timestamp}"
   timestamp  = formatdate("YYYY-MM-DD-hhmm", timestamp())
-  ubuntu_live_iso = "${var.ubuntu_live_iso_src}/${var.ubuntu_version_dir}ubuntu-${var.ubuntu_version}-live-server-amd64.iso"
+  ubuntu_live_iso = "${var.ubuntu_live_iso_src}/ubuntu-${var.ubuntu_version}-live-server-amd64.iso"
 }
 
 source "qemu" "ubuntu" {
