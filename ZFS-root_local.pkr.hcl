@@ -1,16 +1,17 @@
 packer {
   required_plugins {
     qemu = {
-      version = ">= 1.1.0"
+      version = ">= 1.1.1"
       source  = "github.com/hashicorp/qemu"
     }
   }
 }
 
 # Show the VM console gui ?
-# Set to true when running under CI/CD pipelines
+# Set to true when running under CI/CD pipelines or from docker
 # Set to false when running manually/locally
 variable "headless" {
+  description = "Whether to show the VM console gui"
   type    = bool
   default = true
 }
@@ -19,12 +20,15 @@ variable "headless" {
 # Set to "" for running in CI/CD pipelines
 # Set to some location for running locally
 # Be SURE to include trailing slash
+# NOTE: If running under docker this location must be bind-mounted into the container
 variable "output_prefix" {
+  description = "Prefix for output directory location"
   type    = string
   default = ""
 }
 
 variable "ubuntu_version" {
+  description = "Which version of Ubuntu to boot for the build"
   type = string
   default = "24.04.1"
 }
@@ -42,6 +46,7 @@ variable "ubuntu_version_dir" {
 # Can be pulled from Ubuntu, or reference a local copy in some local dir
 # For example  file:///home/myuser/ISOs
 variable "ubuntu_live_iso_src" {
+  description = "URI for the live ISO - can be a URL or local file:/// location"
   type = string
   default = "https://releases.ubuntu.com"
 }
