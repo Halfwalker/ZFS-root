@@ -173,6 +173,8 @@ Note: This makes use of a `vars` file to supply overrides to the packer config. 
 
 ```
 # Where to dump the resuling files
+# NOTE: If running under docker this location must be bind-mounted in the docker run cmd below
+#       The location is relative to the container environment
 output_prefix       = "/home/myuser/qemu/"
 
 # false -> we can see the VM console gui
@@ -206,13 +208,16 @@ docker run --rm -it -v "$(pwd)":"${PWD}" -w "${PWD}" \
   -e PACKER_PLUGIN_PATH="${PWD}/.packer.d/plugins" \
   myname/packer-qemu init ZFS-root_local.pkr.hcl
 
+# NOTE: If setting the output_prefix in the ZFS-root_local.vars.hcl file as above
+#       then must bind-mount that location in the docker container
 docker run --rm -it -v "$(pwd)":"${PWD}" -w "${PWD}" \
   --privileged --cap-add=ALL \
   -v "${PWD}/.packer.d":/root/.cache/packer \
+  -v "/home/myuser/qemu:/home/myuser/qemu" \
   -v /usr/share/OVMF:/usr/share/OVMF \
   -e PACKER_PLUGIN_PATH="${PWD}/.packer.d/plugins" \
   -e PACKER_LOG=1 \
-  myname/packer-qemu build ZFS-root_local.pkr.hcl
+  myname/packer-qemu build -var-file=ZFS-root_local.vars.hcl ZFS-root_local.pkr.hcl
 ```
 
 The first `init` command only needs to be done once to download the packer qemu plugin.  Note: This does not use a `vars` file for packer, so will use the defaults in the `ZFS-root_local.pkr.hcl` packer config file.  That downloads the ISO to `.packer.d` and places the output directory (eg. `packer_zfsroot_2024-10-17-1839)` right in the current (repo) directory.
