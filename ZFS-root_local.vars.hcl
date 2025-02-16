@@ -10,7 +10,7 @@ output_prefix       = "/VirtualBox/qemu/"
 
 # false -> we can see the VM console gui
 # true  -> console is hidden
-headless            = false
+headless            = true
 
 ubuntu_version      = "24.04.1"
 ubuntu_live_iso_src = "file:///home/deano/VirtualBox/ISOs"
