@@ -250,7 +250,8 @@ else
     # Set main disk here - be sure to include the FULL path
     # Get list of disks, ask user which one to install to
     # Ignore cdrom etc.  Limit disk name length to avoid menu uglyness
-    readarray -t disks < <(ls -l /dev/disk/by-id | egrep -v '(CDROM|CDRW|-ROM|CDDVD|-part|md-|dm-|wwn-)' | sort -t '/' -k3 | tr -s " " | cut -d' ' -f9 | cut -c -58 | sed '/^$/d')
+    # readarray -t disks < <(ls -l /dev/disk/by-id | egrep -v '(CDROM|CDRW|-ROM|CDDVD|-part|md-|dm-|wwn-)' | sort -t '/' -k3 | tr -s " " | cut -d' ' -f9 | cut -c -58 | sed '/^$/d')
+    readarray -t disks < <(find /dev/disk/by-id | grep -E -v '(CDROM|CDRW|-ROM|CDDVD|-part|md-|dm-|wwn-)' | cut -d'/' -f5 | sed '/^$/d' | sort)
     
     # If no disks available (kvm needs to use scsi, not virtio) then error out
     if [ ${#disks[@]} -eq 0 ] ; then
@@ -272,13 +273,13 @@ else
     # Set dialog box size to num disks
     list_height=$(( ${#disks[@]} + 1 ))
     box_height=$(( ${#disks[@]} + 8 ))
-    box_width=$(( ${m} + 26 ))
+    box_width=$(( m + 26 ))
     
     DONE=false
     until ${DONE} ; do
         whiptail --title "List of disks" --separate-output --checklist --noitem \
             "Choose disk(s) to install to" ${box_height} ${box_width} ${list_height} \
-            $( for disk in $(seq 0 $(( ${#disks[@]}-1)) ) ; do echo "${disks[${disk}]}" OFF ; done) 2> "${TMPFILE}"
+            $(for disk in $(seq 0 $(( ${#disks[@]}-1)) ) ; do echo "${disks[${disk}]}" OFF ; done) 2> "${TMPFILE}"
         RET=${?}
         [[ ${RET} = 1 ]] && exit 1
         
@@ -347,7 +348,7 @@ else
 fi
 
 # We check /sys/power/state - if no "disk" in there, then HIBERNATE is disabled
-cat /sys/power/state | fgrep disk > /dev/null
+grep disk < /sys/power/state > /dev/null
 HIBERNATE_AVAIL=${?}
 # Force Hibernate to n if not available, overriding anything in ZFS-root.conf
 [ ${HIBERNATE_AVAIL} -ne 0 ] && HIBERNATE=n
@@ -487,17 +488,11 @@ fi # Check for Swap size in ZFS-root.conf
 # Only used for swap partition (encrypted or not)
 USE_ZSWAP="zswap.enabled=1 zswap.compressor=lz4 zswap.max_pool_percent=25"
 
-# What suite is this script running under ?  bionic or focal
-# Xenial does not support a couple of zfs feature flags, so have to
-# not use them when creating the pools, even if the target system
-# is bionic.  Pool can be upgraded after booting into the target.
-SCRIPT_SUITE=$(lsb_release -cs)
-
 # Suite to install - bionic focal jammy noble
 if [[ ! -v SUITE ]] ; then
     SUITE=$(whiptail --title "Select Ubuntu distribtion" --radiolist "Choose distro" 12 50 6 \
         noble "24.04 noble" ON \
-        jammy "22.04 jammy" ON \
+        jammy "22.04 jammy" OFF \
         focal "20.04 focal" OFF \
         bionic "18.04 Bionic" OFF \
         3>&1 1>&2 2>&3)
@@ -609,7 +604,6 @@ cat << EOF
 ==========================================================================
    MYHOSTNAME              = ${MYHOSTNAME}
    RESCUE                  = ${RESCUE}
-   BOOTDEVRAW              = ${BOOTDEVRAW}
    DELAY                   = ${DELAY}
    SUITE                   = ${SUITE}
    POOLNAME                = ${POOLNAME}
@@ -648,7 +642,7 @@ cat > /tmp/selections <<-EOFPRE
 	# zfs-dkms license notification
 	zfs-dkms        zfs-dkms/note-incompatible-licenses  note
 EOFPRE
-cat /tmp/selections | debconf-set-selections
+debconf-set-selections < /tmp/selections
 
 # In case ZFS is already installed in this liveCD, check versions to see
 # if we need to update/upgrade
@@ -883,8 +877,7 @@ else
 fi
 
 # Actual dataset for suite we are installing now
-zfs create -o canmount=noauto -o mountpoint=/ \
-    ${POOLNAME}/ROOT/${SUITE}
+zfs create -o canmount=noauto -o mountpoint=/ ${POOLNAME}/ROOT/${SUITE}
 
 zpool set bootfs=${POOLNAME}/ROOT/${SUITE} ${POOLNAME}
 zfs mount ${POOLNAME}/ROOT/${SUITE}
@@ -923,7 +916,7 @@ echo "---------- $(tput setaf 1)About to debootstrap into ${ZFSBUILD}$(tput sgr0
 zfs list -t all
 df -h
 echo "---------- $(tput setaf 1)About to debootstrap into ${ZFSBUILD}$(tput sgr0) -----------"
-read -t 15 QUIT
+read -r -t 15 -p "Press <enter> to continue (auto-continue in 15secs)"
 
 # Install basic system
 echo "debootstrap to build initial system"
