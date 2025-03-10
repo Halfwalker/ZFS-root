@@ -165,7 +165,7 @@ if [[ ! -v PROXY ]] ; then
     PROXY=""
     for CACHER in bondi.local aptcacher.local ; do
         echo -n "... testing ${CACHER}"
-        CACHER=$(ping -w 2 -c 1 ${CACHER} | fgrep "bytes from" | cut -d' ' -f4)
+        CACHER=$(ping -w 2 -c 1 ${CACHER} | grep "bytes from" | cut -d' ' -f4)
         if [ "${CACHER}" != "" ] ; then
             echo " - found !"
             PROXY="http://${CACHER}:3142/"
@@ -179,7 +179,7 @@ if [[ ! -v PROXY ]] ; then
     RET=${?}
     (( RET )) && PROXY=
 fi # Check if PROXY is set already
-if [ ${PROXY} ]; then
+if [ "${PROXY}" ]; then
     # export http_proxy=${PROXY}
     # export ftp_proxy=${PROXY}
     # This is for apt-get
@@ -195,8 +195,8 @@ apt-get -qq --no-install-recommends --yes install debconf-utils
 # Get userid and full name of main user
 # First see if USERNAME or UCOMMENT are already set in ZFS-root.conf
 if [[ ! -v USERNAME ]] || [[ ! -v UCOMMENT ]] ; then
-    [[ ! -v USERNAME ]] && USERNAME=deano
-    [[ ! -v UCOMMENT ]] && UCOMMENT="Dean Carpenter"
+    [[ ! -v USERNAME ]] && USERNAME=george
+    [[ ! -v UCOMMENT ]] && UCOMMENT="George of the Jungle"
     USERINFO=$(whiptail --inputbox "Enter username (login id) and full name of user\nAs in <username> <space> <First and Last name>\n\nlogin full name here\n|---| |------------ - - -  -  -" --title "User information" 11 70 "$(echo $USERNAME $UCOMMENT)" 3>&1 1>&2 2>&3)
     RET=${?}
     [[ ${RET} = 1 ]] && exit 1
@@ -221,7 +221,7 @@ if [[ ! -v MYHOSTNAME ]] ; then
     MYHOSTNAME=$(whiptail --inputbox "Enter hostname to be used for new system. This name may also be used for the main ZFS poolname." --title "Hostname for new system." 8 70 $(echo $MYHOSTNAME) 3>&1 1>&2 2>&3)
     RET=${?}
     (( RET )) && MYHOSTNAME=
-    if [ ! ${MYHOSTNAME} ]; then
+    if [ ! "${MYHOSTNAME}" ]; then
         echo "Must have a hostname" 
         exit 1
     fi
@@ -232,7 +232,7 @@ if [[ ! -v POOLNAME ]] ; then
     POOLNAME=$(whiptail --inputbox "Enter poolname to use for main system - defaults to hostname" --title "ZFS main poolname" 8 70 $(echo $POOLNAME) 3>&1 1>&2 2>&3)
     RET=${?}
     (( RET )) && POOLNAME=
-    if [ ! ${POOLNAME} ]; then
+    if [ ! "${POOLNAME}" ]; then
         echo "Must have a ZFS poolname"
         exit 1
     fi
@@ -400,6 +400,7 @@ if [[ ! -v ZREPL ]] || [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] 
 fi # Check ALL options from ZFS-root.conf
 
 # See if we need to install Nvidia drivers, notify if so
+# shellcheck disable=SC2046,SC2086  # Don't need quotes or double-quotes
 if [[ ! -v NVIDIA ]] ; then
     NVIDIA=none
     if [ ${GNOME} = "y" ] || [ ${KDE} = "y" ] || [ ${NEON} = "y" ] || [ ${XFCE} = "y" ] ; then
@@ -430,7 +431,7 @@ fi
 # 65484719
 # 23383624
 # 28747791
-if [ ${GOOGLE} = "y" ] ; then
+if [ "${GOOGLE}" = "y" ] ; then
     apt-get -qq --no-install-recommends --yes install python3-qrcode libpam-google-authenticator qrencode
     # Generate a google auth config
     google-authenticator --time-based --disallow-reuse --label=${MYHOSTNAME} --qr-mode=UTF8 --rate-limit=3 --rate-time=30 --secret=/tmp/google_auth.txt --window-size=3 --force --quiet
@@ -441,6 +442,9 @@ if [ ${GOOGLE} = "y" ] ; then
     # is inverted and Authy can't read it
     # Set issuer to Ubuntu so we get a nice Ubuntu logo for the Authy secret
     export NEWT_COLORS='white,black'
+# shellcheck disable=SC2086  # Don't need quotes
+# shellcheck disable=SC1132  # & is part of the secret inside quotes
+# shellcheck disable=SC2034  # issuer is NOT a shell variable
     whiptail --title "Google Authenticator QR code and config" --msgbox "Config for ${USERNAME} is in /home/${USERNAME}/.google_authenticator\n\nBe sure to save the 5 emergency codes below\n\n$(cat /tmp/google_auth.txt)\n\nQR Code for use with OTP application (Authy etc.)\notpauth://totp/${MYHOSTNAME}.local:${USERNAME}?secret=${GOOGLE_SECRET}&Issuer=Ubuntu\n\n$(qrencode -m 3 -t UTF8 otpauth://totp/${MYHOSTNAME}.local:${USERNAME}?secret=${GOOGLE_SECRET}&issuer=Ubuntu)" 45 83
     RET=${?}
     [[ ${RET} = 1 ]] && exit 1
@@ -465,12 +469,13 @@ fi
 # If DISCENC == LUKS then partition will be encrypted.  If SIZE_SWAP is not
 # defined here, then will be calculated to accomodate memory size (plus fudge factor).
 if [[ ! -v SIZE_SWAP ]] ; then
+    # shellcheck disable=SC2002  # Using cat is clearer to understand
     MEMTOTAL=$(cat /proc/meminfo | grep -F MemTotal | tr -s ' ' | cut -d' ' -f2)
     SIZE_SWAP=$(( (MEMTOTAL + 20480) / 1024 ))
     # We MUST have a swap partition of at least ram size if HIBERNATE is enabled
     # So don't even prompt the user for a size. Her own silly fault if it's
     # enabled but she doesn't want a swap partition
-    if [ ${HIBERNATE} = "n" ] ; then
+    if [ "${HIBERNATE}" = "n" ] ; then
         SIZE_SWAP=$(whiptail --inputbox "If HIBERNATE enabled then this will be a disk partition otherwise it will be a regular ZFS dataset. If LUKS enabled then the partition will be encrypted.\nIf SWAP size not set here (left blank), then it will be calculated to accomodate memory size. Set to zero (0) to disable swap.\n\nSize of swap space in megabytes (default is calculated value)\nSet to zero (0) to disable swap" \
         --title "SWAP size" 15 70 $(echo $SIZE_SWAP) 3>&1 1>&2 2>&3)
         RET=${?}
@@ -564,6 +569,7 @@ esac
 #
 if [ "$1" != "packerci" ] ; then
     box_height=$(( ${#zfsdisks[@]} + 28 ))
+    # shellcheck disable=SC2086,SC2116
     whiptail --title "Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
         Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
         $(echo $SUITE $SUITE_NUM) $([ ${HWE} ] && echo WITH || echo without) $(echo hwe kernel ${HWE})\n \
@@ -681,6 +687,7 @@ apt-get -qq --no-install-recommends --yes install openssh-server debootstrap gdi
 
 # Unmount any mdadm disks that might have been automounted
 # Stop all found mdadm arrays - again, just in case.  Sheesh.
+# shellcheck disable=SC2156  # Not "injecting" filenames - this is standard find -exec
 find /dev -iname md* -type b -exec bash -c "umount {} > /dev/null 2>&1 ; mdadm --stop --force {} > /dev/null 2>&1 ; mdadm --remove {} > /dev/null 2>&1" \;
 
 ### Partition layout
@@ -716,7 +723,7 @@ for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
     fi # HIBERNATE
     
     # Main data partition for root
-    if [ ${DISCENC} = "LUKS" ] ; then
+    if [ "${DISCENC}" = "LUKS" ] ; then
         # LUKS Encrypted - should be partition type 8309 (Linux LUKS)
         # wipefs --all --force /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA}
         zpool labelclear -f /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA}
@@ -832,6 +839,7 @@ mkdir -p ${ZFSBUILD}
 case ${DISCENC} in
     LUKS)
         echo "Creating root pool ${POOLNAME}"
+        # shellcheck disable=SC2086  # quoting here kills the zpool create
         zpool create -f -o ashift=12 -o autotrim=on ${SUITE_ROOT_POOL} \
              -O acltype=posixacl -O canmount=off -O compression=lz4 \
              -O atime=off \
@@ -848,6 +856,7 @@ case ${DISCENC} in
         #  -o feature@project_quota=disabled \
         #  -o feature@spacemap_v2=disabled \
         echo "Creating root pool ${POOLNAME}"
+        # shellcheck disable=SC2086  # quoting here kills the zpool create
         zpool create -f -o ashift=12 -o autotrim=on ${SUITE_ROOT_POOL} \
           -O acltype=posixacl -O canmount=off -O compression=lz4 \
           -O atime=off \
@@ -931,6 +940,7 @@ if [ ${#zfsdisks[@]} -eq 1 ] ; then
 else
     # Unmount any mdadm disks that might have been automounted
     # Stop all found mdadm arrays - again, just in case.  Sheesh.
+    # shellcheck disable=SC2156  # Not "injecting" filenames - this is standard find -exec
     find /dev -iname md* -type b -exec bash -c "umount {} > /dev/null 2>&1 ; mdadm --stop --force {} > /dev/null 2>&1 ; mdadm --remove {} > /dev/null 2>&1" \;
 
     for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
@@ -947,10 +957,10 @@ echo "UUID=$(blkid -s UUID -o value ${BOOTDEVRAW}) \
 mkdir ${ZFSBUILD}/boot/efi
 
 
-echo ${MYHOSTNAME} > ${ZFSBUILD}/etc/hostname
+echo "${MYHOSTNAME}" > ${ZFSBUILD}/etc/hostname
 echo "127.0.1.1  ${MYHOSTNAME}" >> ${ZFSBUILD}/etc/hosts
 
-if [ ${PROXY} ]; then
+if [ "${PROXY}" ]; then
     # This is for apt-get
     echo "Acquire::http::proxy \"${PROXY}\";" > ${ZFSBUILD}/etc/apt/apt.conf.d/03proxy
 fi # PROXY
