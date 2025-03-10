@@ -174,7 +174,8 @@ Note: This makes use of a `vars` file to supply overrides to the packer config. 
 ```
 # Where to dump the resuling files
 # NOTE: If running under docker this location must be bind-mounted in the docker run cmd below
-#       The location is relative to the container environment
+#       The location is relative to INSIDE the container environment, so bind-mount like
+#           -v /home/myuser/qemu:/home/myuser/qemu
 output_prefix       = "/home/myuser/qemu/"
 
 # false -> we can see the VM console gui
@@ -185,6 +186,9 @@ ubuntu_version      = "24.04.1"
 
 # Where to find the boot ISO - can be a local dir or URL
 # The full name of the ISO is appended to this location
+# NOTE: Like output_prefix, this path will be used INSIDE the container, so the
+#       full path must be bind-mounted into the container with
+#           -v /home/myuser/ISOs:/home/myuser/ISOs
 ubuntu_live_iso_src = "file:///home/myuser/ISOs"
 # or
 # ubuntu_live_iso_src = "https://releases.ubuntu.com/24.04.1"
@@ -210,8 +214,11 @@ docker run --rm -it -v "$(pwd)":"${PWD}" -w "${PWD}" \
   -e PACKER_PLUGIN_PATH="${PWD}/.packer.d/plugins" \
   myname/packer-qemu init ZFS-root_local.pkr.hcl
 
-# NOTE: If setting the output_prefix in the ZFS-root_local.vars.hcl file as above
-#       then must bind-mount that location in the docker container
+# NOTE: If setting the output_prefix and/or ubuntu_live_iso_src in the ZFS-root_local.vars.hcl
+#       file as above then must bind-mount that location in the docker container
+#           -v /home/myuser/qemu:/home/myuser/qemu
+#           -v /home/myuser/ISOs:/home/myuser/ISOs
+
 docker run --rm -it -v "$(pwd)":"${PWD}" -w "${PWD}" \
   --privileged --cap-add=ALL \
   -v "${PWD}/.packer.d":/root/.cache/packer \
@@ -228,7 +235,7 @@ Of course you may pass in a `vars` file - if any directories are specified outsi
 
 ### Running the disk image
 
-The `.qcow2` format disk image (here in *packer-zfsroot-2024-10-17-1839*) may be run locally with commands like
+The `.qcow2` format disk image (here in *packer-zfsroot-2024-10-17-1839.qcow2*) may be run locally with commands like
 
 * Ensure the local user owns the created files
     ```
@@ -238,7 +245,7 @@ The `.qcow2` format disk image (here in *packer-zfsroot-2024-10-17-1839*) may be
 * Boot with syslinux, no UEFI
     ```
     kvm -no-reboot -m 2048 \
-      -drive file=packer-zfsroot-2024-10-17-1839/packer-zfsroot-2024-10-17-1839,format=qcow2,cache=writeback \
+      -drive file=packer-zfsroot-2024-10-17-1839/packer-zfsroot-2024-10-17-1839.qcow2,format=qcow2,cache=writeback \
       -device virtio-scsi-pci,id=scsi0
     ```
 
@@ -247,7 +254,7 @@ The `.qcow2` format disk image (here in *packer-zfsroot-2024-10-17-1839*) may be
     kvm -no-reboot -m 2048 \
       -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE.fd \
       -drive if=pflash,format=raw,readonly=on,file=packer_zfsroot_2024-10-17-1839/efivars.fd \
-      -drive file=packer_zfsroot_2024-10-17-1839/packer-zfsroot-2024-10-17-1839,format=qcow2,cache=writeback \
+      -drive file=packer_zfsroot_2024-10-17-1839/packer-zfsroot-2024-10-17-1839.qcow2,format=qcow2,cache=writeback \
       -device virtio-scsi-pci,id=scsi0
     ```
 
