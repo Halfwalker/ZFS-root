@@ -30,7 +30,7 @@ variable "output_prefix" {
 variable "ubuntu_version" {
   description = "Which version of Ubuntu to boot for the build"
   type = string
-  default = "24.04.1"
+  default = "24.04.2"
 }
 
 # Full path/source for ubuntu live iso image
@@ -39,7 +39,7 @@ variable "ubuntu_version" {
 variable "ubuntu_live_iso_src" {
   description = "URI for the live ISO - can be a URL or local file:/// location"
   type = string
-  default = "https://releases.ubuntu.com/24.04.1"
+  default = "https://releases.ubuntu.com/24.04.2"
 }
 
 locals {
@@ -49,7 +49,7 @@ locals {
 }
 
 source "qemu" "ubuntu" {
-  vm_name           = "packer-zfsroot-${local.timestamp}"
+  vm_name           = "packer-zfsroot-${local.timestamp}.qcow2"
 
   iso_url           = "${local.ubuntu_live_iso}"
   iso_checksum      = "file:https://releases.ubuntu.com/${var.ubuntu_version}/SHA256SUMS"

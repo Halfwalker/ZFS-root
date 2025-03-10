@@ -12,5 +12,5 @@ output_prefix       = "/VirtualBox/qemu/"
 # true  -> console is hidden
 headless            = true
 
-ubuntu_version      = "24.04.1"
+ubuntu_version      = "24.04.2"
 ubuntu_live_iso_src = "file:///home/deano/VirtualBox/ISOs"
