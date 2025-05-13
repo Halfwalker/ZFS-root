@@ -984,6 +984,8 @@ cat > ${ZFSBUILD}/etc/netplan/01_netcfg.yaml <<-EOF
 	#     interfaces: [alleths]
 	#     # === Example static IP address
 	#     # addresses: [192.168.2.8/24]
+    #     # Set default mtu to 9000 jumbo frames
+	#     mtu: 9000
 	#     dhcp4: yes
 	#     dhcp6: yes
 	#     wakeonlan: true
@@ -995,8 +997,10 @@ cat > ${ZFSBUILD}/etc/netplan/01_netcfg.yaml <<-EOF
 	#     #   - to: default
 	#     #     via: 192.168.2.4
 	#     #     metric: 100
-	#     #     on-link: true
-	#     mtu: 1500
+	#     #     mtu: 1472
+    #     #   - to: 192.168.0.0/16
+    #     #     scope: link
+    #     #     mtu: 9000
 	#     nameservers:
 	#       addresses: [127.0.0.53, 8.8.8.8, 8.8.4.4]
 	#     parameters:
@@ -1894,7 +1898,7 @@ chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}
 # so those keys can be used in the initramfs
 # DROPBEAR can only be y if DISCENC is not NOENC (so encryption enabled)
 #
-mkdir -p /etc/cmdline.d
+mkdir -p /etc/cmdline.d /etc/zfsbootmenu/dracut.conf.d
 if [ "${DROPBEAR}" = "y" ] ; then
   echo "------------------------------------------------------------"
   echo " Installing dropbear for remote unlocking"
