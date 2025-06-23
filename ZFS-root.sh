@@ -604,6 +604,7 @@ cat << EOF
 ==========================================================================
    MYHOSTNAME              = ${MYHOSTNAME}
    RESCUE                  = ${RESCUE}
+   BOOTDEVRAW              = ${BOOTDEVRAW}
    DELAY                   = ${DELAY}
    SUITE                   = ${SUITE}
    POOLNAME                = ${POOLNAME}
@@ -1180,8 +1181,8 @@ cat /etc/default/locale >> /etc/environment
 locale-gen --purge "en_US.UTF-8"
 dpkg-reconfigure -f noninteractive locales
 
-echo "America/New_York" > /etc/timezone
-ln -fs /usr/share/zoneinfo/US/Eastern /etc/localtime
+echo "America/Boise" > /etc/timezone
+ln -fs /usr/share/zoneinfo/US/Mountain /etc/localtime
 dpkg-reconfigure -f noninteractive tzdata
 
 # Make sure the kernel is installed and configured before ZFS
@@ -1363,6 +1364,8 @@ if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "EFI" ] ; then
     curl -L https://get.zfsbootmenu.org/efi/recovery -o /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
 fi
 ##  or the unpacked EFI image (vmlinux/initrd)
+## NOTE: Right now hard-coded version in place.  Need a clean way to get latest version
+##       Fetch github releases json and parse, like in ansible-git_tools
 if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "KERNEL" ] ; then
     echo "--- Using zfsbootmenu KERNEL files"
     curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v3.0.1/zfsbootmenu-recovery-x86_64-v3.0.1-linux6.12.tar.gz -o /tmp/zfsbootmenu.tar.gz
