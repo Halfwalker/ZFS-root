@@ -1,6 +1,6 @@
 # ZFS-root
 
-This script is meant to be run from an Ubuntu Live CD.  It will build an Ubuntu system on the local system or VM using root-on-ZFS, with optional LUKS whole-disk encryption or ZFS native encryption.  UEFI SecureBoot with local keys is also available.
+This script is meant to be run from an Ubuntu Live CD.  It will build an Ubuntu system on the local system or VM using root-on-ZFS, with optional LUKS whole-disk encryption or ZFS native encryption.  It can create a raidz or n-way mirror of disks to boot from.  UEFI SecureBoot with local keys is also available.
 
 ## tl;dr
 
@@ -31,7 +31,7 @@ Number  Start (sector)  End        Size        Code  Name
 
 > <dl>
 >     <dt>BOOT_EFI_0
->     <dd>Used for EFI and Syslinux booting.  Mounted at `/boot/efi`
+>     <dd>Used for EFI and Syslinux booting.  Mounted at `/boot/efi`  For multi-disk raidz this will be a mdadm mirror across all the disks.
 >     <dt>SWAP_0
 >     <dd>Swap partition for use with Hibernate/Resume - only created if Hibernate is available and selected.  Will be encrypted if using LUKS.  Hibernate/Resume only uses the first disk for resume, no matter how many disks and swap partitions there are.  This means that the swap partitions must be at least the size of ram for Hibernate/Resume to work.
 >     <dt>ZFS_0
@@ -51,7 +51,7 @@ sgdisk -n ${PARTITION_WIND}:0:+500G -c ${PARTITION_WIND}:"WIN11_${disk}" -t ${PA
 sgdisk -n ${PARTITION_RCVR}:0:0     -c ${PARTITION_RCVR}:"RCVR_${disk}"  -t ${PARTITION_RCVR}:2700 /dev/disk/by-id/${zfsdisks[${disk}]}
 ```
 
-NOTE: There may be problems with Secure Boot.  Your mileage may vary.
+NOTE: There may be problems with SecureBoot.  Your mileage may vary.
 
 ## Features
 
@@ -79,7 +79,7 @@ For SecureBoot to be enabled and configured, the system must first be put into S
 * **enroll-keys --microsoft** : This enrolls the new keys _and_ the default Microsoft keys into the UEFI SecureBoot efi vars
 * **sign** : Use the new keys to sign the various bootable bits
 
-A **systemd-path** config is put in place in `/etc/systemd/system/zfsbootmenu-update*` to watch the **zfsbootmenu** files.  If they ever change (eg. upgraded) then a new efi bundle is created and signed.  This way you don't have to remember to re-create and sign when you upgrade
+A **systemd-path** config is put in place in `/etc/systemd/system/zfsbootmenu-update*` and `/etc/systemd/system/refind-update*` to watch the **zfsbootmenu** and **rEFInd** files.  If they ever change (eg. upgraded) then a new efi bundle is created and signed.  This way you don't have to remember to re-create and sign when you upgrade
 
 ## Configuration
 
