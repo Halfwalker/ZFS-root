@@ -39,6 +39,13 @@ SUITE="noble"
 RAIDLEVEL="mirror"
 
 #
+# Enable UEFI SecureBoot if available
+# NOTE: System must be in SecureBoot Setup mode
+#       For VirtualBox delete the VM .nvram file
+#       For other systems see the UEFI SecureBoot bios config section
+SECUREBOOT=n
+
+#
 # Swap size in megabytes - if HIBERNATE or LUKS set then this
 # is a partition otherise it's a zfs dataset.
 # Set to 0 to disable swap

@@ -347,6 +347,47 @@ else
     DROPBEAR=n
 fi
 
+# If UEFI SecureBoot should be enabled
+if [[ -d /sys/firmware/efi ]] ; then
+    # Create apt sources for sbctl
+    curl -fsSL https://download.opensuse.org/repositories/home:jloeser:secureboot/xUbuntu_${SUITE_NUM}/Release.key | gpg --dearmor | sudo tee /usr/share/keyrings/secureboot.gpg > /dev/null
+
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+    cat > /etc/apt/sources.list.d/secureboot.sources <<-EOF
+	X-Repolib-Name: SecureBoot
+	Types: deb
+	URIs: http://download.opensuse.org/repositories/home:/jloeser:/secureboot/xUbuntu_${SUITE_NUM}
+	Signed-By: /usr/share/keyrings/secureboot.gpg
+	Suites: /
+	Enabled: yes
+	Architectures: amd64
+	EOF
+
+    apt-get -qq update
+    apt-get -qq --yes --no-install-recommends install systemd-boot-efi
+    apt-get -qq --yes --no-install-recommends install sbctl jq
+
+    # Are we in setup mode for SecureBoot ?
+    SETUPMODE=$(sbctl status --json | jq '.setup_mode')
+    if [ "${SETUPMODE}" == "true" ] ; then
+        if [[ ! -v SECUREBOOT ]] ; then
+            SECUREBOOT=$(whiptail --title "UEFI SecureBoot is available" --yesno "Should UEFI SecureBoot be enabled ?" 8 60 \
+            3>&1 1>&2 2>&3)
+            RET=${?}
+            [[ ${RET} = 0 ]] && SECUREBOOT=y
+            [[ ${RET} = 1 ]] && SECUREBOOT=n
+        fi
+    else
+        # Show current SecureBoot config, set SECUREBOOT var to n so we don't try to install in the chroot
+        SBCTL_STATUS=$(sbctl status)
+        whiptail --title "System UEFI not in setup mode" --msgbox "SecureBoot config in bios must be in setup mode\n\nFor VirtualBox delete the .nvram file\nFor other systems see the bios config\n\n${SBCTL_STATUS}" 17 60
+        SECUREBOOT=n
+    fi
+else
+    # No /sys/firmware/efi means no UEFI means no SecureBoot
+    SECUREBOOT=n
+fi
+
 # We check /sys/power/state - if no "disk" in there, then HIBERNATE is disabled
 grep disk < /sys/power/state > /dev/null
 HIBERNATE_AVAIL=${?}
@@ -563,7 +604,7 @@ esac
 # selected above and we do not want to pause here for 
 #
 if [ "$1" != "packerci" ] ; then
-    box_height=$(( ${#zfsdisks[@]} + 28 ))
+    box_height=$(( ${#zfsdisks[@]} + 29 ))
     # shellcheck disable=SC2086,SC2116
     whiptail --title "Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
         Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
@@ -574,20 +615,21 @@ if [ "$1" != "packerci" ] ; then
         Hostname $(echo $MYHOSTNAME)\n \
         Poolname $(echo $POOLNAME)\n \
         User $(echo $USERNAME $UCOMMENT)\n\n \
-        RESCUE    = $(echo $RESCUE)  : Create rescue dataset by cloning install\n \
-        DELAY     = $(echo $DELAY)  : Enable delay before importing zpool\n \
-        ZREPL     = $(echo $ZREPL)  : Install Zrepl zfs snapshot manager\n \
-        GOOGLE    = $(echo $GOOGLE)  : Install google authenticator\n \
-        GNOME     = $(echo $GNOME)  : Install Ubuntu Gnome desktop\n \
-        XFCE      = $(echo $XFCE)  : Install Ubuntu XFCE4 desktop\n \
-        KDE       = $(echo $KDE)  : Install Ubuntu KDE Plasma desktop\n \
-        NEON      = $(echo $NEON)  : Install Neon KDE Plasma desktop\n \
-        NVIDIA    = $(echo $NVIDIA)  : Install Nvidia drivers\n \
-        SOF       = $(echo $SOF)  : Install Sound Open Firmware ${SOF_VERSION} binaries\n \
-        HIBERNATE = $(echo $HIBERNATE)  : Enable SWAP disk partition for hibernation\n \
-        DISCENC   = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
-        DROPBEAR  = $(echo $DROPBEAR)  : Enable Dropbear unlocking of encrypted disks\n \
-        Swap size = $(echo $SIZE_SWAP)M $([ ${SIZE_SWAP} -eq 0 ] && echo ': DISABLED')\n" \
+        SECUREBOOT = $SECUREBOOT  : Enable UEFI SecureBoot\n \
+        RESCUE     = $(echo $RESCUE)  : Create rescue dataset by cloning install\n \
+        DELAY      = $(echo $DELAY)  : Enable delay before importing zpool\n \
+        ZREPL      = $(echo $ZREPL)  : Install Zrepl zfs snapshot manager\n \
+        GOOGLE     = $(echo $GOOGLE)  : Install google authenticator\n \
+        GNOME      = $(echo $GNOME)  : Install Ubuntu Gnome desktop\n \
+        XFCE       = $(echo $XFCE)  : Install Ubuntu XFCE4 desktop\n \
+        KDE        = $(echo $KDE)  : Install Ubuntu KDE Plasma desktop\n \
+        NEON       = $(echo $NEON)  : Install Neon KDE Plasma desktop\n \
+        NVIDIA     = $(echo $NVIDIA)  : Install Nvidia drivers\n \
+        SOF        = $(echo $SOF)  : Install Sound Open Firmware ${SOF_VERSION} binaries\n \
+        HIBERNATE  = $(echo $HIBERNATE)  : Enable SWAP disk partition for hibernation\n \
+        DISCENC    = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
+        DROPBEAR   = $(echo $DROPBEAR)  : Enable Dropbear unlocking of encrypted disks\n \
+        Swap size  = $(echo $SIZE_SWAP)M $([ ${SIZE_SWAP} -eq 0 ] && echo ': DISABLED')\n" \
         ${box_height} 76
     RET=${?}
     [[ ${RET} = 1 ]] && exit 1
@@ -608,6 +650,7 @@ cat << EOF
    DELAY                   = ${DELAY}
    SUITE                   = ${SUITE}
    POOLNAME                = ${POOLNAME}
+   SECUREBOOT              = ${SECUREBOOT}
    USERNAME                = ${USERNAME}
    UCOMMENT                = "${UCOMMENT}"
    AUTHKEYS                = ${AUTHKEYS}
@@ -1094,6 +1137,7 @@ cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
 	export DELAY=${DELAY}
 	export SUITE=${SUITE}
 	export POOLNAME=${POOLNAME}
+	export SECUREBOOT=${SECUREBOOT}
 	export PASSPHRASE=${PASSPHRASE}
 	export USERNAME=${USERNAME}
 	export UPASSWORD="${UPASSWORD}"
@@ -1507,6 +1551,107 @@ LABEL Memtest86+
 KERNEL /EFI/tools/memtest86/memtest86.syslinux
 
 EOF
+
+#
+# Set up UEFI SecureBoot
+# Test above only allows y if /sys/firmware/efi exists
+#
+if [ ${SECUREBOOT} = "y" ] ; then
+    case ${SUITE} in
+        noble)
+            SUITE_NUM="24.04"
+            ;;
+        jammy)
+            SUITE_NUM="22.04"
+            ;;
+        focal)
+            SUITE_NUM="20.04"
+            ;;
+        *)
+            SUITE_NUM="24.04"
+            ;;
+    esac
+
+    # Create apt sources for sbctl
+    curl -fsSL https://download.opensuse.org/repositories/home:jloeser:secureboot/xUbuntu_${SUITE_NUM}/Release.key | gpg --dearmor | sudo tee /usr/share/keyrings/secureboot.gpg > /dev/null
+
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+    cat > /etc/apt/sources.list.d/secureboot.sources <<-EOF
+	X-Repolib-Name: SecureBoot
+	Types: deb
+	URIs: http://download.opensuse.org/repositories/home:/jloeser:/secureboot/xUbuntu_${SUITE_NUM}
+	Signed-By: /usr/share/keyrings/secureboot.gpg
+	Suites: /
+	Enabled: yes
+	Architectures: amd64
+	EOF
+
+    apt-get -qq update
+    apt-get -qq --yes --no-install-recommends install systemd-boot-efi
+    apt-get -qq --yes --no-install-recommends install sbctl systemd-ukify
+
+    # Create zfsbootmenu efi bundle
+    /usr/bin/ukify build \
+        --linux=/boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu \
+        --initrd=/boot/efi/EFI/zfsbootmenu/initramfs-bootmenu.img \
+        --output=/boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu-bundle.efi \
+        --cmdline='quiet rw'
+
+    # Initialize sbctl and sign all the things
+    # sbctl setup --setup --config /etc/sbctl/sbctl.conf
+    /usr/sbin/sbctl create-keys
+    /usr/sbin/sbctl enroll-keys --microsoft
+    /usr/sbin/sbctl sign -s /boot/efi/EFI/refind/refind_x64.efi
+    /usr/sbin/sbctl sign -s /boot/efi/EFI/tools/memtest86/memtest86.efi
+    /usr/sbin/sbctl sign -s /boot/efi/EFI/tools/shellx64.efi
+    /usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu
+    /usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu-bundle.efi
+
+    # Setup systemd path watch to update zfsbootmenu efi when zfsbootmenu is updated
+    # This way when you update ZBM, it will automagically update and sign the EFI image
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+    cat > /etc/systemd/system/zfsbootmenu-update@.service <<-EOF
+	[Unit]
+	Description=Update ZFSBootmenu EFI image bundle
+
+	[Service]
+	Type=oneshot
+	ExecStart=/usr/bin/ukify build --linux=/boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu --initrd=/boot/efi/EFI/zfsbootmenu/initramfs-bootmenu.img --output=/boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu-bundle.efi --cmdline='quiet rw'
+	ExecStart=/usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu-bundle.efi
+	EOF
+
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+    cat > /etc/systemd/system/zfsbootmenu-update-kernel-bootmenu.path <<-EOF
+	[Unit]
+	Description=ZFSBootmenu kernel changed, rebuild EFI image bundle
+
+	[Path]
+	PathChanged=/boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu
+	Unit=zfsbootmenu-update@vmlinuz-bootmenu.service
+
+	[Install]
+	WantedBy=multi-user.target
+	WantedBy=system-update.target
+	EOF
+
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+    cat > /etc/systemd/system/zfsbootmenu-update-initramfs-bootmenu.path <<-EOF
+	[Unit]
+	Description=ZFSBootmenu initramfs changed, rebuild EFI image bundle
+
+	[Path]
+	PathChanged=/boot/efi/EFI/zfsbootmenu/initramfs-bootmenu.img
+	Unit=zfsbootmenu-update@initramfs-bootmenu.service
+
+	[Install]
+	WantedBy=multi-user.target
+	WantedBy=system-update.target
+	EOF
+
+    systemctl enable zfsbootmenu-update-kernel-bootmenu.path
+    systemctl enable zfsbootmenu-update-initramfs-bootmenu.path
+fi # SecureBoot
+
 
 #
 # Set up LUKS unlocking

@@ -1,6 +1,6 @@
 # ZFS-root
 
-This script is meant to be run from an Ubuntu Live CD.  It will build an Ubuntu system on the local system or VM using root-on-ZFS, with optional LUKS whole-disk encryption or ZFS native encryption.
+This script is meant to be run from an Ubuntu Live CD.  It will build an Ubuntu system on the local system or VM using root-on-ZFS, with optional LUKS whole-disk encryption or ZFS native encryption.  UEFI SecureBoot with local keys is also available.
 
 ## tl;dr
 
@@ -57,6 +57,7 @@ NOTE: There may be problems with Secure Boot.  Your mileage may vary.
 
 * Will accommodate any number of disks for ZFS, and offer options for the raid level to be used.
 * Uses [zfsbootmenu](https://github.com/zbm-dev/zfsbootmenu/) to handle the actual booting of the ZFS pool.
+* Can enable and configure UEFI SecureBoot using locally-generated keys.  The **rEFInd** binary and **zfsbootmenu** EFI bundle will be signed.
 * Can optionally clone the installed ROOT dataset as a rescue dataset. This will be selectable in the **zfsbootmenu** menu in the event the main ROOT dataset ever gets corrupted.
 * When using encryption it can also optionally install [dropbear](https://matt.ucc.asn.au/dropbear/dropbear.html) to allow remote unlocking of system. `ssh -p 222 root@<ip addr>`  **NOTE:** do not enable Dropbear for laptops - it wants to see the network in place, and if it's missing (usb-ethernet etc) then it will just sit and wait.
 * Can pre-populate the main user `~/.ssh/authorized_keys` with a pubkey pulled from named users from github.  This will also pre-populate the *dropbear* _authorized_keys_ if encryption is used.
@@ -67,6 +68,18 @@ NOTE: There may be problems with Secure Boot.  Your mileage may vary.
 * [Packer](https://developer.hashicorp.com/packer) config to generate a *qcow2* KVM disk image for testing or CI/CD
 
 *initramfs-tools* is NOT used, and is in fact disabled via `apt-mark hold initramfs-tools`.  Instead *dracut* is used for managing the initramfs.
+
+## UEFI SecureBoot
+
+For SecureBoot to be enabled and configured, the system must first be put into Setup Mode.  This will vary by system, but generally it means that any existing keys must be deleted in the bios config for UEFI SecureBoot.
+
+[sbctl](https://github.com/Foxboron/sbctl) will be installed to manage the setup and configuration.  If the system is in Setup mode, the general process is as follows :
+
+* **create-keys** : This will generate the local set of keys
+* **enroll-keys --microsoft** : This enrolls the new keys _and_ the default Microsoft keys into the UEFI SecureBoot efi vars
+* **sign** : Use the new keys to sign the various bootable bits
+
+A **systemd-path** config is put in place in `/etc/systemd/system/zfsbootmenu-update*` to watch the **zfsbootmenu** files.  If they ever change (eg. upgraded) then a new efi bundle is created and signed.  This way you don't have to remember to re-create and sign when you upgrade
 
 ## Configuration
 
