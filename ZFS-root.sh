@@ -1499,7 +1499,7 @@ curl -L https://www.memtest86.com/downloads/memtest86-4.3.7-iso.zip -o /tmp/memt
    umount /tmp/memtest86/mnt
 
 # Syslinux entry for memtest86+
-cat > /boot/efi/snippets/05_memtest86 << EOF
+cat > /boot/efi/snippets/05_memtest86 <<EOF
 LABEL Memtest86+
 KERNEL /EFI/tools/memtest86/memtest86.syslinux
 
