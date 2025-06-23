@@ -175,7 +175,7 @@ if [[ ! -v PROXY ]] ; then
         fi
     done
     
-    PROXY=$(whiptail --inputbox "Enter an apt proxy. Cancel or hit <esc> for no proxy" --title "APT proxy setup" 8 70 $(echo $PROXY) 3>&1 1>&2 2>&3)
+    PROXY=$(whiptail --inputbox "Enter an apt proxy. Cancel or hit <esc> for no proxy" --title "APT proxy setup" 8 70 $PROXY 3>&1 1>&2 2>&3)
     RET=${?}
     (( RET )) && PROXY=
 fi # Check if PROXY is set already
@@ -197,18 +197,18 @@ apt-get -qq --no-install-recommends --yes install debconf-utils
 if [[ ! -v USERNAME ]] || [[ ! -v UCOMMENT ]] ; then
     [[ ! -v USERNAME ]] && USERNAME=george
     [[ ! -v UCOMMENT ]] && UCOMMENT="George of the Jungle"
-    USERINFO=$(whiptail --inputbox "Enter username (login id) and full name of user\nAs in <username> <space> <First and Last name>\n\nlogin full name here\n|---| |------------ - - -  -  -" --title "User information" 11 70 "$(echo $USERNAME $UCOMMENT)" 3>&1 1>&2 2>&3)
+    USERINFO=$(whiptail --inputbox "Enter username (login id) and full name of user\nAs in <username> <space> <First and Last name>\n\nlogin full name here\n|---| |------------ - - -  -  -" --title "User information" 11 70 "$USERNAME $UCOMMENT" 3>&1 1>&2 2>&3)
     RET=${?}
     [[ ${RET} = 1 ]] && exit 1
-    USERNAME=$(echo $USERINFO | cut -d' ' -f1)
-    UCOMMENT=$(echo $USERINFO | cut -d' ' -f2-)
+    USERNAME=$(echo "$USERINFO" | cut -d' ' -f1)
+    UCOMMENT=$(echo "$USERINFO" | cut -d' ' -f2-)
 fi # Check if USERNAME/UCOMMENT set
 
 # Get password, confirm and loop until confirmation OK
 if [[ ! -v UPASSWORD ]]; then
     DONE=false
     until ${DONE} ; do
-        PW1=$(whiptail --passwordbox "Please enter a password for user $(echo $USERNAME)" 8 70 --title "User password" 3>&1 1>&2 2>&3)
+        PW1=$(whiptail --passwordbox "Please enter a password for user $USERNAME" 8 70 --title "User password" 3>&1 1>&2 2>&3)
         PW2=$(whiptail --passwordbox "Please re-enter the password to confirm" 8 70 --title "User password confirmation" 3>&1 1>&2 2>&3)
         [ "$PW1" = "$PW2" ] && DONE=true
     done
@@ -217,8 +217,8 @@ fi # Check if UPASSWORD already set
 
 # Hostname - cancel or blank name will exit
 if [[ ! -v MYHOSTNAME ]] ; then
-    MYHOSTNAME=test
-    MYHOSTNAME=$(whiptail --inputbox "Enter hostname to be used for new system. This name may also be used for the main ZFS poolname." --title "Hostname for new system." 8 70 $(echo $MYHOSTNAME) 3>&1 1>&2 2>&3)
+    MYHOSTNAME="test"
+    MYHOSTNAME=$(whiptail --inputbox "Enter hostname to be used for new system. This name may also be used for the main ZFS poolname." --title "Hostname for new system." 8 70 "$MYHOSTNAME" 3>&1 1>&2 2>&3)
     RET=${?}
     (( RET )) && MYHOSTNAME=
     if [ ! "${MYHOSTNAME}" ]; then
@@ -229,7 +229,7 @@ fi # Check if MYHOSTNAME already set
 
 if [[ ! -v POOLNAME ]] ; then
     POOLNAME=${MYHOSTNAME}
-    POOLNAME=$(whiptail --inputbox "Enter poolname to use for main system - defaults to hostname" --title "ZFS main poolname" 8 70 $(echo $POOLNAME) 3>&1 1>&2 2>&3)
+    POOLNAME=$(whiptail --inputbox "Enter poolname to use for main system - defaults to hostname" --title "ZFS main poolname" 8 70 "$POOLNAME" 3>&1 1>&2 2>&3)
     RET=${?}
     (( RET )) && POOLNAME=
     if [ ! "${POOLNAME}" ]; then
@@ -283,7 +283,7 @@ else
         RET=${?}
         [[ ${RET} = 1 ]] && exit 1
         
-        readarray -t zfsdisks < <(cat ${TMPFILE})
+        readarray -t zfsdisks < <(cat "${TMPFILE}")
         if [ ${#zfsdisks[@]} != 0 ] ; then
             DONE=true
         fi
@@ -445,8 +445,8 @@ fi # Check ALL options from ZFS-root.conf
 # shellcheck disable=SC2046,SC2086  # Don't need quotes or double-quotes
 if [[ ! -v NVIDIA ]] ; then
     NVIDIA=none
-    if [ ${GNOME} = "y" ] || [ ${KDE} = "y" ] || [ ${NEON} = "y" ] || [ ${XFCE} = "y" ] ; then
-        if [ $(lspci | fgrep -i nvidia | wc -l) -gt 0 ] ; then
+    if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] || [ "${NEON}" = "y" ] || [ "${XFCE}" = "y" ] ; then
+        if [ $(lspci | grep -ic nvidia) -gt 0 ] ; then
             # Installing Nvidia PPA here just so we can search for versions
             apt-add-repository --yes --update ppa:graphics-drivers/ppa
             NVIDIA_LATEST=$(apt-cache search nvidia-driver- | cut -d ' ' -f1 | grep -e "nvidia-driver-...$" | cut -d'-' -f3 | sort | tail -1)
