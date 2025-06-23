@@ -984,7 +984,7 @@ cat > ${ZFSBUILD}/etc/netplan/01_netcfg.yaml <<-EOF
 	#     interfaces: [alleths]
 	#     # === Example static IP address
 	#     # addresses: [192.168.2.8/24]
-    #     # Set default mtu to 9000 jumbo frames
+	#     # Set default mtu to 9000 jumbo frames
 	#     mtu: 9000
 	#     dhcp4: yes
 	#     dhcp6: yes
@@ -998,9 +998,9 @@ cat > ${ZFSBUILD}/etc/netplan/01_netcfg.yaml <<-EOF
 	#     #     via: 192.168.2.4
 	#     #     metric: 100
 	#     #     mtu: 1472
-    #     #   - to: 192.168.0.0/16
-    #     #     scope: link
-    #     #     mtu: 9000
+	#     #   - to: 192.168.0.0/16
+	#     #     scope: link
+	#     #     mtu: 9000
 	#     nameservers:
 	#       addresses: [127.0.0.53, 8.8.8.8, 8.8.4.4]
 	#     parameters:
@@ -1088,7 +1088,7 @@ echo "Creating Setup.sh in new system for chroot"
 cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
 	#!/bin/bash
 	
-    export RESCUE=${RESCUE}
+	export RESCUE=${RESCUE}
 	export BOOTDEVRAW=${BOOTDEVRAW}
 	export DELAY=${DELAY}
 	export SUITE=${SUITE}
@@ -1100,7 +1100,7 @@ cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
 	export DISCENC=${DISCENC}
 	export DROPBEAR=${DROPBEAR}
 	export AUTHKEYS=${AUTHKEYS}
-    export ZREPL=${ZREPL}
+	export ZREPL=${ZREPL}
 	export GOOGLE=${GOOGLE}
 	export SOF=${SOF}
 	export SOF_VERSION=${SOF_VERSION}
@@ -1110,17 +1110,21 @@ cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
 	export XFCE=${XFCE}
 	export NEON=${NEON}
 	export KDE=${KDE}
-    export NVIDIA=${NVIDIA}
+	export NVIDIA=${NVIDIA}
 	export HIBERNATE=${HIBERNATE}
 	export SIZE_SWAP=${SIZE_SWAP}
 	export PARTITION_BOOT=${PARTITION_BOOT}
 	export PARTITION_SWAP=${PARTITION_SWAP}
 	export PARTITION_DATA=${PARTITION_DATA}
-    export ZFSBOOTMENU_BINARY_TYPE=${ZFSBOOTMENU_BINARY_TYPE}
-    export ZFSBOOTMENU_REPO_TYPE=${ZFSBOOTMENU_REPO_TYPE}
-    export ZFSBOOTMENU_CMDLINE=${ZFSBOOTMENU_CMDLINE}
-    export USE_ZSWAP=${USE_ZSWAP}
-EOF
+	export ZFSBOOTMENU_BINARY_TYPE=${ZFSBOOTMENU_BINARY_TYPE}
+	export ZFSBOOTMENU_REPO_TYPE=${ZFSBOOTMENU_REPO_TYPE}
+	export ZFSBOOTMENU_CMDLINE=${ZFSBOOTMENU_CMDLINE}
+	export USE_ZSWAP="${USE_ZSWAP}"
+	
+	[ "$1" = "-d" ] && set -x
+	[ "$1" = "packerci" ] && set -x
+
+	EOF
 
 for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
     echo "zfsdisks[${disk}]=${zfsdisks[${disk}]}" >> ${ZFSBUILD}/root/Setup.sh
@@ -1143,9 +1147,6 @@ fi
 
 cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 # Setup inside chroot
-
-[ "$1" = "-d" ] && set -x
-[ "$1" = "packerci" ] && set -x
 
 # Make sure we're using a tmpfs for /tmp
 systemctl enable /usr/share/systemd/tmp.mount
@@ -2037,8 +2038,8 @@ if [ "${ZREPL}" = "y" ]; then
 	    snapshotting:
 	      type: periodic
 	      interval: 15m
-          # "human" format has colons in the time, makes selecting/copying a snapshot
-          # name a hassle.  Using dashes makes it a single double-click of the mouse
+	      # "human" format has colons in the time, makes selecting/copying a snapshot
+	      # name a hassle.  Using dashes makes it a single double-click of the mouse
 	      timestamp_format: "2006-01-02_15-04-05"
 	      prefix: zrepl_
 	      hooks:
@@ -2160,10 +2161,10 @@ fi
 cat > /etc/apt/apt.conf.d/30pre-snap <<-EOF
 	# Snapshot main dataset before installing or removing packages
 	# We use a DATE variable to ensure all snaps have SAME date
-    # Use df to find root dataset
+	# Use df to find root dataset
 	
-	 # Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; ${ZFSLOCATION} snap \$(${ZFSLOCATION} list -o name | /usr/bin/grep -E 'ROOT/.*$' | sort | head -1)@apt_\${DATE}"; };
-	 Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; ${ZFSLOCATION} snap \$(/usr/bin/df | /usr/bin/grep -E '/\$' | /usr/bin/cut -d' ' -f1)@apt_\${DATE}"; };
+	# Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; ${ZFSLOCATION} snap \$(${ZFSLOCATION} list -o name | /usr/bin/grep -E 'ROOT/.*$' | sort | head -1)@apt_\${DATE}"; };
+	Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; ${ZFSLOCATION} snap \$(/usr/bin/df | /usr/bin/grep -E '/\$' | /usr/bin/cut -d' ' -f1)@apt_\${DATE}"; };
 EOF
 
 zfs snapshot ${POOLNAME}/ROOT/${SUITE}@base_install
@@ -2239,9 +2240,9 @@ if [ "${NEON}" = "y" ] ; then
     cat > /tmp/neon.debconf <<-EOF
 	encfs  encfs/security-information boolean true
 	encfs  encfs/security-information seen true
-    gdm3   shared/default-x-display-manager select sddm
-    sddm   shared/default-x-display-manager select sddm
-    kdm    shared/default-x-display-manager select sddm
+	gdm3   shared/default-x-display-manager select sddm
+	sddm   shared/default-x-display-manager select sddm
+	kdm    shared/default-x-display-manager select sddm
 	EOF
     cat /tmp/neon.debconf | debconf-set-selections
 
