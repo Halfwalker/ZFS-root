@@ -946,7 +946,7 @@ fi
 
 mkfs.vfat -v -F 32 -s 1 -n "BOOT_EFI" ${BOOTDEVRAW} > /dev/null
 echo "UUID=$(blkid -s UUID -o value ${BOOTDEVRAW}) \
-      /boot/efi vfat nofail,x-systemd.device-timeout=1,x-systemd.after=zfs-mount.service 0 1" >> ${ZFSBUILD}/etc/fstab
+      /boot/efi vfat defaults,x-systemd.after=zfs-mount.service 0 0" >> ${ZFSBUILD}/etc/fstab
 mkdir ${ZFSBUILD}/boot/efi
 
 
