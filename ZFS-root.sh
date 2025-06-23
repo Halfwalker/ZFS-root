@@ -1648,8 +1648,32 @@ if [ ${SECUREBOOT} = "y" ] ; then
 	WantedBy=system-update.target
 	EOF
 
+    cat > /etc/systemd/system/refind-update.service <<-EOF
+	[Unit]
+	Description=Re-sign rEFInd binary
+
+	[Service]
+	Type=oneshot
+	ExecStart=/usr/sbin/sbctl sign -s /boot/efi/EFI/refind/refind_x64.efi
+	EOF
+
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+    cat > /etc/systemd/system/refind-update.path <<-EOF
+	[Unit]
+	Description=rEFInd binary changed, re-sign
+
+	[Path]
+	PathChanged=/boot/efi/EFI/refind/refind_x64.efi
+	Unit=refind-update.service
+
+	[Install]
+	WantedBy=multi-user.target
+	WantedBy=system-update.target
+	EOF
+
     systemctl enable zfsbootmenu-update-kernel-bootmenu.path
     systemctl enable zfsbootmenu-update-initramfs-bootmenu.path
+    systemctl enable refind-update.path
 fi # SecureBoot
 
 
