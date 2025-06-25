@@ -1590,12 +1590,17 @@ if [ ${SECUREBOOT} = "y" ] ; then
     apt-get -qq --yes --no-install-recommends install systemd-boot-efi
     apt-get -qq --yes --no-install-recommends install sbctl systemd-ukify
 
-    # Create zfsbootmenu efi bundle
-    /usr/bin/ukify build \
-        --linux=/boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu \
-        --initrd=/boot/efi/EFI/zfsbootmenu/initramfs-bootmenu.img \
-        --output=/boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu-bundle.efi \
-        --cmdline='quiet rw'
+    # Only need to create the efi image if we installed zfsbootmenu as the
+    # kernel/initramfs setup
+    if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "KERNEL" ] ; then
+        # Create zfsbootmenu efi bundle - use the same name as the EFI image from
+        # when we installed zfsbootmenu above
+        /usr/bin/ukify build \
+            --linux=/boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu \
+            --initrd=/boot/efi/EFI/zfsbootmenu/initramfs-bootmenu.img \
+            --output=/boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi \
+            --cmdline='quiet rw'
+    fi
 
     # Initialize sbctl and sign all the things
     # sbctl setup --setup --config /etc/sbctl/sbctl.conf
@@ -1604,11 +1609,43 @@ if [ ${SECUREBOOT} = "y" ] ; then
     /usr/sbin/sbctl sign -s /boot/efi/EFI/refind/refind_x64.efi
     /usr/sbin/sbctl sign -s /boot/efi/EFI/tools/memtest86/memtest86.efi
     /usr/sbin/sbctl sign -s /boot/efi/EFI/tools/shellx64.efi
-    /usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu
-    /usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu-bundle.efi
+    /usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
+    if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "KERNEL" ] ; then
+        /usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu
+        /usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/initramfs-bootmenu.img
+    fi
 
     # Setup systemd path watch to update zfsbootmenu efi when zfsbootmenu is updated
     # This way when you update ZBM, it will automagically update and sign the EFI image
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+    cat > /etc/systemd/system/zfsbootmenu-sign-efi.service <<-EOF
+	[Unit]
+	Description=Sign ZFSBootmenu EFI image bundle
+
+	[Service]
+	Type=oneshot
+	ExecStart=/usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
+	EOF
+
+    # Watch the zfsbootmenu.efi image for changes
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+    cat > /etc/systemd/system/zfsbootmenu-update-efi-image.path <<-EOF
+	[Unit]
+	Description=ZFSBootmenu kernel changed, rebuild EFI image bundle
+
+	[Path]
+	PathChanged=/boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
+	Unit=zfsbootmenu-sign-efi.service
+
+	[Install]
+	WantedBy=multi-user.target
+	WantedBy=system-update.target
+	EOF
+    systemctl enable zfsbootmenu-update-efi-image.path
+
+    # Rebuild the zfsbootmenu.efi image if the kernel or initramfs change
+    # We re-sign the kernel and initramfs here because there is another watch
+    # above that handles signing the efi image
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
     cat > /etc/systemd/system/zfsbootmenu-update@.service <<-EOF
 	[Unit]
@@ -1616,10 +1653,12 @@ if [ ${SECUREBOOT} = "y" ] ; then
 
 	[Service]
 	Type=oneshot
-	ExecStart=/usr/bin/ukify build --linux=/boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu --initrd=/boot/efi/EFI/zfsbootmenu/initramfs-bootmenu.img --output=/boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu-bundle.efi --cmdline='quiet rw'
-	ExecStart=/usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu-bundle.efi
+	ExecStart=/usr/bin/ukify build --linux=/boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu --initrd=/boot/efi/EFI/zfsbootmenu/initramfs-bootmenu.img --output=/boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi --cmdline='quiet rw'
+	ExecStart=/usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu
+	ExecStart=/usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/initramfs-bootmenu.img
 	EOF
 
+    # Watch the zfsbootmenu kernel for changes
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
     cat > /etc/systemd/system/zfsbootmenu-update-kernel-bootmenu.path <<-EOF
 	[Unit]
@@ -1633,7 +1672,9 @@ if [ ${SECUREBOOT} = "y" ] ; then
 	WantedBy=multi-user.target
 	WantedBy=system-update.target
 	EOF
+    systemctl enable zfsbootmenu-update-kernel-bootmenu.path
 
+    # Watch the zfsbootmenu initramfs for changes
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
     cat > /etc/systemd/system/zfsbootmenu-update-initramfs-bootmenu.path <<-EOF
 	[Unit]
@@ -1647,7 +1688,9 @@ if [ ${SECUREBOOT} = "y" ] ; then
 	WantedBy=multi-user.target
 	WantedBy=system-update.target
 	EOF
+    systemctl enable zfsbootmenu-update-initramfs-bootmenu.path
 
+    # Re-sign the rEFInd efi binary if required
     cat > /etc/systemd/system/refind-update.service <<-EOF
 	[Unit]
 	Description=Re-sign rEFInd binary
@@ -1657,6 +1700,7 @@ if [ ${SECUREBOOT} = "y" ] ; then
 	ExecStart=/usr/sbin/sbctl sign -s /boot/efi/EFI/refind/refind_x64.efi
 	EOF
 
+    # Watch rEFInd for changes
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
     cat > /etc/systemd/system/refind-update.path <<-EOF
 	[Unit]
@@ -1670,10 +1714,8 @@ if [ ${SECUREBOOT} = "y" ] ; then
 	WantedBy=multi-user.target
 	WantedBy=system-update.target
 	EOF
-
-    systemctl enable zfsbootmenu-update-kernel-bootmenu.path
-    systemctl enable zfsbootmenu-update-initramfs-bootmenu.path
     systemctl enable refind-update.path
+
 fi # SecureBoot
 
 
