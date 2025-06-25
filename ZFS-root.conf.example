@@ -12,8 +12,8 @@ PROXY=
 #
 # Main username and comment
 #
-USERNAME="cloud-user"
-UCOMMENT="Cloud User"
+USERNAME="george"
+UCOMMENT="George of the Jungle"
 UPASSWORD="password"
 
 #
@@ -36,19 +36,22 @@ SUITE="noble"
 #
 # If multidisk, select main pool raid level
 # single, mirror, raidz1, raidz2, raidz3
+#
 RAIDLEVEL="mirror"
 
 #
 # Enable UEFI SecureBoot if available
 # NOTE: System must be in SecureBoot Setup mode
 #       For VirtualBox delete the VM .nvram file
-#       For other systems see the UEFI SecureBoot bios config section
+#       For other systems see the UEFI SecureBoot config section in the bios
+#
 SECUREBOOT=n
 
 #
 # Swap size in megabytes - if HIBERNATE or LUKS set then this
 # is a partition otherise it's a zfs dataset.
 # Set to 0 to disable swap
+#
 SIZE_SWAP=300
 
 #
@@ -77,12 +80,15 @@ DROPBEAR=n
 
 #
 # For zfsbootmenu there are 3 different ways to install
-#   EFI    : Uses a single EFI image
+#   EFI    : Uses a single EFI image - for UEFI systems only
 #   KERNEL : Same binary but with the vmlinuz/initrd extracted
+#            Can be used with legacy non-UEFI systems as well as UEFI systems
 #   LOCAL  : Built and install from the git repo
 #
 # The EFI image precludes a working syslinux config though - that requires
-# a vmlunuz/initrd set to work.  In general the KERNEL option is most flexible
+# a vmlunuz/initrd set to work.  In general the KERNEL option is most flexible.
+# If you KNOW you won't use the install in a non-UEFI system later, then the
+# EFI image is simplest.
 #
 ZFSBOOTMENU_BINARY_TYPE=KERNEL
 
@@ -99,6 +105,7 @@ ZFSBOOTMENU_REPO_TYPE=TAGGED
 # 90-xhci-unbind.sh runs, as it kills power to the USB ports.  For those we
 # disable that hook script.
 # See https://docs.zfsbootmenu.org/en/v3.0.x/man/zfsbootmenu.7.html
+#
 ZFSBOOTMENU_CMDLINE="zbm.skip_hooks=90-xhci-unbind.sh"
 
 #
