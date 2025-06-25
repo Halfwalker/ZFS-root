@@ -347,47 +347,6 @@ else
     DROPBEAR=n
 fi
 
-# If UEFI SecureBoot should be enabled
-if [[ -d /sys/firmware/efi ]] ; then
-    # Create apt sources for sbctl
-    curl -fsSL https://download.opensuse.org/repositories/home:jloeser:secureboot/xUbuntu_${SUITE_NUM}/Release.key | gpg --dearmor | sudo tee /usr/share/keyrings/secureboot.gpg > /dev/null
-
-    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat > /etc/apt/sources.list.d/secureboot.sources <<-EOF
-	X-Repolib-Name: SecureBoot
-	Types: deb
-	URIs: http://download.opensuse.org/repositories/home:/jloeser:/secureboot/xUbuntu_${SUITE_NUM}
-	Signed-By: /usr/share/keyrings/secureboot.gpg
-	Suites: /
-	Enabled: yes
-	Architectures: amd64
-	EOF
-
-    apt-get -qq update
-    apt-get -qq --yes --no-install-recommends install systemd-boot-efi
-    apt-get -qq --yes --no-install-recommends install sbctl jq
-
-    # Are we in setup mode for SecureBoot ?
-    SETUPMODE=$(sbctl status --json | jq '.setup_mode')
-    if [ "${SETUPMODE}" == "true" ] ; then
-        if [[ ! -v SECUREBOOT ]] ; then
-            SECUREBOOT=$(whiptail --title "UEFI SecureBoot is available" --yesno "Should UEFI SecureBoot be enabled ?" 8 60 \
-            3>&1 1>&2 2>&3)
-            RET=${?}
-            [[ ${RET} = 0 ]] && SECUREBOOT=y
-            [[ ${RET} = 1 ]] && SECUREBOOT=n
-        fi
-    else
-        # Show current SecureBoot config, set SECUREBOOT var to n so we don't try to install in the chroot
-        SBCTL_STATUS=$(sbctl status)
-        whiptail --title "System UEFI not in setup mode" --msgbox "SecureBoot config in bios must be in setup mode\n\nFor VirtualBox delete the .nvram file\nFor other systems see the bios config\n\n${SBCTL_STATUS}" 17 60
-        SECUREBOOT=n
-    fi
-else
-    # No /sys/firmware/efi means no UEFI means no SecureBoot
-    SECUREBOOT=n
-fi
-
 # We check /sys/power/state - if no "disk" in there, then HIBERNATE is disabled
 grep disk < /sys/power/state > /dev/null
 HIBERNATE_AVAIL=${?}
@@ -597,6 +556,47 @@ case ${SUITE} in
         SUITE_ROOT_POOL="-O dnodesize=auto"
         ;;
 esac
+
+# If UEFI SecureBoot should be enabled
+if [[ -d /sys/firmware/efi ]] ; then
+    # Create apt sources for sbctl
+    curl -fsSL https://download.opensuse.org/repositories/home:jloeser:secureboot/xUbuntu_${SUITE_NUM}/Release.key | gpg --dearmor | sudo tee /usr/share/keyrings/secureboot.gpg > /dev/null
+
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+    cat > /etc/apt/sources.list.d/secureboot.sources <<-EOF
+	X-Repolib-Name: SecureBoot
+	Types: deb
+	URIs: http://download.opensuse.org/repositories/home:/jloeser:/secureboot/xUbuntu_${SUITE_NUM}
+	Signed-By: /usr/share/keyrings/secureboot.gpg
+	Suites: /
+	Enabled: yes
+	Architectures: amd64
+	EOF
+
+    apt-get -qq update
+    apt-get -qq --yes --no-install-recommends install systemd-boot-efi
+    apt-get -qq --yes --no-install-recommends install sbctl jq
+
+    # Are we in setup mode for SecureBoot ?
+    SETUPMODE=$(sbctl status --json | jq '.setup_mode')
+    if [ "${SETUPMODE}" == "true" ] ; then
+        if [[ ! -v SECUREBOOT ]] ; then
+            SECUREBOOT=$(whiptail --title "UEFI SecureBoot is available" --yesno "Should UEFI SecureBoot be enabled ?" 8 60 \
+            3>&1 1>&2 2>&3)
+            RET=${?}
+            [[ ${RET} = 0 ]] && SECUREBOOT=y
+            [[ ${RET} = 1 ]] && SECUREBOOT=n
+        fi
+    else
+        # Show current SecureBoot config, set SECUREBOOT var to n so we don't try to install in the chroot
+        SBCTL_STATUS=$(sbctl status)
+        whiptail --title "System UEFI not in setup mode" --msgbox "SecureBoot config in bios must be in setup mode\n\nFor VirtualBox delete the .nvram file\nFor other systems see the bios config\n\n${SBCTL_STATUS}" 17 60
+        SECUREBOOT=n
+    fi
+else
+    # No /sys/firmware/efi means no UEFI means no SecureBoot
+    SECUREBOOT=n
+fi
 
 #
 # If script was started with one parameter "packerci" then we're running under CI/CD
