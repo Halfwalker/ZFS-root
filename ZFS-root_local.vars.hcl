@@ -13,4 +13,4 @@ output_prefix       = "/VirtualBox/qemu/"
 headless            = true
 
 ubuntu_version      = "24.04.2"
-ubuntu_live_iso_src = "file:///home/deano/VirtualBox/ISOs"
+ubuntu_live_iso_src = "file:///VirtualBox/ISOs"
