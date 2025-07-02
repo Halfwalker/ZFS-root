@@ -104,12 +104,6 @@ if [ -e ZFS-root.conf ] ; then
     . ZFS-root.conf
 fi
 
-# ZFSBOOTMENU_BINARY_TYPE - use a downloaded binary or build locally
-# = EFI    (use EFI binary - NOTE: precludes syslinux from working)
-# = KERNEL (use vmlinuz/initrd pair from downloaded binary)
-# = LOCAL  (built locally)
-[[ ! -v ZFSBOOTMENU_BINARY_TYPE ]] && ZFSBOOTMENU_BINARY_TYPE=KERNEL
-
 # ZFSBOOTMENU_REPO_TYPE - use the tagged git release or latest git clone
 # = TAGGED
 # = GIT
@@ -322,6 +316,16 @@ if [[ ! -v DISCENC ]] ; then
     [[ ${RET} = 1 ]] && exit 1
 fi # Check DISCENC already set
 
+# ZFSBOOTMENU_BINARY_TYPE - use a downloaded binary or build locally
+# = EFI    (use EFI binary - NOTE: precludes syslinux from working)
+# = KERNEL (use vmlinuz/initrd pair from downloaded binary)
+# = LOCAL  (built locally)
+#
+# NOTE: If Dropbear is required for remote unlocking of LUKS or ZFS enecryption
+#       then this will be forced to LOCAL below in the Dropbear config section.
+#       This is because Dropbear must be included in the initramfs for zfsbootmenu.
+[[ ! -v ZFSBOOTMENU_BINARY_TYPE ]] && ZFSBOOTMENU_BINARY_TYPE=KERNEL
+
 # If encryption enabled, need a passphrase
 if [ "${DISCENC}" != "NOENC" ] ; then
     if [[ ! -v PASSPHRASE ]] ; then
@@ -336,11 +340,17 @@ if [ "${DISCENC}" != "NOENC" ] ; then
 
     # retcode 0 = YES, 1 = NO
     if [[ ! -v DROPBEAR ]] ; then
-        DROPBEAR=$(whiptail --title "Enable Dropbear ?" --yesno "Should Dropbear be enabled for remote unlocking of encrypted disks ?" 8 60 \
+        DROPBEAR=$(whiptail --title "Enable Dropbear ?" --yesno "Should Dropbear be enabled for remote unlocking of encrypted disks ?\n\nNOTE: Dropbear requires use of ZFSBOOTMENU_BINARY_TYPE as LOCAL, so it can be built locally" 12 60 \
         3>&1 1>&2 2>&3)
         RET=${?}
         [[ ${RET} = 0 ]] && DROPBEAR=y
         [[ ${RET} = 1 ]] && DROPBEAR=n
+    fi
+    # If we have encryption and want Dropbear, then we HAVE to have the LOCAL
+    # version of zfsbootmenu, so we can rebuild the zfsbootmenu initramfs to
+    # include Dropbear
+    if [ "${DROPBEAR}" == "y" ] ; then
+        ZFSBOOTMENU_BINARY_TYPE=LOCAL
     fi
 else
     # Default Dropbear to NO

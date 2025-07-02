@@ -125,6 +125,8 @@ Host unlock-foobox
 
 This will run the `zfsbootmenu` command upon login automagically.  NOTE: one problem is that the ssh session remains after unlocking - need a clean way to ensure it exits after the unlock is finished
 
+NOTE: Enabling encryption and Dropbear will _force_ the **ZFSBOOTMENU_BINARY_TYPE** in the config file to be **LOCAL**.  This will build _zfsbootmenu_ locally from scratch, including Dropbear into the _zfsbootmenu_ initramfs.
+
 ## Booting details
 
 The final root-on-ZFS install can be booted in a UEFI or Legacy Bios system - configurations for both are included.  While `efibootmgr` can be used to manage the UEFI boot slots, [rEFInd](https://www.rodsbooks.com/refind/) is much nicer and easier to use and configure.

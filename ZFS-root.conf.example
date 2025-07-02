@@ -74,6 +74,10 @@ SIZE_SWAP=300
 # It is safe to store the keys there as they're not visible until the main root
 # dataset is unlocked
 #
+# NOTE: If DROPBEAR is set to y here, then ZFSBOOTMENU_BINARY_TYPE below will
+#       be forced to LOCAL so the zfsbootmenu initramfs can be rebuilt to include
+#       Dropbear
+#
 DISCENC="NOENC"
 PASSPHRASE="password"
 DROPBEAR=n
@@ -89,6 +93,11 @@ DROPBEAR=n
 # a vmlunuz/initrd set to work.  In general the KERNEL option is most flexible.
 # If you KNOW you won't use the install in a non-UEFI system later, then the
 # EFI image is simplest.
+#
+# NOTE: If Dropbear is required for remote unlocking of LUKS or ZFS enecryption
+#       then you must select LOCAL.  This is because Dropbear must be included
+#       in the initramfs for zfsbootmenu.  If DROPBEAR above is set to y, then
+#       any value here will be overridden to LOCAL
 #
 ZFSBOOTMENU_BINARY_TYPE=KERNEL
 
