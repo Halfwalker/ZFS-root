@@ -608,13 +608,22 @@ else
     SECUREBOOT=n
 fi
 
+# If SecureBoot automatic signing of rEFInd and ZFSBootMenu .efi bundles should be enabled
+if [[ ! -v AUTOSIGN ]] ; then
+    if [ "${SECUREBOOT}" == "y" ] ; then
+        AUTOSIGN=$(whiptail --title "Enable SecureBoot auto-signing" --yesno "Should systemd PATH watches be enabled to allow auto-signing of rEFInd and ZFSBootMenu ?\n\nNOTE: Auto-signing means ANY change to refind_x64.efi or zfsbootmenu.efi (or kernel/initramfs) will be signed, regardless of who/what made the changes.\n\nWithout auto-signing YOU must manage the signing - forgetting or mistakes can lead to the system being unbootable.  Signing is managed via the sbctl package." 17 60 3>&1 1>&2 2>&3)
+    else
+        AUTOSIGN=n
+    fi
+fi
+
 #
 # If script was started with one parameter "packerci" then we're running under CI/CD
 # and using packer to build an image via qemu. That means a single disk /dev/vda was
 # selected above and we do not want to pause here for 
 #
 if [ "$1" != "packerci" ] ; then
-    box_height=$(( ${#zfsdisks[@]} + 29 ))
+    box_height=$(( ${#zfsdisks[@]} + 30 ))
     # shellcheck disable=SC2086,SC2116
     whiptail --title "Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
         Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
@@ -626,6 +635,7 @@ if [ "$1" != "packerci" ] ; then
         Poolname $(echo $POOLNAME)\n \
         User $(echo $USERNAME $UCOMMENT)\n\n \
         SECUREBOOT = $SECUREBOOT  : Enable UEFI SecureBoot\n \
+        AUTOSIGN   = ${AUTOSIGN}  : Enable auto-signing of bootable .efi bundles\n \
         RESCUE     = $(echo $RESCUE)  : Create rescue dataset by cloning install\n \
         DELAY      = $(echo $DELAY)  : Enable delay before importing zpool\n \
         ZREPL      = $(echo $ZREPL)  : Install Zrepl zfs snapshot manager\n \
@@ -661,6 +671,7 @@ cat << EOF
    SUITE                   = ${SUITE}
    POOLNAME                = ${POOLNAME}
    SECUREBOOT              = ${SECUREBOOT}
+   AUTOSIGN                = ${AUTOSIGN}
    USERNAME                = ${USERNAME}
    UCOMMENT                = "${UCOMMENT}"
    AUTHKEYS                = ${AUTHKEYS}
@@ -1148,6 +1159,7 @@ cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
 	export SUITE=${SUITE}
 	export POOLNAME=${POOLNAME}
 	export SECUREBOOT=${SECUREBOOT}
+    export AUTOSIGN=${AUTOSIGN}
 	export PASSPHRASE=${PASSPHRASE}
 	export USERNAME=${USERNAME}
 	export UPASSWORD="${UPASSWORD}"
@@ -1721,10 +1733,13 @@ if [ ${SECUREBOOT} = "y" ] ; then
 	WantedBy=multi-user.target
 	WantedBy=system-update.target
 	EOF
+
+    if [ "${AUTOSIGN}" = "y" ] ; then
         systemctl enable zfsbootmenu-update-efi-image.path
         systemctl enable zfsbootmenu-update-kernel-bootmenu.path
         systemctl enable zfsbootmenu-update-initramfs-bootmenu.path
         systemctl enable refind-update.path
+    fi
 
 fi # SecureBoot
 

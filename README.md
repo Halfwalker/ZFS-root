@@ -79,7 +79,7 @@ For SecureBoot to be enabled and configured, the system must first be put into S
 * **enroll-keys --microsoft** : This enrolls the new keys _and_ the default Microsoft keys into the UEFI SecureBoot efi vars
 * **sign** : Use the new keys to sign the various bootable bits
 
-A **systemd-path** config is put in place in `/etc/systemd/system/zfsbootmenu-update*` and `/etc/systemd/system/refind-update*` to watch the **zfsbootmenu** and **rEFInd** files.  If they ever change (eg. upgraded) then a new efi bundle is created and signed.  This way you don't have to remember to re-create and sign when you upgrade
+A **systemd-path** config is put in place in `/etc/systemd/system/zfsbootmenu-update*` and `/etc/systemd/system/refind-update*` wihch can watch the **zfsbootmenu** and **rEFInd** files.  If they ever change (eg. upgraded) then a new efi bundle is created and signed.  This way you don't have to remember to re-create and sign when you upgrade
 
 ## Configuration
 
