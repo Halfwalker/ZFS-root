@@ -1621,7 +1621,6 @@ if [ ${SECUREBOOT} = "y" ] ; then
     /usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
     if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "KERNEL" ] ; then
         /usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu
-        /usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/initramfs-bootmenu.img
     fi
 
     # Setup systemd path watch to update zfsbootmenu efi when zfsbootmenu is updated
