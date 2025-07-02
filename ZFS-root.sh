@@ -1363,7 +1363,7 @@ done
 # Install and configure ZFSBootMenu
 #
 DEBIAN_FRONTEND=noninteractive apt-get --yes install kexec-tools
-apt-get --yes install libconfig-inifiles-perl libsort-versions-perl libboolean-perl fzf mbuffer make curl bsdextrautils
+apt-get --yes install libconfig-inifiles-perl libsort-versions-perl libboolean-perl fzf mbuffer make curl bsdextrautils git
 
 # Assign command-line arguments to be used when booting the final kernel
 # For hibernation and resume to work we have to specify which device to resume from
@@ -1422,8 +1422,8 @@ fi
 ##       Fetch github releases json and parse, like in ansible-git_tools
 if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "KERNEL" ] ; then
     echo "--- Using zfsbootmenu KERNEL files"
-    curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v3.0.1/zfsbootmenu-recovery-x86_64-v3.0.1-linux6.12.tar.gz -o /tmp/zfsbootmenu.tar.gz
-    tar xvzf /tmp/zfsbootmenu.tar.gz --strip-components=1 -C /boot/efi/EFI/zfsbootmenu
+    curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v3.0.1/zfsbootmenu-recovery-x86_64-v3.0.1-linux6.12.tar.gz -o /usr/local/share/zfsbootmenu.tar.gz
+    tar xvzf /usr/local/share/zfsbootmenu.tar.gz --strip-components=1 -C /boot/efi/EFI/zfsbootmenu
 fi
 
 # For a binary release setup we still need the syslinux-update.sh script from the repo
@@ -1444,26 +1444,25 @@ fi
 #### OR install the git repo and build locally
 
 ### Two choices - tagged release or latest git
+rm -rf /usr/local/share/zfsbootmenu && mkdir -p /usr/local/share/zfsbootmenu
 
 # Get latest tagged release, sure to work. Base git repo may be in flux
 if [ "${ZFSBOOTMENU_REPO_TYPE}" = "TAGGED" ] ; then
     echo "--- Using zfsbootmenu TAGGED repo"
-    rm -rf /tmp/zfsbootmenu && mkdir -p /tmp/zfsbootmenu
-    curl -L https://get.zfsbootmenu.org/source | tar xz --strip=1 --directory /tmp/zfsbootmenu
+    curl -L https://get.zfsbootmenu.org/source | tar xz --strip=1 --directory /usr/local/share/zfsbootmenu
 fi
 
 #### OR For latest just clone
 
 if [ "${ZFSBOOTMENU_REPO_TYPE}" = "GIT" ] ; then
     echo "--- Using zfsbootmenu GIT repo"
-    rm -rf /tmp/zfsbootmenu
-    git clone https://github.com/zbm-dev/zfsbootmenu.git
+    git clone https://github.com/zbm-dev/zfsbootmenu.git /usr/local/share/zfsbootmenu
 fi
 
 ## Now intall - ONLY if using git repo
 if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "LOCAL" ] ; then
     echo "--- zfsbootmenu building LOCAL"
-    cd /tmp/zfsbootmenu
+    cd /usr/local/share/zfsbootmenu
     make install
 
     # This seems to fail sometimes - gets killed during install
@@ -1505,7 +1504,7 @@ if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "LOCAL" ] ; then
     # Copy syslinux-update.sh script and modify to suit
     # This makes generate-zbm create a valid syslinux.cfg that can
     # also include memtest86 snippet
-    cp /tmp/zfsbootmenu/contrib/syslinux-update.sh /etc/zfsbootmenu/generate-zbm.post.d
+    cp /usr/local/share/zfsbootmenu/contrib/syslinux-update.sh /etc/zfsbootmenu/generate-zbm.post.d
     chmod +x /etc/zfsbootmenu/generate-zbm.post.d/syslinux-update.sh
     sed -i '
       s/^SYSLINUX_ROOT.*/SYSLINUX_ROOT="\/boot\/efi"/
