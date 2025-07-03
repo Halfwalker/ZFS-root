@@ -1483,7 +1483,7 @@ if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "LOCAL" ] ; then
     
     #
     # Configure ZFSBootMenu
-    #
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
     cat <<-END > /etc/zfsbootmenu/config.yaml
 	Global:
 	  ManageImages: true
@@ -1495,12 +1495,9 @@ if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "LOCAL" ] ; then
 	  InitCPIOConfig: /etc/zfsbootmenu/mkinitcpio.conf
 	Components:
 	  ImageDir: /boot/efi/EFI/zfsbootmenu
-      # Versions: false means generate-zbm creates vmlinuz-bootmenu/initramgs-bootmenu.img
+	  # Versions: false means generate-zbm creates vmlinuz-bootmenu and initramgs-bootmenu.img
 	  Versions: false
 	  Enabled: true
-	  syslinux:
-	    Config: /boot/efi/syslinux/syslinux.cfg
-	    Enabled: false
 	EFI:
 	  ImageDir: /boot/efi/EFI/zfsbootmenu
 	  Versions: 2
@@ -1997,7 +1994,7 @@ else
   # Not using Dropbear, so set neednet=0
   echo 'install_items+=" /etc/cmdline.d/dracut-network.conf "' > /etc/zfsbootmenu/dracut.conf.d/network.conf
   echo 'ip=dhcp rd.neednet=0' > /etc/cmdline.d/dracut-network.conf
-fi
+fi # DROPBEAR
 
 # For ZFS encryption point to the /etc/zfs/zroot.key files in the initramfs
 # These keys should have been copied into place above outside the chroot
