@@ -609,12 +609,12 @@ else
 fi
 
 # If SecureBoot automatic signing of rEFInd and ZFSBootMenu .efi bundles should be enabled
-if [[ ! -v AUTOSIGN ]] ; then
-    if [ "${SECUREBOOT}" == "y" ] ; then
+if [ "${SECUREBOOT}" == "y" ] ; then
+    if [[ ! -v AUTOSIGN ]] ; then
         AUTOSIGN=$(whiptail --title "Enable SecureBoot auto-signing" --yesno "Should systemd PATH watches be enabled to allow auto-signing of rEFInd and ZFSBootMenu ?\n\nNOTE: Auto-signing means ANY change to refind_x64.efi or zfsbootmenu.efi (or kernel/initramfs) will be signed, regardless of who/what made the changes.\n\nWithout auto-signing YOU must manage the signing - forgetting or mistakes can lead to the system being unbootable.  Signing is managed via the sbctl package." 17 60 3>&1 1>&2 2>&3)
-    else
-        AUTOSIGN=n
     fi
+else
+    AUTOSIGN=n
 fi
 
 #
@@ -666,7 +666,6 @@ cat << EOF
 ==========================================================================
    MYHOSTNAME              = ${MYHOSTNAME}
    RESCUE                  = ${RESCUE}
-   BOOTDEVRAW              = ${BOOTDEVRAW}
    DELAY                   = ${DELAY}
    SUITE                   = ${SUITE}
    POOLNAME                = ${POOLNAME}
