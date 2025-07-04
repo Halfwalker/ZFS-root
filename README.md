@@ -2,6 +2,8 @@
 
 This script is meant to be run from an Ubuntu Live CD.  It will build an Ubuntu system on the local system or VM using root-on-ZFS, with optional LUKS whole-disk encryption or ZFS native encryption.  It can create a raidz or n-way mirror of disks to boot from.  UEFI SecureBoot with local keys is also available.
 
+_Current issue: SecureBoot with locally-built kernel/initramfs for ZFSBootMenu is not working yet._
+
 ## tl;dr
 
 - Boot an Ubuntu live-cd, like [ubuntu-24.04.1-live-server-amd64.iso](https://releases.ubuntu.com/noble/ubuntu-24.04.1-live-server-amd64.iso) and select *Try or install Ubuntu server*
@@ -90,6 +92,35 @@ The *ZFS-root.sh* script will prompt for all details it needs.  In addition, you
 >   <dd> Any SSH pubkey to add to the new system main user `~/.ssh/authorized_keys` file.
 >   <dt>HOST_ECDSA_KEY or HOST_RSA_KEY
 >   <dd> Can specify the host ECDSA or RSA keys if desired.  Comes in handy for repeated runs of the script in testing, so you don't have to keep editing your `~/.ssh/known_hosts`.
+> </dl>
+
+There are a few parameters that are defaulted in the script, but can be overridden in the `ZFS-root.conf` file
+
+> <dl>
+>   <dt>ZFSBOOTMENU_BINARY_TYPE
+>   <dd>
+>     <dl>
+>       <dt>EFI
+>       <dd>Pulls ZFSBootmenu efi image
+>       <dt>KERNEL
+>       <dd>Pulls ZFSBootmenu kernel/initramfs set
+>       <dt>LOCAL
+>       <dd>Pulls full git repo and builds kernel/initramfs locally
+>     </dl>
+>   <dt>ZFSBOOTMENU_REPO_TYPE
+>   <dd>
+>     <dl>
+>       <dt>TAGGED
+>       <dd>Pulls the latest stable release
+>       <dt>GIT
+>       <dd>Pulls the latest full repo, which may be in flux
+>     </dl>
+>   <dt>ZFSBOOTMENU_CMDLINE
+>   <dd>Extra options for the ZFSBootMenu boot command-line.  The default here disables the hook script that sometimes kills power to USB ports.  See the ZFS-root.conf.example file
+>   <dd>Default "zbm.skip_hooks=90-xhci-unbind.sh"
+>   <dt>SOF_VERSION
+>   <dd> Sound Open Firmware binaries (for laptops)
+>   <dd> Default "2024.06"
 > </dl>
 
 NOTE: It will _always_ prompt for the list of disks to install to, and will pause with a textbox showing the selected options.
@@ -272,4 +303,14 @@ The `.qcow2` format disk image (here in *packer-zfsroot-2024-10-17-1839.qcow2*) 
       -drive file=packer_zfsroot_2024-10-17-1839/packer-zfsroot-2024-10-17-1839.qcow2,format=qcow2,cache=writeback \
       -device virtio-scsi-pci,id=scsi0
     ```
+
+## TODO
+
+Things that are coming sooner or later ...
+
+- Fix issue with SecureBoot and LOCAL locally generated kernel/initramfs.  While ZFSBootMenu loads and runs, it is unable to load the main system kernel in the ZFS pool
+- Better additional partition handling - instead of editing the script, provide menus or `ZFS-root.conf` parameters to more easily set up Window partitions etc.
+- Perhaps fetch SOF (Sound Open Firmware) versions to make available via menu
+- Clean up Packer configs - it all works perfectly fine, but feels really cumbersome
+- More shellcheck fixes
 
