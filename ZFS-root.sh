@@ -1427,6 +1427,17 @@ echo "ZFSBOOTMENU_BINARY_TYPE = $ZFSBOOTMENU_BINARY_TYPE  ZFSBOOTMENU_REPO_TYPE 
 if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "EFI" ] ; then
     echo "--- Using zfsbootmenu EFI image"
     curl -L https://get.zfsbootmenu.org/efi/recovery -o /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
+
+    # Add rEFInd entry for ZFSBootMenu
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+    cat >> /boot/efi/EFI/refind/refind.conf << EOF
+	# ZFSBootMenu EFI Loader Configuration
+	menuentry "ZFSBootMenu" {
+	  loader EFI/zfsbootmenu/zfsbootmenu.efi
+	  icon EFI/refind/icons/os_ubuntu.png
+	}
+	EOF
+
 fi
 ##  or the unpacked EFI image (vmlinux/initrd)
 ## NOTE: Right now hard-coded version in place.  Need a clean way to get latest version
