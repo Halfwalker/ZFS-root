@@ -573,7 +573,7 @@ if [[ -d /sys/firmware/efi ]] ; then
     curl -fsSL https://download.opensuse.org/repositories/home:jloeser:secureboot/xUbuntu_${SUITE_NUM}/Release.key | gpg --dearmor | sudo tee /usr/share/keyrings/secureboot.gpg > /dev/null
 
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat > /etc/apt/sources.list.d/secureboot.sources <<-EOF
+    cat > /etc/apt/sources.list.d/secureboot.sources <<- EOF
 	X-Repolib-Name: SecureBoot
 	Types: deb
 	URIs: http://download.opensuse.org/repositories/home:/jloeser:/secureboot/xUbuntu_${SUITE_NUM}
@@ -702,7 +702,7 @@ cat << EOF
 EOF
 
 # Pre-OK the zfs-dkms licenses notification
-cat > /tmp/selections <<-EOFPRE
+cat > /tmp/selections <<- EOFPRE
 	# zfs-dkms license notification
 	zfs-dkms        zfs-dkms/note-incompatible-licenses  note
 EOFPRE
@@ -1027,7 +1027,7 @@ fi # PROXY
 # We create a bridge here with all found ethernet interfaces as slaves
 # Makes it easier to set up multipass or LXD later
 # NOTE: tabs as first char to handle indented heredoc
-cat > ${ZFSBUILD}/etc/netplan/01_netcfg.yaml <<-EOF
+cat > ${ZFSBUILD}/etc/netplan/01_netcfg.yaml <<- EOF
 	network:
 	  version: 2
 	  renderer: networkd
@@ -1081,7 +1081,7 @@ fi
 case ${SUITE} in
     focal | jammy | noble)
         # TABs for this
-        cat > ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu.sources <<-EOF
+        cat > ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu.sources <<- EOF
 		Types: deb
 		URIs: http://us.archive.ubuntu.com/ubuntu/
 		Suites: ${SUITE} ${SUITE}-updates ${SUITE}-backports
@@ -1100,7 +1100,7 @@ case ${SUITE} in
 
         # Create new empty sources.list
         # TABs for this
-        cat > ${ZFSBUILD}/etc/apt/sources.list <<-EOF
+        cat > ${ZFSBUILD}/etc/apt/sources.list <<- EOF
 		# Ubuntu sources have moved to the /etc/apt/sources.list.d/ubuntu.sources
 		# file, which uses the deb822 format. Use deb822-formatted .sources files
 		# to manage package sources in the /etc/apt/sources.list.d/ directory.
@@ -1110,7 +1110,7 @@ case ${SUITE} in
     bionic)
         # Old sources setup before deb822
         # TABs for this
-        cat > ${ZFSBUILD}/etc/apt/sources.list <<-EOF
+        cat > ${ZFSBUILD}/etc/apt/sources.list <<- EOF
 			deb http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse restricted
 			deb-src http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse restricted
 			
@@ -1126,7 +1126,7 @@ case ${SUITE} in
 
         # We put universe into its own .list file so ansible apt_repository will match 
         # TABs for this
-        cat > ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu_universe.list <<-EOF
+        cat > ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu_universe.list <<- EOF
 			deb http://archive.ubuntu.com/ubuntu ${SUITE} universe
 			deb-src http://archive.ubuntu.com/ubuntu ${SUITE} universe
 		
@@ -1149,7 +1149,7 @@ esac
 [ -e os_linux.png ] && cp os_linux.png ${ZFSBUILD}/root/os_linux.png
 
 echo "Creating Setup.sh in new system for chroot"
-cat > ${ZFSBUILD}/root/Setup.sh <<-EOF
+cat > ${ZFSBUILD}/root/Setup.sh <<- EOF
 	#!/bin/bash
 	
 	export RESCUE=${RESCUE}
@@ -1349,7 +1349,7 @@ fi
 
 # For multiple disks, looks like we need a startup.nsh
 if [ ${#zfsdisks[@]} -ge 1 ] ; then
-    cat <<-'END' > /boot/efi/startup.nsh
+    cat <<- 'END' > /boot/efi/startup.nsh
 	fs0:
 	EFI\refind\refind_x64.efi
 	END
@@ -1383,7 +1383,7 @@ apt-get --yes install libconfig-inifiles-perl libsort-versions-perl libboolean-p
 # LUKS encryption uses the 1st swap_crypt0 device
 if [ ${HIBERNATE} = "y" ] ; then
     # NOTE: be sure to use real TABS for this heredoc
-    cat <<-END > /etc/dracut.conf.d/resume-from-hibernate.conf
+    cat <<- END > /etc/dracut.conf.d/resume-from-hibernate.conf
 	add_dracutmodules+=" resume "
 	END
 
@@ -1392,7 +1392,7 @@ if [ ${HIBERNATE} = "y" ] ; then
         zfs set org.zfsbootmenu:commandline="rw quiet ${USE_ZSWAP} resume=/dev/mapper/swap_crypt0" ${POOLNAME}/ROOT/${SUITE}
 
         # NOTE: be sure to use real TABS for this heredoc
-        cat <<-END > /etc/dracut.conf.d/resume-swap-uuid.conf
+        cat <<- END > /etc/dracut.conf.d/resume-swap-uuid.conf
 		# add_device+=" UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP}) "
 		add_device+=" /dev/mapper/swap_crypt0 "
 		END
@@ -1484,7 +1484,7 @@ if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "LOCAL" ] ; then
     #
     # Configure ZFSBootMenu
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat <<-END > /etc/zfsbootmenu/config.yaml
+    cat <<- END > /etc/zfsbootmenu/config.yaml
 	Global:
 	  ManageImages: true
 	  BootMountPoint: /boot/efi
@@ -1564,7 +1564,7 @@ curl -L https://www.memtest86.com/downloads/memtest86-4.3.7-iso.zip -o /tmp/memt
    umount /tmp/memtest86/mnt
 
 # Syslinux entry for memtest86+
-cat > /boot/efi/snippets/05_memtest86 <<EOF
+cat > /boot/efi/snippets/05_memtest86 << EOF
 LABEL Memtest86+
 KERNEL /EFI/tools/memtest86/memtest86.syslinux
 
@@ -1587,7 +1587,7 @@ if [ "${DISCENC}" = "LUKS" ] ; then
     # should be LUKS encrypted and try to open them all
     #
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat > /usr/local/bin/zfsbootmenu_luks_unlock.sh <<-'EOF'
+    cat > /usr/local/bin/zfsbootmenu_luks_unlock.sh <<- 'EOF'
 	#!/bin/bash
 	
 	sources=(
@@ -1749,7 +1749,7 @@ cp /usr/share/doc/avahi-daemon/examples/ssh.service /etc/avahi/services
 # For ZFSENC we need to set up a script and systemd unit to load the keyfile
 if [ ${DISCENC} = "ZFSENC" ] ; then
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat > /usr/bin/zfs-multi-mount.sh <<-'EOF'
+    cat > /usr/bin/zfs-multi-mount.sh <<- 'EOF'
 	#!/usr/bin/env bash
 	# https://gbyte.dev/blog/unlock-mount-several-zfs-datasets-boot-single-passphrase
 	
@@ -1907,7 +1907,7 @@ PROMPT_COMMAND='history -a; history -n;'
 EOF
 
 # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-cat >> /etc/skel/.bashrc <<-EOF
+cat >> /etc/skel/.bashrc <<- EOF
 	
 	PS1="${debian_chroot:+($debian_chroot)}\[\$(tput setaf 2)\]\u@\[\$(tput bold)\]\[\$(tput setaf 5)\]\h\[\$(tput sgr0)\]\[\$(tput setaf 7)\]:\[\$(tput bold)\]\[\$(tput setaf 4)\]\w\[\$(tput setaf 7)\]\\$ \[\$(tput sgr0)\]"
 	
@@ -1915,14 +1915,14 @@ cat >> /etc/skel/.bashrc <<-EOF
 	PROMPT_COMMAND='history -a; history -n;'
 EOF
 
-cat >> /etc/skel/.bash_aliases <<-EOF
+cat >> /etc/skel/.bash_aliases <<- EOF
 	alias ls='ls --color=auto'
 	alias l='ls -la'
 	alias lt='ls -lat | head -25'
 EOF
 cp /etc/skel/.bash_aliases /root
 
-cat >> /root/.bashrc <<-"EOF"
+cat >> /root/.bashrc <<- "EOF"
 	# PS1='\[\033[01;37m\]\[\033[01;41m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]$ '
 	PS1='\[\033[01;37m\]\[\033[01;41m\]\u@\[\033[00m\]\[$(tput bold)\]\[$(tput setaf 5)\]\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]$ '
 	
@@ -2043,7 +2043,7 @@ if [ ${SECUREBOOT} = "y" ] ; then
     curl -fsSL https://download.opensuse.org/repositories/home:jloeser:secureboot/xUbuntu_${SUITE_NUM}/Release.key | gpg --dearmor | sudo tee /usr/share/keyrings/secureboot.gpg > /dev/null
 
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat > /etc/apt/sources.list.d/secureboot.sources <<-EOF
+    cat > /etc/apt/sources.list.d/secureboot.sources <<- EOF
 	X-Repolib-Name: SecureBoot
 	Types: deb
 	URIs: http://download.opensuse.org/repositories/home:/jloeser:/secureboot/xUbuntu_${SUITE_NUM}
@@ -2084,7 +2084,7 @@ if [ ${SECUREBOOT} = "y" ] ; then
     # Setup systemd path watch to update zfsbootmenu efi when zfsbootmenu is updated
     # This way when you update ZBM, it will automagically update and sign the EFI image
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat > /etc/systemd/system/zfsbootmenu-sign-efi.service <<-EOF
+    cat > /etc/systemd/system/zfsbootmenu-sign-efi.service <<- EOF
 	[Unit]
 	Description=Sign ZFSBootmenu EFI image bundle
 
@@ -2095,7 +2095,7 @@ if [ ${SECUREBOOT} = "y" ] ; then
 
     # Watch the zfsbootmenu.efi image for changes
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat > /etc/systemd/system/zfsbootmenu-update-efi-image.path <<-EOF
+    cat > /etc/systemd/system/zfsbootmenu-update-efi-image.path <<- EOF
 	[Unit]
 	Description=ZFSBootmenu kernel changed, rebuild EFI image bundle
 
@@ -2112,7 +2112,7 @@ if [ ${SECUREBOOT} = "y" ] ; then
     # We re-sign the kernel and initramfs here because there is another watch
     # above that handles signing the efi image
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat > /etc/systemd/system/zfsbootmenu-update@.service <<-EOF
+    cat > /etc/systemd/system/zfsbootmenu-update@.service <<- EOF
 	[Unit]
 	Description=Update ZFSBootmenu EFI image bundle
 
@@ -2126,7 +2126,7 @@ if [ ${SECUREBOOT} = "y" ] ; then
 
     # Watch the zfsbootmenu kernel for changes
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat > /etc/systemd/system/zfsbootmenu-update-kernel-bootmenu.path <<-EOF
+    cat > /etc/systemd/system/zfsbootmenu-update-kernel-bootmenu.path <<- EOF
 	[Unit]
 	Description=ZFSBootmenu kernel changed, rebuild EFI image bundle
 
@@ -2141,7 +2141,7 @@ if [ ${SECUREBOOT} = "y" ] ; then
 
     # Watch the zfsbootmenu initramfs for changes
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat > /etc/systemd/system/zfsbootmenu-update-initramfs-bootmenu.path <<-EOF
+    cat > /etc/systemd/system/zfsbootmenu-update-initramfs-bootmenu.path <<- EOF
 	[Unit]
 	Description=ZFSBootmenu initramfs changed, rebuild EFI image bundle
 
@@ -2155,7 +2155,7 @@ if [ ${SECUREBOOT} = "y" ] ; then
 	EOF
 
     # Re-sign the rEFInd efi binary if required
-    cat > /etc/systemd/system/refind-update.service <<-EOF
+    cat > /etc/systemd/system/refind-update.service <<- EOF
 	[Unit]
 	Description=Re-sign rEFInd binary
 
@@ -2166,7 +2166,7 @@ if [ ${SECUREBOOT} = "y" ] ; then
 
     # Watch rEFInd for changes
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat > /etc/systemd/system/refind-update.path <<-EOF
+    cat > /etc/systemd/system/refind-update.path <<- EOF
 	[Unit]
 	Description=rEFInd binary changed, re-sign
 
@@ -2256,7 +2256,7 @@ if [ "${ZREPL}" = "y" ]; then
     zfs set com.zrepl:snapshot-threshold=120000000 ${POOLNAME}/ROOT/${SUITE}
 
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat > /etc/zrepl/zrepl.yml <<-EOF
+    cat > /etc/zrepl/zrepl.yml <<- EOF
 	global:
 	  logging:
 	    # use syslog instead of stdout because it makes journald happy
@@ -2338,7 +2338,7 @@ if [ "${ZREPL}" = "y" ]; then
 	EOF
     
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat > /usr/local/bin/zrepl_threshold_check.sh <<-'EOF'
+    cat > /usr/local/bin/zrepl_threshold_check.sh <<- 'EOF'
 	#!/usr/bin/env bash
 	set -e
 	
@@ -2394,7 +2394,7 @@ fi
 #-----------------------------------------------------------------------------
 
 # Set apt/dpkg to automagically snap the system datasets on install/remove
-cat > /etc/apt/apt.conf.d/30pre-snap <<-EOF
+cat > /etc/apt/apt.conf.d/30pre-snap <<- EOF
 	# Snapshot main dataset before installing or removing packages
 	# We use a DATE variable to ensure all snaps have SAME date
 	# Use df to find root dataset
@@ -2448,7 +2448,7 @@ if [ "${NEON}" = "y" ] ; then
     # Ensure the keyrings dir exists - it should, but be sure
     mkdir -p /usr/share/keyrings
     wget -qO /usr/share/keyrings/neon.key 'https://archive.neon.kde.org/public.key'
-    cat > /etc/apt/sources.list.d/neon.list <<-EOF
+    cat > /etc/apt/sources.list.d/neon.list <<- EOF
 	deb [signed-by=/usr/share/keyrings/neon.key] http://archive.neon.kde.org/user/ ${SUITE} main
 	deb-src [signed-by=/usr/share/keyrings/neon.key] http://archive.neon.kde.org/user/ ${SUITE} main
 	EOF
@@ -2456,7 +2456,7 @@ if [ "${NEON}" = "y" ] ; then
     # Pin base-files to not install the Neon version
     # This prevents the install identifying as Neon, and stops problems with programs that this confuses
     # eg the Docker install script
-    cat > /etc/apt/preferences.d/99block-neon <<-EOF
+    cat > /etc/apt/preferences.d/99block-neon <<- EOF
 	Package: base-files
 	Pin: origin archive.neon.kde.org
 	Pin-Priority: 1
@@ -2464,7 +2464,7 @@ if [ "${NEON}" = "y" ] ; then
 
     # Use real firefox, not that snap crap
     apt-add-repository --yes --update ppa:mozillateam/ppa
-    cat > /etc/apt/preferences.d/99mozillateam <<-EOF
+    cat > /etc/apt/preferences.d/99mozillateam <<- EOF
 	Package: firefox
 	Pin: origin ppa.launchpadcontent.net
 	Pin-Priority: 700
@@ -2473,7 +2473,7 @@ if [ "${NEON}" = "y" ] ; then
     # neon desktop includes encfs, which prompts that it's not secure,
     # requiring someone to hit <enter> - this should bypass that
     # Also, pre-select the sddm display manager login
-    cat > /tmp/neon.debconf <<-EOF
+    cat > /tmp/neon.debconf <<- EOF
 	encfs  encfs/security-information boolean true
 	encfs  encfs/security-information seen true
 	gdm3   shared/default-x-display-manager select sddm
@@ -2490,9 +2490,9 @@ if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] || [ "${NEON}" = "y" ] || [ "${XFC
     # Ensure networking is handled by NetworkManager
     sed -i 's/networkd/NetworkManager/' /etc/netplan/01_netcfg.yaml
 
-    # NOTE: Using <<-EOF so it wills strip leading TAB chars
+    # NOTE: Using <<- EOF so it wills strip leading TAB chars
     #       MUST be TAB chars, not spaces
-    cat > /etc/NetworkManager/conf.d/10-globally-managed-devices.conf <<-EOF
+    cat > /etc/NetworkManager/conf.d/10-globally-managed-devices.conf <<- EOF
 	[keyfile]
 	unmanaged-devices=*,except:type:wifi,except:type:wwan,except:type:ethernet
 	EOF
@@ -2525,7 +2525,7 @@ fi # GNOME KDE NEON XFCE
     
 # Enable hibernate in upower and logind if desktop is installed
 if [ -d /etc/polkit-1/localauthority/50-local.d ] ; then
-    cat > /etc/polkit-1/localauthority/50-local.d/com.ubuntu.enable-hibernate.pkla <<-EOF
+    cat > /etc/polkit-1/localauthority/50-local.d/com.ubuntu.enable-hibernate.pkla <<- EOF
 	[Re-enable hibernate by default in upower]
 	Identity=unix-user:*
 	Action=org.freedesktop.upower.hibernate
