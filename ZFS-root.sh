@@ -1431,7 +1431,8 @@ if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "EFI" ] ; then
 
     # Add rEFInd entry for ZFSBootMenu
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat >> /boot/efi/EFI/refind/refind.conf << EOF
+    cat >> /boot/efi/EFI/refind/refind.conf <<- EOF
+	
 	# ZFSBootMenu EFI Loader Configuration
 	menuentry "ZFSBootMenu" {
 	  loader EFI/zfsbootmenu/zfsbootmenu.efi
