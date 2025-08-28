@@ -1005,7 +1005,8 @@ else
         mdadm --zero-superblock --force /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_BOOT} > /dev/null 2>&1
     done
     BOOTDEVRAW="/dev/md/BOOT_EFI"
-	echo y | mdadm --create ${BOOTDEVRAW} --metadata=1.0 --force --level=mirror --raid-devices=${#zfsdisks[@]} --homehost=${MYHOSTNAME} --name=efi  --assume-clean ${PARTSBOOT}
+    # NOTE: Need metadata=1.0 to ensure that mdadm metadata is written to the END of the partition, especially for UEFI
+    echo y | mdadm --create ${BOOTDEVRAW} --metadata=1.0 --force --level=mirror --raid-devices=${#zfsdisks[@]} --homehost=${MYHOSTNAME} --name=efi  --assume-clean ${PARTSBOOT}
 fi
 
 mkfs.vfat -v -F 32 -s 1 -n "BOOT_EFI" ${BOOTDEVRAW} > /dev/null
