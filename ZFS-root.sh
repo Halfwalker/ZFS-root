@@ -1158,7 +1158,7 @@ cat > ${ZFSBUILD}/root/Setup.sh <<- EOF
 	export SUITE=${SUITE}
 	export POOLNAME=${POOLNAME}
 	export SECUREBOOT=${SECUREBOOT}
-    export AUTOSIGN=${AUTOSIGN}
+	export AUTOSIGN=${AUTOSIGN}
 	export PASSPHRASE=${PASSPHRASE}
 	export USERNAME=${USERNAME}
 	export UPASSWORD="${UPASSWORD}"
