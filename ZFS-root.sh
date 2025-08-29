@@ -1320,6 +1320,56 @@ mount /boot/efi
 DEBIAN_FRONTEND=noninteractive apt-get --yes install refind efi-shell-x64
 refind-install --yes
 
+# For multiple disks, add a startup.nsh and do manual efibootmgr setup
+# since refind-install doesn't handle raid'd ESP partitions
+if [ ${#zfsdisks[@]} -ge 1 ] ; then
+
+    # Set refind on each disk to be a valid bootable efi image
+    for DISK in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
+        efibootmgr --create --disk /dev/disk/by-id/${zfsdisks[${DISK}]} --part ${PARTITION_BOOT} --loader /EFI/refind/refind_x64.efi --label "rEFInd Boot Manager" --unicode
+    done
+
+## Replacement startup.nsh to iterate over all disks looking for refind
+    cat <<- 'EOF' > /boot/efi/startup.nsh
+	@echo -off
+	cls
+	
+	# List all mapped file systems (disks/partitions)
+	echo -n "Enumerating filesystems... "
+	fs0:
+	if %lasterror% == 0 then
+	    echo "OK"
+	else
+	    echo "No filesystems found."
+	    goto error
+	endif
+	
+	set found 0
+	
+	for %i in (fs*) do (
+	    echo -n "Checking %i for /EFI/refind/refind_x64.efi ... "
+	    if exist %i:\EFI\refind\refind_x64.efi then
+	        echo "FOUND"
+	        echo "Launching rEFInd from %i:"
+	        %i:\EFI\refind\refind_x64.efi
+	        goto done
+	    else
+	        echo "not present"
+	    endif
+	)
+	
+	:error
+	echo "ERROR: Could not find /EFI/refind/refind_x64.efi on any filesystem."
+	goto end
+	
+	:done
+	echo "rEFInd launched successfully."
+	goto end
+	
+	:end
+	EOF
+fi # multiple boot disks
+
 mkdir -p /boot/efi/EFI/zfsbootmenu
 cat <<- END > /boot/efi/EFI/zfsbootmenu/refind_linux.conf
 # NOTE: The xhci Tearing down USB controller tends to disable USB controllers
@@ -1346,14 +1396,6 @@ if [ -e /root/logo.png ] || [ -e /root/logo.jpg ] ; then
     [ -e /root/logo.png ] && sed -i 's,^#banner hostname.bmp,banner logo.png,' /boot/efi/EFI/refind/refind.conf
     cp /root/logo.{png,jpg} /boot/efi/EFI/refind/
     cp /root/os_linux.png /boot/efi/EFI/refind/icons
-fi
-
-# For multiple disks, looks like we need a startup.nsh
-if [ ${#zfsdisks[@]} -ge 1 ] ; then
-    cat <<- 'END' > /boot/efi/startup.nsh
-	fs0:
-	EFI\refind\refind_x64.efi
-	END
 fi
 
 # Set up syslinux
