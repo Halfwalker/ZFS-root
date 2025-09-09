@@ -2,6 +2,9 @@
 
 # https://www.osso.nl/blog/proxmox-virtio-blk-disk-by-id/
 #
+# Arch setup with encrypted zfs root and swap
+# https://nwildner.com/posts/2025-09-03-zfs-setup/
+#
 # packer with virtio-scsi as disk_interface creates
 # /dev/disk/by-id/scsi-0QWMU_QEMU_HARDDISK_drive0
 #
@@ -1446,7 +1449,7 @@ if [ ${HIBERNATE} = "y" ] ; then
 else
     zfs set org.zfsbootmenu:commandline="rw quiet" ${POOLNAME}/ROOT
     zfs set org.zfsbootmenu:commandline="rw quiet" ${POOLNAME}/ROOT/${SUITE}
-fi
+fi # Hibernate
 zfs set canmount=noauto ${POOLNAME}/ROOT
 zfs set canmount=noauto ${POOLNAME}/ROOT/${SUITE}
 
@@ -2299,9 +2302,20 @@ if [ "${ZREPL}" = "y" ]; then
     # Install zrepl for zfs snapshot management
     zrepl_apt_key_url=https://zrepl.cschwarz.com/apt/apt-key.asc
     zrepl_apt_key_dst=/usr/share/keyrings/zrepl.gpg
-    zrepl_apt_repo_file=/etc/apt/sources.list.d/zrepl.list
     curl -fsSL "$zrepl_apt_key_url" | tee | gpg --dearmor | tee "$zrepl_apt_key_dst" > /dev/null
-    echo "deb [signed-by=$zrepl_apt_key_dst] https://zrepl.cschwarz.com/apt/ubuntu ${SUITE} main" | tee /etc/apt/sources.list.d/zrepl.list
+
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+    cat > /etc/apt/sources.list.d/zrepl.sources << EOF
+	Architectures: amd64
+	Components: main
+	Enabled: yes
+	X-Repolib-Name: zrepl ZFS replication
+	Signed-By: ${zrepl_apt_key_dst}
+	Suites:${SUITE} 
+	Types: deb
+	URIs: https://zrepl.cschwarz.com/apt/ubuntu
+	EOF
+
     apt-get -qq update
     apt-get -qq --yes install zrepl
     systemctl stop zrepl
@@ -2391,7 +2405,7 @@ if [ "${ZREPL}" = "y" ]; then
 	        negate: true
 	        regex: "^zrepl_.*"
 	EOF
-    
+
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
     cat > /usr/local/bin/zrepl_threshold_check.sh <<- 'EOF'
 	#!/usr/bin/env bash
