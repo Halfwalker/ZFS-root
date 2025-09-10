@@ -1378,6 +1378,7 @@ cat <<- END > /boot/efi/EFI/zfsbootmenu/refind_linux.conf
 # NOTE: The xhci Tearing down USB controller tends to disable USB controllers
 #       on Supermicro X10DHR motherboards, so we disable that hook here.
 #       See https://docs.zfsbootmenu.org/en/v3.0.x/man/zfsbootmenu.7.html
+# NOTE: This will also need to be set in the syslinux-update.sh below
 "Boot to ZFSbootMenu" "zbm.prefer=${POOLNAME} ro quiet loglevel=0 ${ZFSBOOTMENU_CMDLINE}"
 END
 
@@ -1506,6 +1507,7 @@ if [ "${ZFSBOOTMENU_BINARY_TYPE}" != "LOCAL" ] ; then
       s/^SYSLINUX_ROOT.*/SYSLINUX_ROOT="\/boot\/efi"/
       s/^KERNEL_PATH.*/KERNEL_PATH="EFI\/zfsbootmenu"/
       s/^SYSLINUX_CONFD.*/SYSLINUX_CONFD="\/boot\/efi\/snippets"/
+      s/^ZBM_KCL_ARGS.*/ZBM_KCL_ARGS="zbm.prefer=${POOLNAME} ${ZFSBOOTMENU_CMDLINE}/
       s/^cp .*/cp "\${SYSLINUX_CFG}" "\${SYSLINUX_ROOT}\/syslinux\/syslinux.cfg"/
      ' /boot/efi/syslinux-update.sh
 fi
