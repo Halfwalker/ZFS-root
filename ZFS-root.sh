@@ -1507,7 +1507,7 @@ if [ "${ZFSBOOTMENU_BINARY_TYPE}" != "LOCAL" ] ; then
       s/^SYSLINUX_ROOT.*/SYSLINUX_ROOT="\/boot\/efi"/
       s/^KERNEL_PATH.*/KERNEL_PATH="EFI\/zfsbootmenu"/
       s/^SYSLINUX_CONFD.*/SYSLINUX_CONFD="\/boot\/efi\/snippets"/
-      s/^ZBM_KCL_ARGS.*/ZBM_KCL_ARGS="zbm.prefer=${POOLNAME} ${ZFSBOOTMENU_CMDLINE}/
+      s/^ZBM_KCL_ARGS.*/ZBM_KCL_ARGS="zbm.prefer=${POOLNAME} ro quiet loglevel=0 ${ZFSBOOTMENU_CMDLINE}"/
       s/^cp .*/cp "\${SYSLINUX_CFG}" "\${SYSLINUX_ROOT}\/syslinux\/syslinux.cfg"/
      ' /boot/efi/syslinux-update.sh
 fi
@@ -1563,7 +1563,7 @@ if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "LOCAL" ] ; then
 	  Versions: 2
 	  Enabled: false
 	Kernel:
-	  CommandLine: zbm.prefer=${POOLNAME} ro quiet loglevel=0
+	  CommandLine: zbm.prefer=${POOLNAME} ro quiet loglevel=0 ${ZFSBOOTMENU_CMDLINE}
 	END
     
     # Create pre and post hooks dirs and syslinux snippets dir
@@ -1579,7 +1579,7 @@ if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "LOCAL" ] ; then
       s/^SYSLINUX_ROOT.*/SYSLINUX_ROOT="\/boot\/efi"/
       s/^KERNEL_PATH.*/KERNEL_PATH="EFI\/zfsbootmenu"/
       s/^SYSLINUX_CONFD.*/SYSLINUX_CONFD="\/boot\/efi\/snippets"/
-      s/^ZBM_KCL_ARGS.*/ZBM_KCL_ARGS="zbm.prefer=${POOLNAME} ${ZFSBOOTMENU_CMDLINE}/
+      s/^ZBM_KCL_ARGS.*/ZBM_KCL_ARGS="zbm.prefer=${POOLNAME} ro quiet loglevel=0 ${ZFSBOOTMENU_CMDLINE}"/
       s/^cp .*/cp "\${SYSLINUX_CFG}" "\${SYSLINUX_ROOT}\/syslinux\/syslinux.cfg"/
      ' /etc/zfsbootmenu/generate-zbm.post.d/syslinux-update.sh
 fi # LOCAL
@@ -2308,7 +2308,7 @@ if [ "${ZREPL}" = "y" ]; then
     curl -fsSL "$zrepl_apt_key_url" | tee | gpg --dearmor | tee "$zrepl_apt_key_dst" > /dev/null
 
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat > /etc/apt/sources.list.d/zrepl.sources << EOF
+    cat > /etc/apt/sources.list.d/zrepl.sources <<- EOF
 	Architectures: amd64
 	Components: main
 	Enabled: yes
