@@ -2573,7 +2573,7 @@ if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] || [ "${NEON}" = "y" ] || [ "${XFC
     # The NVIDIA var should be set to the appropriate version from the menu query
     if [ "${NVIDIA}" != "none" ] ; then
         apt-add-repository --yes --update ppa:graphics-drivers/ppa
-        apt-get -qq --yes install nvidia-driver-${NVIDIA}
+        apt-get -qq --yes install nvidia-driver-${NVIDIA} libxnvctrl0
     fi
 
     ####
