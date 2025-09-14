@@ -2260,9 +2260,23 @@ if [ "${GOOGLE}" = "y" ]; then
     chmod 400 /home/${USERNAME}/.google_authenticator
     chown ${USERNAME}:${USERNAME} /home/${USERNAME}/.google_authenticator
 
+    # TODO: parameterize the nullok bits
     # Set pam to use google authenticator for ssh
+    # NOTE: add nullok to end of line to allow regular logins if ~/.google_authenticator does not exist
     echo "auth required pam_google_authenticator.so" >> /etc/pam.d/sshd
-    sed -i "s/^ChallengeResponseAuthentication.*/ChallengeResponseAuthentication yes/" /etc/ssh/sshd_config
+    # If using nullok, then add this line
+    # echo "auth required pam_permit.so" >> /etc/pam.d/sshd
+
+    # Tell sshd to use google_authenticator
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+    cat > /etc/ssh/sshd_config.d/70-google_auth.conf < EOF
+	# For google authenticator
+	#
+	KbdInteractiveAuthentication yes
+	EOF
+
+    # Instruct PAM to prompt for a password by default
+    sed -i "s/^#.*@include common-auth/@include common-auth/" /etc/pam.d/sshd
 
     # Enable this to force use of token always, even with SSH key
     # sed -i "s/.*PasswordAuthentication.*/PasswordAuthentication no/" /etc/ssh/sshd_config
