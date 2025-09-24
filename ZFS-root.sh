@@ -2316,9 +2316,13 @@ systemctl enable showip.service
 
 #-----------------------------------------------------------------------------
 if [ "${ZREPL}" = "y" ]; then
+    if [ ! -d /etc/apt/keyrings ] ; then
+        mkdir /etc/apt/keyrings
+    fi
+
     # Install zrepl for zfs snapshot management
     zrepl_apt_key_url=https://zrepl.cschwarz.com/apt/apt-key.asc
-    zrepl_apt_key_dst=/usr/share/keyrings/zrepl.gpg
+    zrepl_apt_key_dst=/etc/apt/keyrings/zrepl.gpg
     curl -fsSL "$zrepl_apt_key_url" | tee | gpg --dearmor | tee "$zrepl_apt_key_dst" > /dev/null
 
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
