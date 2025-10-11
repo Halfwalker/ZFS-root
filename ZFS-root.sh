@@ -67,13 +67,13 @@
 # It will ask a few questions (username, which disk, bionic/focal etc)
 # and then fully install a minimal Ubuntu system. Depending on the choices
 # several partitions and zfs datasets will be created.
-# 
+#
 # Part Name  Use
 # ===========================================================================
 #  1   BOOT  EFI partition, also has syslinux
 #  2   SWAP  Only created if HIBERNATE is enabled (may be encrypted with LUKS)
 #  3   ZFS   Main zfs pool (rpool) for full system (rpool/ROOT/bionic)
-# 
+#
 # Datasets created
 # ================
 # rpool/ROOT/bionic               Contains main system
@@ -81,10 +81,10 @@
 # rpool/home                      Container for user directories
 # rpool/home/<username>           Dataset for initial user
 # rpool/home/root                 Dataset for root user
-# 
+#
 # One option is to enable LUKS full disk encryption. If HIBERNATE is enabled
 # and a SWAP partition created, then that will be encrypted as well.
-# 
+#
 # NOTE: The HIBERNATE option will be disabled if the appropriate feature is not
 # enabled in the power options of the system bios (/sys/power/state)
 #
@@ -104,22 +104,22 @@ preflight() {
         echo "This script must be run as root" 1>&2
         exit 1
     fi
-    
+
     # Grab any possible pre-config settings in ZFS-root.conf
     if [ -e ZFS-root.conf ] ; then
         . ZFS-root.conf
     fi
-    
+
     # ZFSBOOTMENU_REPO_TYPE - use the tagged git release or latest git clone
     # = TAGGED
     # = GIT
     [[ ! -v ZFSBOOTMENU_REPO_TYPE ]] && ZFSBOOTMENU_REPO_TYPE=TAGGED
-    
+
     # ZFSBOOTMENU_CMDLINE - any additional cmdline options for zfsbootmenu
     # May need options to skip xhci-unbind - see ZFS-root.conf.example
     # See https://docs.zfsbootmenu.org/en/v3.0.x/man/zfsbootmenu.7.html
     [[ ! -v ZFSBOOTMENU_CMDLINE ]] && ZFSBOOTMENU_CMDLINE=""
-    
+
     if [ "$1" = "packerci" ] ; then
         # Ensure we pick up the packerci-specific config
         if [ -e ZFS-root.conf.packerci ] ; then
@@ -130,26 +130,26 @@ preflight() {
             exit 1
         fi
     fi
-    
+
     # For SOF binaries, default to 2024.06
     if [[ ! -v $SOF_VERSION ]] ; then
         SOF_VERSION=2024.06
     fi
-    
+
     # No magenta overrides for whiptail dialogs please
     export NEWT_COLORS="none"
-    
+
     # Build location - will be removed prior to build
     # NOTE: Can NOT have "zfs" in the name
     ZFSBUILD=/mnt/builder
-    
+
     # Partition numbers of each partition
     PARTITION_BOOT=1
     PARTITION_SWAP=2
     PARTITION_DATA=3
     PARTITION_WIND=4
     PARTITION_RCVR=5
-    
+
     # ZFS encryption options
     ZFSENC_ROOT_OPTIONS="-o encryption=aes-256-gcm -o keylocation=prompt -o keyformat=passphrase"
     # NOTE: for keyfile, put key in local /etc/zfs, then later copy to target /etc/zfs
@@ -198,7 +198,7 @@ setup_cacher() {
                 echo " - not found :("
             fi
         done
-        
+
         PROXY=$(whiptail --inputbox "Enter an apt proxy. Cancel or hit <esc> for no proxy" --title "APT proxy setup" 8 70 $PROXY 3>&1 1>&2 2>&3)
         RET=${?}
         (( RET )) && PROXY=
@@ -209,7 +209,7 @@ setup_cacher() {
         # This is for apt-get
         echo "Acquire::http::proxy \"${PROXY}\";" > /etc/apt/apt.conf.d/03proxy
     fi # PROXY
-    
+
     apt-get -qq update
     apt-get -qq --no-install-recommends --yes install software-properties-common
     apt-add-repository -y universe
@@ -217,7 +217,7 @@ setup_cacher() {
     apt-get -qq --no-install-recommends --yes install debconf-utils
 } # setup_cacher()
 
-    
+
 # -------------------------------------------------------------------------------------------------------
 query_user() {
     # Get userid and full name of main user
@@ -231,7 +231,7 @@ query_user() {
         USERNAME=$(echo "$USERINFO" | cut -d' ' -f1)
         UCOMMENT=$(echo "$USERINFO" | cut -d' ' -f2-)
     fi # Check if USERNAME/UCOMMENT set
-    
+
     # Get password, confirm and loop until confirmation OK
     if [[ ! -v UPASSWORD ]]; then
         DONE=false
@@ -242,7 +242,7 @@ query_user() {
         done
         UPASSWORD="$PW1"
     fi # Check if UPASSWORD already set
-    
+
     # Hostname - cancel or blank name will exit
     if [[ ! -v MYHOSTNAME ]] ; then
         MYHOSTNAME="test"
@@ -250,11 +250,11 @@ query_user() {
         RET=${?}
         (( RET )) && MYHOSTNAME=
         if [ ! "${MYHOSTNAME}" ]; then
-            echo "Must have a hostname" 
+            echo "Must have a hostname"
             exit 1
         fi
     fi # Check if MYHOSTNAME already set
-    
+
     if [[ ! -v POOLNAME ]] ; then
         POOLNAME=${MYHOSTNAME}
         POOLNAME=$(whiptail --inputbox "Enter poolname to use for main system - defaults to hostname" --title "ZFS main poolname" 8 70 "$POOLNAME" 3>&1 1>&2 2>&3)
@@ -285,13 +285,13 @@ select_disks() {
         # Ignore cdrom etc.  Limit disk name length to avoid menu uglyness
         # readarray -t disks < <(ls -l /dev/disk/by-id | egrep -v '(CDROM|CDRW|-ROM|CDDVD|-part|md-|dm-|wwn-)' | sort -t '/' -k3 | tr -s " " | cut -d' ' -f9 | cut -c -58 | sed '/^$/d')
         readarray -t disks < <(find /dev/disk/by-id | grep -E -v '(CDROM|CDRW|-ROM|CDDVD|-part|md-|dm-|wwn-)' | cut -d'/' -f5 | sed '/^$/d' | sort)
-        
+
         # If no disks available (kvm needs to use scsi, not virtio) then error out
         if [ ${#disks[@]} -eq 0 ] ; then
             whiptail --title "No disks available in /dev/disk/by-id" --msgbox "No valid disk links were found in /dev/disk/by-id - ensure your target disk has a link in that directory.\n\nKVM/qemu VMs need to use the SCSI storage driver, not the default virtio one (which does not create links in /dev/disk/by-id)" 12 70
             exit 1
         fi
-        
+
         TMPFILE=$(mktemp)
         # Find longest disk name
         m=-1
@@ -302,12 +302,12 @@ select_disks() {
               m=${#disk}
            fi
         done
-        
+
         # Set dialog box size to num disks
         list_height=$(( ${#disks[@]} + 1 ))
         box_height=$(( ${#disks[@]} + 8 ))
         box_width=$(( m + 26 ))
-        
+
         DONE=false
         until ${DONE} ; do
             whiptail --title "List of disks" --separate-output --checklist --noitem \
@@ -315,19 +315,19 @@ select_disks() {
                 $(for disk in $(seq 0 $(( ${#disks[@]}-1)) ) ; do echo "${disks[${disk}]}" OFF ; done) 2> "${TMPFILE}"
             RET=${?}
             [[ ${RET} = 1 ]] && exit 1
-            
+
             readarray -t zfsdisks < <(cat "${TMPFILE}")
             if [ ${#zfsdisks[@]} != 0 ] ; then
                 DONE=true
             fi
         done
     fi # Check for packerci
-    
+
     # Single disk can only be "single"
     if [ ${#zfsdisks[@]} -eq 1 ] ; then
         RAIDLEVEL="single"
     fi
-    
+
     # Check if raid level already set in ZFS-root.conf
     if [[ ! -v RAIDLEVEL ]] ; then
         #_# DISK="/dev/disk/by-id/${DISK}"
@@ -371,7 +371,7 @@ select_encryption() {
             [[ ${RET} = 1 ]] && exit 1
         fi # Check DISCENC already set
     fi
-    
+
     # ZFSBOOTMENU_BINARY_TYPE - use a downloaded binary or build locally
     # = EFI    (use EFI binary - NOTE: precludes syslinux from working)
     # = KERNEL (use vmlinuz/initrd pair from downloaded binary)
@@ -381,7 +381,7 @@ select_encryption() {
     #       then this will be forced to LOCAL below in the Dropbear config section.
     #       This is because Dropbear must be included in the initramfs for zfsbootmenu.
     [[ ! -v ZFSBOOTMENU_BINARY_TYPE ]] && ZFSBOOTMENU_BINARY_TYPE=KERNEL
-    
+
     # If encryption enabled, need a passphrase
     if [ "${DISCENC}" != "NOENC" ] ; then
         if [[ ! -v PASSPHRASE ]] ; then
@@ -393,7 +393,7 @@ select_encryption() {
             done
             PASSPHRASE="$PW1"
         fi # If PASSPHRASE not already set in ZFS-root.conf
-    
+
         # retcode 0 = YES, 1 = NO
         if [[ ! -v DROPBEAR ]] ; then
             DROPBEAR=$(whiptail --title "Enable Dropbear ?" --yesno "Should Dropbear be enabled for remote unlocking of encrypted disks ?\n\nNOTE: Dropbear requires use of ZFSBOOTMENU_BINARY_TYPE as LOCAL, so it can be built locally" 12 60 \
@@ -423,7 +423,7 @@ query_install_options() {
     HIBERNATE_AVAIL=${?}
     # Force Hibernate to n if not available, overriding anything in ZFS-root.conf
     [ ${HIBERNATE_AVAIL} -ne 0 ] && HIBERNATE=n
-    
+
     #
     # Slightly fugly - have to check if ANY of these are not set
     #
@@ -459,12 +459,12 @@ query_install_options() {
         fi
         RET=${?}
         [[ ${RET} = 1 ]] && exit 1
-    
+
         # Set any selected options to 'y'
         while read -r TODO ; do
             eval "${TODO}"='y'
         done < "${TMPFILE}"
-    
+
         # Any options not enabled in the basic options menu we now set to 'n'
         for option in ZREPL RESCUE GNOME XFCE NEON KDE HWE HIBERNATE DELAY SOF GOOGLE; do
             [ ${!option} ] || eval "${option}"='n'
@@ -517,7 +517,7 @@ query_google_auth() {
         google-authenticator --time-based --disallow-reuse --label=${MYHOSTNAME} --qr-mode=UTF8 --rate-limit=3 --rate-time=30 --secret=/tmp/google_auth.txt --window-size=3 --force --quiet
         # Grab secret to build otpauth line below
         GOOGLE_SECRET=$(head -1 /tmp/google_auth.txt)
-    
+
         # Have to tell whiptail library newt to use black/white text, otherwise QR code
         # is inverted and Authy can't read it
         # Set issuer to Ubuntu so we get a nice Ubuntu logo for the Authy secret
@@ -542,7 +542,7 @@ query_ssh_auth() {
         [[ ${RET} = 1 ]] && exit 1
         (( RET )) && AUTHKEYS=none
     fi # Check for github user ssh keys in AUTHKEYS
-    
+
     # If it's NOT a ZFS encryption setup, then clear out the ZFSENC_ROOT_OPTIONS variable
     if [ "${DISCENC}" != "ZFSENC" ] ; then
         ZFSENC_ROOT_OPTIONS=""
@@ -553,7 +553,7 @@ query_ssh_auth() {
 
 # -------------------------------------------------------------------------------------------------------
 query_swap() {
-    # Swap size - if HIBERNATE enabled then this will be an actual disk partition.  
+    # Swap size - if HIBERNATE enabled then this will be an actual disk partition.
     # If DISCENC == LUKS then partition will be encrypted.  If SIZE_SWAP is not
     # defined here, then will be calculated to accomodate memory size (plus fudge factor).
     if [[ ! -v SIZE_SWAP ]] ; then
@@ -570,7 +570,7 @@ query_swap() {
             [[ ${RET} = 1 ]] && exit 1
         fi
     fi # Check for Swap size in ZFS-root.conf
-    
+
     # Use zswap compressed page cache in front of swap ? https://wiki.archlinux.org/index.php/Zswap
     # Only used for swap partition (encrypted or not)
     USE_ZSWAP="zswap.enabled=1 zswap.compressor=lz4 zswap.max_pool_percent=25"
@@ -590,7 +590,7 @@ query_suite() {
         RET=${?}
         [[ ${RET} = 1 ]] && exit 1
     fi # Check for Ubuntu suite to install
-    
+
     #
     # TODO: Make use of SUITE_EXTRAS maybe
     #
@@ -656,7 +656,7 @@ query_secureboot() {
     if [[ -d /sys/firmware/efi ]] ; then
         # Create apt sources for sbctl
         curl -fsSL https://download.opensuse.org/repositories/home:jloeser:secureboot/xUbuntu_${SUITE_NUM}/Release.key | gpg --dearmor | sudo tee /usr/share/keyrings/secureboot.gpg > /dev/null
-    
+
         # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
         cat > /etc/apt/sources.list.d/secureboot.sources <<- EOF
 		X-Repolib-Name: SecureBoot
@@ -667,11 +667,11 @@ query_secureboot() {
 		Enabled: yes
 		Architectures: amd64
 		EOF
-    
+
         apt-get -qq update
         apt-get -qq --yes --no-install-recommends install systemd-boot-efi
         apt-get -qq --yes --no-install-recommends install sbctl jq
-    
+
         # Are we in setup mode for SecureBoot ?
         SETUPMODE=$(sbctl status --json | jq '.setup_mode')
         if [ "${SETUPMODE}" == "true" ] ; then
@@ -692,7 +692,7 @@ query_secureboot() {
         # No /sys/firmware/efi means no UEFI means no SecureBoot
         SECUREBOOT=n
     fi
-    
+
     # If SecureBoot automatic signing of rEFInd and ZFSBootMenu .efi bundles should be enabled
     if [ "${SECUREBOOT}" == "y" ] ; then
         if [[ ! -v AUTOSIGN ]] ; then
@@ -709,7 +709,7 @@ show_options() {
     #
     # If script was started with one parameter "packerci" then we're running under CI/CD
     # and using packer to build an image via qemu. That means a single disk /dev/vda was
-    # selected above and we do not want to pause here for 
+    # selected above and we do not want to pause here for
     #
     if [ "${WIPE_FRESH}" != "y" ] ; then
         box_height=$(( ${#zfsdisks[@]} + 30 ))
@@ -813,7 +813,7 @@ log_options() {
 	   ZFSBOOTMENU_CMDLINE     = ${ZFSBOOTMENU_CMDLINE}
 	   WIPE_FRESH              = ${WIPE_FRESH}
 	==========================================================================
-	
+
 	EOF
 } # log_options()
 
@@ -828,14 +828,14 @@ install_zfs() {
 		zfs-dkms        zfs-dkms/note-incompatible-licenses  note
 	EOFPRE
     debconf-set-selections < /tmp/selections
-    
+
     # In case ZFS is already installed in this liveCD, check versions to see
     # if we need to update/upgrade
     # NOTE: Chances are that the kernel module is (eg) 0.8.x and the packages are 0.7.x
     #       so we may as well just upgrade to latest by PPA. Which means building
     #       the newest module, which can take a while.
     # Update ZFS if module mismatch, ZFS encryption selected or update-zfs selected
-    
+
     # Check if ZFS currently installed in this livecd env
     ZFS_LIVECD=
     if [ -f /usr/sbin/zfs ] || [ -f /sbin/zfs ] ; then
@@ -846,10 +846,10 @@ install_zfs() {
         ZFS_LIVECD=y
     fi
     [ "$ZFS_LIVECD" = "y" ] && echo "ZFS installed with ${ZFS_INSTALLED}, module with ${ZFS_MODULE}"
-    
+
     apt-get -qq update
     apt-get --no-install-recommends --yes install zfsutils-linux zfs-zed
-    
+
     # Create an encryption key for LUKs partitions
     if [ "${DISCENC}" = "LUKS" ] ; then
         dd if=/dev/urandom of=/etc/zfs/zroot.rawkey bs=32 count=1
@@ -861,7 +861,7 @@ install_zfs() {
         echo "${PASSPHRASE}" > /etc/zfs/zroot.homekey
         chmod 000 /etc/zfs/zroot.key /etc/zfs/zroot.homekey
     fi
-    
+
     apt-get -qq --no-install-recommends --yes install openssh-server debootstrap gdisk dosfstools mdadm
 } # install_zfs()
 
@@ -885,25 +885,25 @@ partition_disks() {
     # Stop all found mdadm arrays - again, just in case.  Sheesh.
     # shellcheck disable=SC2156  # Not "injecting" filenames - this is standard find -exec
     find /dev -iname md* -type b -exec bash -c "umount {} > /dev/null 2>&1 ; mdadm --stop --force {} > /dev/null 2>&1 ; mdadm --remove {} > /dev/null 2>&1" \;
-    
+
     ### Partition layout
     for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
         zpool labelclear -f /dev/disk/by-id/${zfsdisks[${disk}]}
-    
+
         # Wipe mdadm superblock from all partitions found, even if not md raid partition
         mdadm --zero-superblock --force /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_BOOT} > /dev/null 2>&1
-     
+
         wipefs --all --force /dev/disk/by-id/${zfsdisks[${disk}]}
         sgdisk --zap-all /dev/disk/by-id/${zfsdisks[${disk}]}
         sgdisk --clear /dev/disk/by-id/${zfsdisks[${disk}]}
-    
+
         # Legacy (BIOS) booting
         sgdisk -a 1                                     /dev/disk/by-id/${zfsdisks[${disk}]}     # Set sector alignment to 1MiB
         sgdisk -n ${PARTITION_BOOT}:1M:+1000M           /dev/disk/by-id/${zfsdisks[${disk}]}     # Create partition 1/BOOT 1M size
         sgdisk -A ${PARTITION_BOOT}:set:2               /dev/disk/by-id/${zfsdisks[${disk}]}     # Turn legacy boot attribute on
         sgdisk -c ${PARTITION_BOOT}:"BOOT_EFI_${disk}"  /dev/disk/by-id/${zfsdisks[${disk}]}     # Set partition name to BOOT_EFI_n
         sgdisk -t ${PARTITION_BOOT}:EF00                /dev/disk/by-id/${zfsdisks[${disk}]}     # Set partition type to EFI
-        
+
         #
         # TODO: figure out partitions for both ZFS and LUKS encryption
         #       both swap and main partitions
@@ -917,7 +917,7 @@ partition_disks() {
                 sgdisk -n ${PARTITION_SWAP}:0:+${SIZE_SWAP}M -c ${PARTITION_SWAP}:"SWAP_${disk}" -t ${PARTITION_SWAP}:8200 /dev/disk/by-id/${zfsdisks[${disk}]}
             fi # DISCENC for ZFS or LUKS
         fi # HIBERNATE
-        
+
         # Main data partition for root
         if [ "${DISCENC}" = "LUKS" ] ; then
             # LUKS Encrypted - should be partition type 8309 (Linux LUKS)
@@ -929,17 +929,17 @@ partition_disks() {
         # Unencrypted or ZFS encrypted
             sgdisk -n ${PARTITION_DATA}:0:0 -c ${PARTITION_DATA}:"ZFS_${disk}" -t ${PARTITION_DATA}:BF00 /dev/disk/by-id/${zfsdisks[${disk}]}
         fi # DISCENC for LUKS
-    
+
         #
         # Example partition creation for Windows - be sure to change :0:0 above to :0:+<some size> and +500G here to appropriate
         #
         # sgdisk -n ${PARTITION_WIND}:0:+500G -c ${PARTITION_WIND}:"WIN11_${disk}" -t ${PARTITION_WIND}:C12A /dev/disk/by-id/${zfsdisks[${disk}]}
         # sgdisk -n ${PARTITION_RCVR}:0:0     -c ${PARTITION_RCVR}:"RCVR_${disk}"  -t ${PARTITION_RCVR}:2700 /dev/disk/by-id/${zfsdisks[${disk}]}
     done
-    
+
     # Refresh partition information
     partprobe
-    
+
     # Have to wait a bit for the partitions to actually show up
     echo "Wait for partition info to settle out"
     sleep 5
@@ -972,14 +972,14 @@ setup_swap_partition() {
     if [ "${HIBERNATE}" = "y" ] ; then
         # Hibernate, so we need a real swap partition(s)
         for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
-    
+
             case ${DISCENC} in
                 LUKS)
                     echo "Encrypting swap partition ${disk} size ${SIZE_SWAP}M"
-                    echo "${PASSPHRASE}" | cryptsetup luksFormat --type luks2 --disable-keyring -c aes-xts-plain64 -s 512 -h sha256 /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} 
+                    echo "${PASSPHRASE}" | cryptsetup luksFormat --type luks2 --disable-keyring -c aes-xts-plain64 -s 512 -h sha256 /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP}
                     echo "${PASSPHRASE}" | cryptsetup luksOpen --disable-keyring /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} swap_crypt${disk}
                     mkswap -f /dev/mapper/swap_crypt${disk}
-    
+
                     if [ ${disk} -eq 0 ] ; then
                         # Get derived key to insert into other encrypted devices
                         # To be more secure do this into a small ramdisk
@@ -991,12 +991,12 @@ setup_swap_partition() {
                     # Add the generated key from /etc/zfs/zroot.rawkey
                     echo "${PASSPHRASE}" | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} /etc/zfs/zroot.rawkey
                     ;;
-    
+
                 ZFSENC)
                     # ZFS encryption can just use a regular partition
                     mkswap -f /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP}
                     ;;
-    
+
                 NOENC)
                     # Not LUKS, so just use a regular partition
                     mkswap -f /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP}
@@ -1016,9 +1016,9 @@ luks_encrypt_root() {
         for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
             # Encrypted LUKS root
             echo "Encrypting root ZFS ${disk}"
-            echo "${PASSPHRASE}" | cryptsetup luksFormat --type luks2 -c aes-xts-plain64 -s 512 -h sha256 /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} 
+            echo "${PASSPHRASE}" | cryptsetup luksFormat --type luks2 -c aes-xts-plain64 -s 512 -h sha256 /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA}
             echo "${PASSPHRASE}" | cryptsetup luksOpen /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} root_crypt${disk}
-    
+
             # If no encrypted SWAP then use 1st root device as derived key
             # otherwise assume derived key was created above in "Create SWAP volume"
             if [ ${disk} -eq 0 ] && [ ${HIBERNATE} = "n" ] ; then
@@ -1026,7 +1026,7 @@ luks_encrypt_root() {
                 # To be more secure do this into a small ramdisk
                 /lib/cryptsetup/scripts/decrypt_derived root_crypt${disk} > /tmp/key
             fi
-    
+
             # Add the derived key to all the other devices
             echo "${PASSPHRASE}" | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} /tmp/key
             # Add the generated key from /etc/zfs/zroot.rawkey
@@ -1037,11 +1037,11 @@ luks_encrypt_root() {
 
 
 # -------------------------------------------------------------------------------------------------------
-create_rool_pool() {
+create_root_pool() {
     # COMPLETELY clear out build dir
     rm -rf ${ZFSBUILD}
     mkdir -p ${ZFSBUILD}
-    
+
     # Create root pool
     case ${DISCENC} in
         LUKS)
@@ -1054,7 +1054,7 @@ create_rool_pool() {
                  -O mountpoint=/ -R ${ZFSBUILD} \
                  ${POOLNAME} ${RAIDLEVEL} ${ZPOOLDISK}
             ;;
-    
+
         # With ZFS encryption we don't encrypt the pool, we encrypt individual
         # datasets hierarchies
         NOENC|ZFSENC)
@@ -1071,7 +1071,7 @@ create_rool_pool() {
               -O mountpoint=none -R ${ZFSBUILD} \
               ${POOLNAME} ${RAIDLEVEL} ${ZPOOLDISK}
             ;;
-    
+
         *)
             # Unknown option
             echo "Unknown option DISCENC = ${DISCENC}"
@@ -1084,7 +1084,7 @@ create_rool_pool() {
 # -------------------------------------------------------------------------------------------------------
 create_zfs_datasets() {
     # Main filesystem datasets
-    
+
     echo "Creating main zfs datasets"
     # Container for root filesystems - possibly zfs native encrypted
     if [ "${DISCENC}" = "ZFSENC" ] ; then
@@ -1092,20 +1092,20 @@ create_zfs_datasets() {
     else
         zfs create -o canmount=off -o mountpoint=none ${POOLNAME}/ROOT
     fi
-    
+
     # Actual dataset for suite we are installing now
     zfs create -o canmount=noauto -o mountpoint=/ ${POOLNAME}/ROOT/${SUITE}
-    
+
     zpool set bootfs=${POOLNAME}/ROOT/${SUITE} ${POOLNAME}
     zfs mount ${POOLNAME}/ROOT/${SUITE}
-    
+
     if [ "${DISCENC}" != "NOENC" ] ; then
         # Making sure we have the LUKS raw key available and/or
         # Making sure we have the non-root key used for other datasets (/home)
         mkdir -p ${ZFSBUILD}/etc/zfs
         cp /etc/zfs/zroot.*key ${ZFSBUILD}/etc/zfs
     fi
-    
+
     # zfs create pool/home and main user home dataset - possibly zfs native encrypted
     if [ "${DISCENC}" = "ZFSENC" ] ; then
         echo "${PASSPHRASE}" | zfs create -o canmount=off -o mountpoint=none -o compression=lz4 -o atime=off ${ZFSENC_HOME_OPTIONS} ${POOLNAME}/home
@@ -1114,7 +1114,7 @@ create_zfs_datasets() {
     fi
     zfs create -o canmount=on -o mountpoint=/home/${USERNAME} ${POOLNAME}/home/${USERNAME}
     zfs create -o canmount=on -o mountpoint=/root ${POOLNAME}/home/root
-    
+
     # If this system will use Docker (which manages its own datasets & snapshots):
     zfs create -o com.sun:auto-snapshot=false -o mountpoint=/var/lib/docker ${POOLNAME}/docker
 
@@ -1141,7 +1141,7 @@ install_debootstrap() {
     df -h
     echo "---------- $(tput setaf 1)About to debootstrap into ${ZFSBUILD}$(tput sgr0) -----------"
     read -r -t 15 -p "Press <enter> to continue (auto-continue in 15secs)"
-    
+
     # Install basic system
     echo "debootstrap to build initial system"
     debootstrap --include=${SUITE_BOOTSTRAP} ${SUITE} ${ZFSBUILD}
@@ -1161,7 +1161,7 @@ setup_boot_partition() {
         # Stop all found mdadm arrays - again, just in case.  Sheesh.
         # shellcheck disable=SC2156  # Not "injecting" filenames - this is standard find -exec
         find /dev -iname md* -type b -exec bash -c "umount {} > /dev/null 2>&1 ; mdadm --stop --force {} > /dev/null 2>&1 ; mdadm --remove {} > /dev/null 2>&1" \;
-    
+
         for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
             # Wipe mdadm superblock from all partitions found, even if not md raid partition
             mdadm --zero-superblock --force /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_BOOT} > /dev/null 2>&1
@@ -1170,7 +1170,7 @@ setup_boot_partition() {
         # NOTE: Need metadata=1.0 to ensure that mdadm metadata is written to the END of the partition, especially for UEFI
         echo y | mdadm --create ${BOOTDEVRAW} --metadata=1.0 --force --level=mirror --raid-devices=${#zfsdisks[@]} --homehost=${MYHOSTNAME} --name=efi  --assume-clean ${PARTSBOOT}
     fi
-    
+
     mkfs.vfat -v -F 32 -s 1 -n "BOOT_EFI" ${BOOTDEVRAW} > /dev/null
     echo "UUID=$(blkid -s UUID -o value ${BOOTDEVRAW}) \
           /boot/efi vfat defaults,x-systemd.after=zfs-mount.service 0 0" >> ${ZFSBUILD}/etc/fstab
@@ -1182,7 +1182,7 @@ setup_boot_partition() {
 setup_network_config() {
     echo "${MYHOSTNAME}" > ${ZFSBUILD}/etc/hostname
     echo "127.0.1.1  ${MYHOSTNAME}" >> ${ZFSBUILD}/etc/hosts
-    
+
     # Set up networking for netplan
     # renderer: networkd is for text mode only, use NetworkManager for gnome
     # We create a bridge here with all found ethernet interfaces as slaves
@@ -1198,12 +1198,12 @@ setup_network_config() {
 		      match:
 		        name: e*
 		      dhcp4: true
-		      dhcp6: true 
+		      dhcp6: true
 		      wakeonlan: true
 		      # === With the bridge config below, set dhcp to false
 		      # dhcp4: false
 		      # dhcp6: false
-		
+
 		# bridges:
 		#   br0:
 		#     interfaces: [alleths]
@@ -1252,7 +1252,7 @@ setup_apt_config() {
 				Suites: ${SUITE} ${SUITE}-updates ${SUITE}-backports
 				Components: main restricted universe multiverse
 				Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-				
+
 				Types: deb
 				URIs: http://security.ubuntu.com/ubuntu/
 				Suites: ${SUITE}-security
@@ -1278,29 +1278,29 @@ setup_apt_config() {
             cat > ${ZFSBUILD}/etc/apt/sources.list <<- EOF
 				deb http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse restricted
 				deb-src http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse restricted
-				
+
 				deb http://security.ubuntu.com/ubuntu ${SUITE}-security main multiverse restricted
 				deb-src http://security.ubuntu.com/ubuntu ${SUITE}-security main multiverse restricted
-				
+
 				deb http://archive.ubuntu.com/ubuntu ${SUITE}-updates main multiverse restricted
 				deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-updates main multiverse restricted
-				
+
 				deb http://archive.ubuntu.com/ubuntu ${SUITE}-backports main multiverse restricted
 				deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-backports main multiverse restricted
 			EOF
 
-            # We put universe into its own .list file so ansible apt_repository will match 
+            # We put universe into its own .list file so ansible apt_repository will match
             # TABs for this
             cat > ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu_universe.list <<- EOF
 				deb http://archive.ubuntu.com/ubuntu ${SUITE} universe
 				deb-src http://archive.ubuntu.com/ubuntu ${SUITE} universe
-				
+
 				deb http://security.ubuntu.com/ubuntu ${SUITE}-security universe
 				deb-src http://security.ubuntu.com/ubuntu ${SUITE}-security universe
-				
+
 				deb http://archive.ubuntu.com/ubuntu ${SUITE}-updates universe
 				deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-updates universe
-				
+
 				deb http://archive.ubuntu.com/ubuntu ${SUITE}-backports universe
 				deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-backports universe
 			EOF
@@ -1329,7 +1329,7 @@ prep_setup() {
     echo "Creating Setup.sh in new system for chroot"
     cat > ${ZFSBUILD}/root/Setup.sh <<- EOF
 		#!/bin/bash
-		
+
 		export RESCUE=${RESCUE}
 		export BOOTDEVRAW=${BOOTDEVRAW}
 		export DELAY=${DELAY}
@@ -1365,10 +1365,10 @@ prep_setup() {
 		export ZFSBOOTMENU_CMDLINE=${ZFSBOOTMENU_CMDLINE}
 		export USE_ZSWAP="${USE_ZSWAP}"
 		export WIPE_FRESH="${WIPE_FRESH}"
-		
+
 		[ "$1" = "-d" ] && set -x
 		[ "$1" = "packerci" ] && set -x
-		
+
 	EOF
 
     # Only need the list of disks for a fresh install
@@ -1511,7 +1511,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
     # For a non-wipe_fresh, we don't actually need to install refind since it's already
     # there in /boot/efi - so only do this if we're wiping fresh
-    if [ "${WIPE_FRESH}" = "y" ] ; then
+    if [ "${WIPE_FRESH}" = "y" ] ; then     # <<<<<------------------------------------------------ WIPE_FRESH ------ VVVVV
         refind-install --yes
 
         # For multiple disks, add a startup.nsh and do manual efibootmgr setup
@@ -1528,7 +1528,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
             cat <<- 'EOF' > /boot/efi/startup.nsh
 				@echo -off
 				cls
-				
+
 				# List all mapped file systems (disks/partitions)
 				echo -n "Enumerating filesystems... "
 				fs0:
@@ -1538,9 +1538,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 				    echo "No filesystems found."
 				    goto error
 				endif
-				
+
 				set found 0
-				
+
 				for %i in (fs*) do (
 				    echo -n "Checking %i for /EFI/refind/refind_x64.efi ... "
 				    if exist %i:\EFI\refind\refind_x64.efi then
@@ -1552,15 +1552,15 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 				        echo "not present"
 				    endif
 				)
-				
+
 				:error
 				echo "ERROR: Could not find /EFI/refind/refind_x64.efi on any filesystem."
 				goto end
-				
+
 				:done
 				echo "rEFInd launched successfully."
 				goto end
-				
+
 				:end
 			EOF
         fi # multiple boot disks
@@ -1607,7 +1607,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
         # Copy logo for syslinux if there
         [ -e /root/logo_sm.jpg ] && cp /root/logo_sm.jpg /boot/efi/syslinux
-    fi #WIPE_FRESH
+    fi # WIPE_FRESH                         # <<<<<------------------------------------------------ WIPE_FRESH ------ ^^^^^
 
 
     #
@@ -1647,63 +1647,69 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     zfs set canmount=noauto ${POOLNAME}/ROOT
     zfs set canmount=noauto ${POOLNAME}/ROOT/${SUITE}
 
-    #
-    # Install the ZFSBootMenu package directly
-    #
-    
-    # If this is NOT a UEFI system then we'll be using syslinux to boot.
-    # And that won't work with an EFI image, it needs the vmlinuz/initrd set
-    # So if it was trying for an EFI image we force it to the KERNEL version
-    # If it was trying for LOCAL then that's fine and leave it be.
-    if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "EFI" ] ; then
-        [[ ! -d /sys/firmware/efi ]] && ZFSBOOTMENU_BINARY_TYPE=KERNEL
-    fi
-    
-    echo "ZFSBOOTMENU_BINARY_TYPE = $ZFSBOOTMENU_BINARY_TYPE  ZFSBOOTMENU_REPO_TYPE = $ZFSBOOTMENU_REPO_TYPE ZFSBOOTMENU_CMDLINE = $ZFSBOOTMENU_CMDLINE"
-    
-    ## Either the actual zfsbootmenu EFI image
-    ## NOTE: syslinux requires the KERNEL version since it needs to use the
-    ##       vmlinuz/initrd files to boot with
-    if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "EFI" ] ; then
-        echo "--- Using zfsbootmenu EFI image"
-        curl -L https://get.zfsbootmenu.org/efi/recovery -o /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
-    
-        # Add rEFInd entry for ZFSBootMenu
-        # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-        cat >> /boot/efi/EFI/refind/refind.conf <<- EOF
-			
-			# ZFSBootMenu EFI Loader Configuration
-			menuentry "ZFSBootMenu" {
-			  loader EFI/zfsbootmenu/zfsbootmenu.efi
-			  icon EFI/refind/icons/os_ubuntu.png
-			}
-		EOF
-    fi # ZFSBOOTMENU_BINARY_TYPE
+    if [ "${WIPE_FRESH}" = "y" ] ; then     # <<<<<------------------------------------------------ WIPE_FRESH ------ VVVVV
+        #
+        # Install the ZFSBootMenu package directly
+        #
 
-    ##  or the unpacked EFI image (vmlinux/initrd)
-    ## NOTE: Right now hard-coded version in place.  Need a clean way to get latest version
-    ##       Fetch github releases json and parse, like in ansible-git_tools
-    if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "KERNEL" ] ; then
-        echo "--- Using zfsbootmenu KERNEL files"
-        curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v3.0.1/zfsbootmenu-recovery-x86_64-v3.0.1-linux6.12.tar.gz -o /usr/local/share/zfsbootmenu.tar.gz
-        tar xvzf /usr/local/share/zfsbootmenu.tar.gz --strip-components=1 -C /boot/efi/EFI/zfsbootmenu
-    fi
+        # If this is NOT a UEFI system then we'll be using syslinux to boot.
+        # And that won't work with an EFI image, it needs the vmlinuz/initrd set
+        # So if it was trying for an EFI image we force it to the KERNEL version
+        # If it was trying for LOCAL then that's fine and leave it be.
+        if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "EFI" ] ; then
+            [[ ! -d /sys/firmware/efi ]] && ZFSBOOTMENU_BINARY_TYPE=KERNEL
+        fi
 
-    # For a binary release setup we still need the syslinux-update.sh script from the repo
-    # NOTE: This is in /usr/local/bin so it can be run ad-hoc to update the syslinux config
-    #       For a LOCAL install it is in /etc/zfsbootmenu/generate-zbm.post.d/syslinux-update.sh
-    #       and run via generate-zbm.sh
-    if [ "${ZFSBOOTMENU_BINARY_TYPE}" != "LOCAL" ] ; then
-        curl -L https://raw.githubusercontent.com/zbm-dev/zfsbootmenu/master/contrib/syslinux-update.sh -o /boot/efi/syslinux-update.sh
-        chmod +x /boot/efi/syslinux-update.sh
-        sed -i '
-          s/^SYSLINUX_ROOT.*/SYSLINUX_ROOT="\/boot\/efi"/
-          s/^KERNEL_PATH.*/KERNEL_PATH="EFI\/zfsbootmenu"/
-          s/^SYSLINUX_CONFD.*/SYSLINUX_CONFD="\/boot\/efi\/snippets"/
-          s/^ZBM_KCL_ARGS.*/ZBM_KCL_ARGS="zbm.prefer=${POOLNAME} ro quiet loglevel=0 ${ZFSBOOTMENU_CMDLINE}"/
-          s/^cp .*/cp "\${SYSLINUX_CFG}" "\${SYSLINUX_ROOT}\/syslinux\/syslinux.cfg"/
-         ' /boot/efi/syslinux-update.sh
-    fi
+        echo "ZFSBOOTMENU_BINARY_TYPE = $ZFSBOOTMENU_BINARY_TYPE  ZFSBOOTMENU_REPO_TYPE = $ZFSBOOTMENU_REPO_TYPE ZFSBOOTMENU_CMDLINE = $ZFSBOOTMENU_CMDLINE"
+
+        ## Either the actual zfsbootmenu EFI image
+        ## NOTE: syslinux requires the KERNEL version since it needs to use the
+        ##       vmlinuz/initrd files to boot with
+        if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "EFI" ] ; then
+            echo "--- Using zfsbootmenu EFI image"
+            curl -L https://get.zfsbootmenu.org/efi/recovery -o /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
+
+            # Add rEFInd entry for ZFSBootMenu
+            # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+            cat >> /boot/efi/EFI/refind/refind.conf <<- EOF
+
+				# ZFSBootMenu EFI Loader Configuration
+				menuentry "ZFSBootMenu" {
+				  loader EFI/zfsbootmenu/zfsbootmenu.efi
+				  icon EFI/refind/icons/os_ubuntu.png
+				}
+			EOF
+        fi # ZFSBOOTMENU_BINARY_TYPE
+
+        ##  or the unpacked EFI image (vmlinux/initrd)
+        ## NOTE: Right now hard-coded version in place.  Need a clean way to get latest version
+        ##       Fetch github releases json and parse, like in ansible-git_tools
+        if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "KERNEL" ] ; then
+            echo "--- Using zfsbootmenu KERNEL files"
+            curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v3.0.1/zfsbootmenu-recovery-x86_64-v3.0.1-linux6.12.tar.gz -o /usr/local/share/zfsbootmenu.tar.gz
+            tar xvzf /usr/local/share/zfsbootmenu.tar.gz --strip-components=1 -C /boot/efi/EFI/zfsbootmenu
+        fi
+
+        # For a binary release setup we still need the syslinux-update.sh script from the repo
+        # NOTE: This is in /usr/local/bin so it can be run ad-hoc to update the syslinux config
+        #       For a LOCAL install it is in /etc/zfsbootmenu/generate-zbm.post.d/syslinux-update.sh
+        #       and run via generate-zbm.sh
+        if [ "${ZFSBOOTMENU_BINARY_TYPE}" != "LOCAL" ] ; then
+            curl -L https://raw.githubusercontent.com/zbm-dev/zfsbootmenu/master/contrib/syslinux-update.sh -o /boot/efi/syslinux-update.sh
+            chmod +x /boot/efi/syslinux-update.sh
+            sed -i '
+              s/^SYSLINUX_ROOT.*/SYSLINUX_ROOT="\/boot\/efi"/
+              s/^KERNEL_PATH.*/KERNEL_PATH="EFI\/zfsbootmenu"/
+              s/^SYSLINUX_CONFD.*/SYSLINUX_CONFD="\/boot\/efi\/snippets"/
+              s/^ZBM_KCL_ARGS.*/ZBM_KCL_ARGS="zbm.prefer=${POOLNAME} ro quiet loglevel=0 ${ZFSBOOTMENU_CMDLINE}"/
+              s/^cp .*/cp "\${SYSLINUX_CFG}" "\${SYSLINUX_ROOT}\/syslinux\/syslinux.cfg"/
+             ' /boot/efi/syslinux-update.sh
+        fi
+    fi # WIPE_FRESH                         # <<<<<------------------------------------------------ WIPE_FRESH ------ ^^^^^
+
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    #   Configuration needed regardless of WIPE_FRESH
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
 
     #### OR install the git repo and build locally
 
@@ -1723,7 +1729,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         git clone https://github.com/zbm-dev/zfsbootmenu.git /usr/local/share/zfsbootmenu
     fi
 
-    ## Now intall - ONLY if using git repo
+    ## Now install - ONLY if using git repo
     if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "LOCAL" ] ; then
         echo "--- zfsbootmenu building LOCAL"
         cd /usr/local/share/zfsbootmenu
@@ -1777,201 +1783,209 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
          ' /etc/zfsbootmenu/generate-zbm.post.d/syslinux-update.sh
     fi # LOCAL
 
-    mkdir -p /boot/efi/snippets
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    #   Modifications to /boot/efi only when WIPE_FRESH
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    if [ "${WIPE_FRESH}" = "y" ] ; then     # <<<<<------------------------------------------------ WIPE_FRESH ------ VVVVV
+        mkdir -p /boot/efi/snippets
 
-    # Header for syslinux.cfg
-    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat > /boot/efi/snippets/01_header <<- EOF
-		UI vesamenu.c32
-		PROMPT 0
-		
-		MENU BACKGROUND logo_sm.jpg
-		MENU TITLE Boot Menu
-		TIMEOUT 50
-		
-	EOF
-
-    # Syslinux hardware info
-    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat > /boot/efi/snippets/06_hardware <<- EOF
-		LABEL hdt
-		MENU LABEL Hardware Info
-		COM32 hdt.c32
-		
-	EOF
-
-    # Download and install memtest86
-    # EFI version is latest v11, syslinux version is v4
-    rm -rf /tmp/memtest86 && mkdir -p /tmp/memtest86/mnt
-    mkdir -p /boot/efi/EFI/tools/memtest86
-    curl -L https://www.memtest86.com/downloads/memtest86-usb.zip -o /tmp/memtest86/memtest86-usb.zip
-    curl -L https://www.memtest86.com/downloads/memtest86-4.3.7-iso.zip -o /tmp/memtest86/memtest86-iso.zip
-    # For EFI
-       unzip -d /tmp/memtest86 /tmp/memtest86/memtest86-usb.zip memtest86-usb.img
-       losetup -P /dev/loop33 /tmp/memtest86/memtest86-usb.img
-       mount -o loop /dev/loop33p1 /tmp/memtest86/mnt
-       cp /tmp/memtest86/mnt/EFI/BOOT/BOOTX64.efi /boot/efi/EFI/tools/memtest86/memtest86.efi
-       umount /tmp/memtest86/mnt
-       losetup -d /dev/loop33
-    # For Syslinux
-       unzip -d /tmp/memtest86 /tmp/memtest86/memtest86-iso.zip Memtest86-4.3.7.iso
-       mount -o loop /tmp/memtest86/Memtest86-4.3.7.iso /tmp/memtest86/mnt
-       cp /tmp/memtest86/mnt/isolinux/memtest /boot/efi/EFI/tools/memtest86/memtest86.syslinux
-       umount /tmp/memtest86/mnt
-    
-    # Syslinux entry for memtest86+
-    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-    cat > /boot/efi/snippets/05_memtest86 << EOF
-		LABEL Memtest86+
-		KERNEL /EFI/tools/memtest86/memtest86.syslinux
-		
-	EOF
-
-
-    #
-    # Set up LUKS unlocking
-    #
-    if [ "${DISCENC}" = "LUKS" ] ; then
-        for DISK in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
-            echo "root_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) /etc/zfs/zroot.rawkey discard,keyfile-timeout=10s" >> /etc/crypttab
-            if [ ${HIBERNATE} = "y" ] ; then
-                echo "swap_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_SWAP}) /etc/zfs/zroot.rawkey discard,keyfile-timeout=10s" >> /etc/crypttab
-            fi
-        done
-    
-        #
-        # Early-stage script for zfsbootmenu - scan for ZFS_ partitions which
-        # should be LUKS encrypted and try to open them all
-        #
+        # Header for syslinux.cfg
         # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-        cat > /usr/local/bin/zfsbootmenu_luks_unlock.sh <<- 'EOF'
-			#!/bin/bash
-			
-			sources=(
-			  /lib/profiling-lib.sh
-			  /etc/zfsbootmenu.conf
-			  /lib/zfsbootmenu-core.sh
-			  /lib/kmsg-log-lib.sh
-			  /etc/profile
-			)
-			
-			for src in "${sources[@]}"; do
-			  # shellcheck disable=SC1090
-			  if ! source "${src}" > /dev/null 2>&1 ; then
-			    echo -e "\033[0;31mWARNING: ${src} was not sourced; unable to proceed\033[0m"
-			    exit 1
-			  fi
-			done
-			unset src sources
-			
-			# We only unlock the ZFS partition(s) since the SWAP ones can use the
-			# /etc/zfs/zroot.rawkey to unlock once main pool is open
-			# ZFS_PARTS=(/dev/disk/by-partlabel/{SWAP_*,ZFS_*})
-			ZFS_PARTS=(/dev/disk/by-partlabel/ZFS_*)
-			
-			echo "Found these partitions for LUKS encryption"
-			echo $ZFS_PARTS
-			echo ""
-			
-			# Read passphrase for LUKS encryption into $REPLY
-			read -s -p "LUKS encryption passphrase : "
-			
-			for idx in ${!ZFS_PARTS[@]} ; do
-			    # Grab just ZFS_0 or SWAP_0
-			    test_luks=$(basename ${ZFS_PARTS[$idx]})
-			    # luks is the full path to the disk partition
-			    luks=${ZFS_PARTS[$idx]}
-			    # Set $dm to root_crypt0 or swap_crypt0 depending on basename
-			    [ ${test_luks%_*} = "ZFS" ] && dm=root_crypt${idx}
-			    [ ${test_luks%_*} = "SWAP" ] && dm=swap_crypt${idx}
-			
-			    if ! cryptsetup isLuks ${luks} >/dev/null 2>&1 ; then
-			        zwarn "LUKS device ${luks} missing LUKS partition header"
-			        exit
-			    fi
-			
-			    if cryptsetup status "${dm}" >/dev/null 2>&1 ; then
-			        zinfo "${dm} already active, continuing"
-			        continue
-			    fi
-			
-			    header="$( center_string "[CTRL-C] cancel luksOpen attempts" )"
-			
-			    tput clear
-			    colorize red "${header}\n\n"
-			
-			    # https://fossies.org/linux/cryptsetup/docs/Keyring.txt
-			    echo $REPLY | cryptsetup luksOpen ${luks} ${dm}
-			    ret=$?
-			
-			    # successfully entered a passphrase
-			    if [ "${ret}" -eq 0 ] ; then
-			        zdebug "$(
-			            cryptsetup status "${dm}"
-			        )"
-			        continue
-			    fi
-			
-			    # ctrl-c'd the process
-			    if [ "${ret}" -eq 1 ] ; then
-			        zdebug "canceled luksOpen attempts via SIGINT"
-			        exit
-			    fi
-			
-			    # failed all password attempts
-			    if [ "${ret}" -eq 2 ] ; then
-			        if timed_prompt -e "emergency shell" \
-			            -r "continue unlock attempts" \
-			            -p "Continuing in %0.2d seconds" ; then
-			            continue
-			        else
-			            emergency_shell "unable to unlock LUKS partition"
-			        fi
-			    fi
-			done
+        cat > /boot/efi/snippets/01_header <<- EOF
+			UI vesamenu.c32
+			PROMPT 0
+
+			MENU BACKGROUND logo_sm.jpg
+			MENU TITLE Boot Menu
+			TIMEOUT 50
+
 		EOF
-        chmod +x /usr/local/bin/zfsbootmenu_luks_unlock.sh
 
-        echo 'zfsbootmenu_early_setup+=" /usr/local/bin/zfsbootmenu_luks_unlock.sh "' > /etc/zfsbootmenu/dracut.conf.d/luks_zbm.conf
-    fi #DISCENC
+        # Syslinux hardware info
+        # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+        cat > /boot/efi/snippets/06_hardware <<- EOF
+			LABEL hdt
+			MENU LABEL Hardware Info
+			COM32 hdt.c32
+
+		EOF
+
+        # Download and install memtest86
+        # EFI version is latest v11, syslinux version is v4
+        rm -rf /tmp/memtest86 && mkdir -p /tmp/memtest86/mnt
+        mkdir -p /boot/efi/EFI/tools/memtest86
+        curl -L https://www.memtest86.com/downloads/memtest86-usb.zip -o /tmp/memtest86/memtest86-usb.zip
+        curl -L https://www.memtest86.com/downloads/memtest86-4.3.7-iso.zip -o /tmp/memtest86/memtest86-iso.zip
+        # For EFI
+           unzip -d /tmp/memtest86 /tmp/memtest86/memtest86-usb.zip memtest86-usb.img
+           losetup -P /dev/loop33 /tmp/memtest86/memtest86-usb.img
+           mount -o loop /dev/loop33p1 /tmp/memtest86/mnt
+           cp /tmp/memtest86/mnt/EFI/BOOT/BOOTX64.efi /boot/efi/EFI/tools/memtest86/memtest86.efi
+           umount /tmp/memtest86/mnt
+           losetup -d /dev/loop33
+        # For Syslinux
+           unzip -d /tmp/memtest86 /tmp/memtest86/memtest86-iso.zip Memtest86-4.3.7.iso
+           mount -o loop /tmp/memtest86/Memtest86-4.3.7.iso /tmp/memtest86/mnt
+           cp /tmp/memtest86/mnt/isolinux/memtest /boot/efi/EFI/tools/memtest86/memtest86.syslinux
+           umount /tmp/memtest86/mnt
+
+        # Syslinux entry for memtest86+
+        # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+        cat > /boot/efi/snippets/05_memtest86 << EOF
+			LABEL Memtest86+
+			KERNEL /EFI/tools/memtest86/memtest86.syslinux
+
+		EOF
 
 
-    # Using a swap partition ?
-    if [ ${HIBERNATE} = "y" ] ; then
-
-        # Hibernate is enabled - we HAVE to use a swap partition
-        # Also, only works with a single disk (as in laptop)
+        #
+        # Set up LUKS unlocking
+        #
         if [ "${DISCENC}" = "LUKS" ] ; then
-
-            # LUKS encrypted
-            for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
-                echo "/dev/mapper/swap_crypt${disk} none swap discard,sw 0 0" >> /etc/fstab
+            for DISK in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
+                echo "root_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) /etc/zfs/zroot.rawkey discard,keyfile-timeout=10s" >> /etc/crypttab
+                if [ ${HIBERNATE} = "y" ] ; then
+                    echo "swap_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_SWAP}) /etc/zfs/zroot.rawkey discard,keyfile-timeout=10s" >> /etc/crypttab
+                fi
             done
+
+            #
+            # Early-stage script for zfsbootmenu - scan for ZFS_ partitions which
+            # should be LUKS encrypted and try to open them all
+            #
+            # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+            cat > /usr/local/bin/zfsbootmenu_luks_unlock.sh <<- 'EOF'
+				#!/bin/bash
+
+				sources=(
+				  /lib/profiling-lib.sh
+				  /etc/zfsbootmenu.conf
+				  /lib/zfsbootmenu-core.sh
+				  /lib/kmsg-log-lib.sh
+				  /etc/profile
+				)
+
+				for src in "${sources[@]}"; do
+				  # shellcheck disable=SC1090
+				  if ! source "${src}" > /dev/null 2>&1 ; then
+				    echo -e "\033[0;31mWARNING: ${src} was not sourced; unable to proceed\033[0m"
+				    exit 1
+				  fi
+				done
+				unset src sources
+
+				# We only unlock the ZFS partition(s) since the SWAP ones can use the
+				# /etc/zfs/zroot.rawkey to unlock once main pool is open
+				# ZFS_PARTS=(/dev/disk/by-partlabel/{SWAP_*,ZFS_*})
+				ZFS_PARTS=(/dev/disk/by-partlabel/ZFS_*)
+
+				echo "Found these partitions for LUKS encryption"
+				echo $ZFS_PARTS
+				echo ""
+
+				# Read passphrase for LUKS encryption into $REPLY
+				read -s -p "LUKS encryption passphrase : "
+
+				for idx in ${!ZFS_PARTS[@]} ; do
+				    # Grab just ZFS_0 or SWAP_0
+				    test_luks=$(basename ${ZFS_PARTS[$idx]})
+				    # luks is the full path to the disk partition
+				    luks=${ZFS_PARTS[$idx]}
+				    # Set $dm to root_crypt0 or swap_crypt0 depending on basename
+				    [ ${test_luks%_*} = "ZFS" ] && dm=root_crypt${idx}
+				    [ ${test_luks%_*} = "SWAP" ] && dm=swap_crypt${idx}
+
+				    if ! cryptsetup isLuks ${luks} >/dev/null 2>&1 ; then
+				        zwarn "LUKS device ${luks} missing LUKS partition header"
+				        exit
+				    fi
+
+				    if cryptsetup status "${dm}" >/dev/null 2>&1 ; then
+				        zinfo "${dm} already active, continuing"
+				        continue
+				    fi
+
+				    header="$( center_string "[CTRL-C] cancel luksOpen attempts" )"
+
+				    tput clear
+				    colorize red "${header}\n\n"
+
+				    # https://fossies.org/linux/cryptsetup/docs/Keyring.txt
+				    echo $REPLY | cryptsetup luksOpen ${luks} ${dm}
+				    ret=$?
+
+				    # successfully entered a passphrase
+				    if [ "${ret}" -eq 0 ] ; then
+				        zdebug "$(
+				            cryptsetup status "${dm}"
+				        )"
+				        continue
+				    fi
+
+				    # ctrl-c'd the process
+				    if [ "${ret}" -eq 1 ] ; then
+				        zdebug "canceled luksOpen attempts via SIGINT"
+				        exit
+				    fi
+
+				    # failed all password attempts
+				    if [ "${ret}" -eq 2 ] ; then
+				        if timed_prompt -e "emergency shell" \
+				            -r "continue unlock attempts" \
+				            -p "Continuing in %0.2d seconds" ; then
+				            continue
+				        else
+				            emergency_shell "unable to unlock LUKS partition"
+				        fi
+				    fi
+				done
+			EOF
+            chmod +x /usr/local/bin/zfsbootmenu_luks_unlock.sh
+
+            echo 'zfsbootmenu_early_setup+=" /usr/local/bin/zfsbootmenu_luks_unlock.sh "' > /etc/zfsbootmenu/dracut.conf.d/luks_zbm.conf
+        fi #DISCENC
+
+
+        # Using a swap partition ?
+        if [ ${HIBERNATE} = "y" ] ; then
+
+            # Hibernate is enabled - we HAVE to use a swap partition
+            # Also, only works with a single disk (as in laptop)
+            if [ "${DISCENC}" = "LUKS" ] ; then
+
+                # LUKS encrypted
+                for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
+                    echo "/dev/mapper/swap_crypt${disk} none swap discard,sw 0 0" >> /etc/fstab
+                done
+
+            else
+
+                # Not LUKS encrypted
+                for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
+                    echo "UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP}) none swap discard,sw 0 0" >> /etc/fstab
+                done
+
+            fi # DISCENC for LUKS
+
+            # If using zswap enable lz4 compresstion
+            if [ "ZZ${USE_ZSWAP}" != "ZZ" ]; then
+                echo "lz4" >> /etc/modules-load.d/zfs-lz4.conf
+            fi
 
         else
-
-            # Not LUKS encrypted
-            for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
-                echo "UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP}) none swap discard,sw 0 0" >> /etc/fstab
-            done
-
-        fi # DISCENC for LUKS
-
-        # If using zswap enable lz4 compresstion
-        if [ "ZZ${USE_ZSWAP}" != "ZZ" ]; then
-            echo "lz4" >> /etc/modules-load.d/zfs-lz4.conf
-        fi
-
-    else
-        # No swap partition - maybe using a zvol for swap
-        echo "Enabling swap size ${SIZE_SWAP} on /dev/zvol/${POOLNAME}/swap"
-        mkswap -f /dev/zvol/${POOLNAME}/swap
-        if [ ${SIZE_SWAP} -ne 0 ] ; then
-            echo "/dev/zvol/${POOLNAME}/swap none swap discard,sw 0 0" >> /etc/fstab
-        fi
-    fi # HIBERNATE
+            # No swap partition - maybe using a zvol for swap
+            echo "Enabling swap size ${SIZE_SWAP} on /dev/zvol/${POOLNAME}/swap"
+            mkswap -f /dev/zvol/${POOLNAME}/swap
+            if [ ${SIZE_SWAP} -ne 0 ] ; then
+                echo "/dev/zvol/${POOLNAME}/swap none swap discard,sw 0 0" >> /etc/fstab
+            fi
+        fi # HIBERNATE
+    fi # WIPE_FRESH                         # <<<<<------------------------------------------------ WIPE_FRESH ------ ^^^^^
 
 
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    #   Configuration needed regardless of WIPE_FRESH
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     #
     # Potentially add delay before importing root pool in initramfs
     #
@@ -2009,9 +2023,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         cat > /usr/bin/zfs-multi-mount.sh <<- 'EOF'
 			#!/usr/bin/env bash
 			# https://gbyte.dev/blog/unlock-mount-several-zfs-datasets-boot-single-passphrase
-			
+
 			PATH=/usr/bin:/sbin:/bin
-			
+
 			help() {
 			    echo "Usage: $(basename "$0") [OPTION]... [SOURCE_POOL/DATASET]..."
 			    echo
@@ -2020,7 +2034,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 			    echo " -h, --help           show this help"
 			    exit 0
 			}
-			
+
 			for arg in "$@"; do
 			  case $arg in
 			  -s | --systemd)
@@ -2036,12 +2050,12 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 			    die "Invalid option '$1' Try '$(basename "$0") --help' for more information." ;;
 			  esac
 			done
-			
+
 			datasets=("$@")
 			[ ${#datasets[@]} -eq 0 ] && mapfile -t datasets < <(zfs list -H -o name)
 			attempt=0
 			attempt_limit=3
-			
+
 			function ask_password {
 			  if [ -v systemd ]; then
 			    key=$(systemd-ask-password "Enter $dataset passphrase:" --no-tty) # While booting.
@@ -2049,7 +2063,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 			    read -srp "Enter $dataset passphrase: " key ; echo # Other places.
 			  fi
 			}
-			
+
 			function load_key {
 			  ! zfs list -H -o name | grep -qx "$dataset" && echo "ERROR: Dataset '$dataset' does not exist." && return 1
 			  [[ $attempt == "$attempt_limit" ]] && echo "No more attempts left." && exit 1
@@ -2066,7 +2080,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 			      exit 1
 			    fi
 			  fi
-			
+
 			  if [ ! -v key ]; then
 			    ((attempt++))
 			    ask_password
@@ -2078,17 +2092,17 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 			  attempt=0
 			  return 0
 			}
-			
+
 			for dataset in "${datasets[@]}"; do
 			  ! load_key "$dataset" && exit 1
-			
+
 			  # Mounting as non-root user on Linux is not possible,
 			  # see https://github.com/openzfs/zfs/issues/10648.
 			  [ ! -v no_mount ] && sudo zfs mount "$dataset" && echo "Dataset '$dataset' has been mounted."
 			done
-			
+
 			unset key
-			
+
 			exit 0
 		EOF
         chmod 755 /usr/bin/zfs-multi-mount.sh
@@ -2108,19 +2122,19 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 			### If this system does not have unknown keys, then OnFailure may be enabled
 			### to ensure a proper stop when missing keys.
 			# OnFailure=emergency.target
-			
+
 			### For now, we only unlock the home dataset which will unlock any child
 			### datasets under it (root and ${USERNAME} by default from the ZFS-root.sh script)
 			### If we do NOT specify the datasets here, then zfs-multi-mount.sh will try
 			### to unlock ALl encrypted datasets it finds.  For those without keys this can
 			### cause a delay until it times out.
-			
+
 			[Service]
 			Type=oneshot
 			RemainAfterExit=yes
-			
+
 			ExecStart=/usr/bin/zfs-multi-mount.sh --systemd ${POOLNAME}/home
-			
+
 			[Install]
 			WantedBy=zfs-mount.service
 		EOF
@@ -2160,16 +2174,16 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     cat >> /etc/bash.bashrc << EOF
 
 		PS1="${debian_chroot:+($debian_chroot)}\[\$(tput setaf 2)\]\u@\[\$(tput bold)\]\[\$(tput setaf 5)\]\h\[\$(tput sgr0)\]\[\$(tput setaf 7)\]:\[\$(tput bold)\]\[\$(tput setaf 4)\]\w\[\$(tput setaf 7)\]\\$ \[\$(tput sgr0)\]"
-		
+
 		# https://unix.stackexchange.com/questions/99325/automatically-save-bash-command-history-in-screen-session
 		PROMPT_COMMAND='history -a; history -n;'
 	EOF
 
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
     cat >> /etc/skel/.bashrc <<- EOF
-			
+
 			PS1="${debian_chroot:+($debian_chroot)}\[\$(tput setaf 2)\]\u@\[\$(tput bold)\]\[\$(tput setaf 5)\]\h\[\$(tput sgr0)\]\[\$(tput setaf 7)\]:\[\$(tput bold)\]\[\$(tput setaf 4)\]\w\[\$(tput setaf 7)\]\\$ \[\$(tput sgr0)\]"
-			
+
 			# https://unix.stackexchange.com/questions/99325/automatically-save-bash-command-history-in-screen-session
 			PROMPT_COMMAND='history -a; history -n;'
 	EOF
@@ -2186,7 +2200,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     cat >> /root/.bashrc <<- "EOF"
 		# PS1='\[\033[01;37m\]\[\033[01;41m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]$ '
 		PS1='\[\033[01;37m\]\[\033[01;41m\]\u@\[\033[00m\]\[$(tput bold)\]\[$(tput setaf 5)\]\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]$ '
-		
+
 		# https://unix.stackexchange.com/questions/99325/automatically-save-bash-command-history-in-screen-session
 		PROMPT_COMMAND='history -a; history -n;'
 		HISTSIZE=5000
@@ -2196,31 +2210,40 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 	EOF
 
 
-    # Create user
+    # Create user - this create the mountpoint /home/${USERNAME}
     useradd -c "${UCOMMENT}" -p $(echo "${UPASSWORD}" | mkpasswd -m sha-512 --stdin) -M --home-dir /home/${USERNAME} --user-group --groups adm,cdrom,dip,lpadmin,plugdev,sambashare,sudo --shell /bin/bash ${USERNAME} > /dev/null 2>&1
-    # Since /etc/skel/* files aren't copied, have to do it manually
-    rsync -a /etc/skel/ /home/${USERNAME}
-    mkdir /home/${USERNAME}/.ssh
-    chmod 700 /home/${USERNAME}/.ssh
-    
-    if [ "${AUTHKEYS}" != "none" ] ; then
-      for SSHKEY in ${AUTHKEYS} ; do
-          FETCHKEY=$(wget --quiet -O- https://github.com/${SSHKEY}.keys)
-          if [ ${#FETCHKEY} -ne 0 ] ; then
-              echo "####### Github ${SSHKEY} key #######" >> /home/${USERNAME}/.ssh/authorized_keys 
-              echo "${FETCHKEY}" >> /home/${USERNAME}/.ssh/authorized_keys 
-              echo "#" >> /home/${USERNAME}/.ssh/authorized_keys
-          fi
-      done
-    fi
 
-    if [[ -v SSHPUBKEY ]] ; then
-        echo "####### ZFS-root.conf configured key #######" >> /home/${USERNAME}/.ssh/authorized_keys 
-        echo "${SSHPUBKEY}" >> /home/${USERNAME}/.ssh/authorized_keys 
-    fi
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    #   Modifications to /boot/efi only when WIPE_FRESH
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    if [ "${WIPE_FRESH}" = "y" ] ; then     # <<<<<------------------------------------------------ WIPE_FRESH ------ VVVVV
+        # Since /etc/skel/* files aren't copied, have to do it manually
+        rsync -a /etc/skel/ /home/${USERNAME}
+        mkdir /home/${USERNAME}/.ssh
+        chmod 700 /home/${USERNAME}/.ssh
 
-    chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}
+        if [ "${AUTHKEYS}" != "none" ] ; then
+          for SSHKEY in ${AUTHKEYS} ; do
+              FETCHKEY=$(wget --quiet -O- https://github.com/${SSHKEY}.keys)
+              if [ ${#FETCHKEY} -ne 0 ] ; then
+                  echo "####### Github ${SSHKEY} key #######" >> /home/${USERNAME}/.ssh/authorized_keys
+                  echo "${FETCHKEY}" >> /home/${USERNAME}/.ssh/authorized_keys
+                  echo "#" >> /home/${USERNAME}/.ssh/authorized_keys
+              fi
+          done
+        fi
 
+        if [[ -v SSHPUBKEY ]] ; then
+            echo "####### ZFS-root.conf configured key #######" >> /home/${USERNAME}/.ssh/authorized_keys
+            echo "${SSHPUBKEY}" >> /home/${USERNAME}/.ssh/authorized_keys
+        fi
+
+        chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}
+    fi # WIPE_FRESH                         # <<<<<------------------------------------------------ WIPE_FRESH ------ ^^^^^
+
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+    #   Configuration needed regardless of WIPE_FRESH
+    # <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
     #
     # Set up Dropbear - after user is created with .ssh/authorized_keys
     # so those keys can be used in the initramfs
@@ -2260,8 +2283,10 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     # For ZFS encryption point to the /etc/zfs/zroot.key files in the initramfs
     # These keys should have been copied into place above outside the chroot
     if [ "${DISCENC}" = "ZFSENC" ] ; then
-      echo 'install_items+=" /etc/zfs/zroot.key /etc/zfs/zroot.homekey"' >> /etc/dracut.conf.d/zfskey.conf
-      zfs change-key -o keylocation=file:///etc/zfs/zroot.key -o keyformat=passphrase ${POOLNAME}/ROOT
+        echo 'install_items+=" /etc/zfs/zroot.key /etc/zfs/zroot.homekey"' >> /etc/dracut.conf.d/zfskey.conf
+        if [ "${WIPE_FRESH}" = "y" ] ; then     # <<<<<------------------------------------------------ WIPE_FRESH ------ VVVVV
+            zfs change-key -o keylocation=file:///etc/zfs/zroot.key -o keyformat=passphrase ${POOLNAME}/ROOT
+        fi # WIPE_FRESH                         # <<<<<------------------------------------------------ WIPE_FRESH ------ ^^^^^
     fi
 
     # For LUKS point to the larger 32-byte (zfs enc compatible) /etc/zfs/zroot.rawkey in the initramfs
@@ -2269,15 +2294,17 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         echo 'install_items+=" /etc/zfs/zroot.rawkey "' >> /etc/dracut.conf.d/zfskey.conf
     fi
 
-    dracut -v -f --regenerate-all
+    if [ "${WIPE_FRESH}" = "y" ] ; then     # <<<<<------------------------------------------------ WIPE_FRESH ------ VVVVV
+        dracut -v -f --regenerate-all
 
-    if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "LOCAL" ] ; then
-        # generate-zbm only there if we built from scratch, not using downloaded image
-        [ -e /usr/bin/generate-zbm ] && generate-zbm --debug
-    else
-        # Otherwise use syslinux-update.sh to create/update the syslinux.cfg
-        [ -e /boot/efi/syslinux-update.sh ] && /boot/efi/syslinux-update.sh 
-    fi
+        if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "LOCAL" ] ; then
+            # generate-zbm only there if we built from scratch, not using downloaded image
+            [ -e /usr/bin/generate-zbm ] && generate-zbm --debug
+        else
+            # Otherwise use syslinux-update.sh to create/update the syslinux.cfg
+            [ -e /boot/efi/syslinux-update.sh ] && /boot/efi/syslinux-update.sh
+        fi
+    fi # WIPE_FRESH                         # <<<<<------------------------------------------------ WIPE_FRESH ------ ^^^^^
 
 
     #
@@ -2299,10 +2326,10 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
                 SUITE_NUM="24.04"
                 ;;
         esac
-    
+
         # Create apt sources for sbctl
         curl -fsSL https://download.opensuse.org/repositories/home:jloeser:secureboot/xUbuntu_${SUITE_NUM}/Release.key | gpg --dearmor | sudo tee /usr/share/keyrings/secureboot.gpg > /dev/null
-    
+
         # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
         cat > /etc/apt/sources.list.d/secureboot.sources <<- EOF
 			X-Repolib-Name: SecureBoot
@@ -2318,29 +2345,31 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         apt-get -qq --yes --no-install-recommends install systemd-boot-efi
         apt-get -qq --yes --no-install-recommends install sbctl systemd-ukify
 
-        # Only need to create the efi image if we installed zfsbootmenu as the
-        # kernel/initramfs setup or built locally
-        if [ "${ZFSBOOTMENU_BINARY_TYPE}" != "EFI" ] ; then
-            # Create zfsbootmenu efi bundle - use the same name as the EFI image from
-            # when we installed zfsbootmenu above
-            /usr/bin/ukify build \
-                --linux=/boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu \
-                --initrd=/boot/efi/EFI/zfsbootmenu/initramfs-bootmenu.img \
-                --output=/boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi \
-                --cmdline='quiet rw'
-        fi
+        if [ "${WIPE_FRESH}" = "y" ] ; then     # <<<<<------------------------------------------------ WIPE_FRESH ------ VVVVV
+            # Only need to create the efi image if we installed zfsbootmenu as the
+            # kernel/initramfs setup or built locally
+            if [ "${ZFSBOOTMENU_BINARY_TYPE}" != "EFI" ] ; then
+                # Create zfsbootmenu efi bundle - use the same name as the EFI image from
+                # when we installed zfsbootmenu above
+                /usr/bin/ukify build \
+                    --linux=/boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu \
+                    --initrd=/boot/efi/EFI/zfsbootmenu/initramfs-bootmenu.img \
+                    --output=/boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi \
+                    --cmdline='quiet rw'
+            fi
 
-        # Initialize sbctl and sign all the things
-        # sbctl setup --setup --config /etc/sbctl/sbctl.conf
-        /usr/sbin/sbctl create-keys
-        /usr/sbin/sbctl enroll-keys --microsoft
-        /usr/sbin/sbctl sign -s /boot/efi/EFI/refind/refind_x64.efi
-        /usr/sbin/sbctl sign -s /boot/efi/EFI/tools/memtest86/memtest86.efi
-        /usr/sbin/sbctl sign -s /boot/efi/EFI/tools/shellx64.efi
-        /usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
-        if [ "${ZFSBOOTMENU_BINARY_TYPE}" != "EFI" ] ; then
-            /usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu
-        fi
+            # Initialize sbctl and sign all the things
+            # sbctl setup --setup --config /etc/sbctl/sbctl.conf
+            /usr/sbin/sbctl create-keys
+            /usr/sbin/sbctl enroll-keys --microsoft
+            /usr/sbin/sbctl sign -s /boot/efi/EFI/refind/refind_x64.efi
+            /usr/sbin/sbctl sign -s /boot/efi/EFI/tools/memtest86/memtest86.efi
+            /usr/sbin/sbctl sign -s /boot/efi/EFI/tools/shellx64.efi
+            /usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
+            if [ "${ZFSBOOTMENU_BINARY_TYPE}" != "EFI" ] ; then
+                /usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu
+            fi
+        fi # WIPE_FRESH                         # <<<<<------------------------------------------------ WIPE_FRESH ------ ^^^^^
 
         # Setup systemd path watch to update zfsbootmenu efi when zfsbootmenu is updated
         # This way when you update ZBM, it will automagically update and sign the EFI image
@@ -2348,7 +2377,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         cat > /etc/systemd/system/zfsbootmenu-sign-efi.service <<- EOF
 			[Unit]
 			Description=Sign ZFSBootmenu EFI image bundle
-			
+
 			[Service]
 			Type=oneshot
 			ExecStart=/usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
@@ -2359,11 +2388,11 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         cat > /etc/systemd/system/zfsbootmenu-update-efi-image.path <<- EOF
 			[Unit]
 			Description=ZFSBootmenu kernel changed, rebuild EFI image bundle
-			
+
 			[Path]
 			PathChanged=/boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
 			Unit=zfsbootmenu-sign-efi.service
-			
+
 			[Install]
 			WantedBy=multi-user.target
 			WantedBy=system-update.target
@@ -2376,7 +2405,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         cat > /etc/systemd/system/zfsbootmenu-update@.service <<- EOF
 			[Unit]
 			Description=Update ZFSBootmenu EFI image bundle
-			
+
 			[Service]
 			Type=oneshot
 		 	# Sleep for 5secs to allow both kernel/initramfs files to be created
@@ -2390,11 +2419,11 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         cat > /etc/systemd/system/zfsbootmenu-update-kernel-bootmenu.path <<- EOF
 			[Unit]
 			Description=ZFSBootmenu kernel changed, rebuild EFI image bundle
-			
+
 			[Path]
 			PathChanged=/boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu
 			Unit=zfsbootmenu-update@vmlinuz-bootmenu.service
-			
+
 			[Install]
 			WantedBy=multi-user.target
 			WantedBy=system-update.target
@@ -2405,11 +2434,11 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         cat > /etc/systemd/system/zfsbootmenu-update-initramfs-bootmenu.path <<- EOF
 			[Unit]
 			Description=ZFSBootmenu initramfs changed, rebuild EFI image bundle
-			
+
 			[Path]
 			PathChanged=/boot/efi/EFI/zfsbootmenu/initramfs-bootmenu.img
 			Unit=zfsbootmenu-update@initramfs-bootmenu.service
-			
+
 			[Install]
 			WantedBy=multi-user.target
 			WantedBy=system-update.target
@@ -2419,7 +2448,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         cat > /etc/systemd/system/refind-update.service <<- EOF
 			[Unit]
 			Description=Re-sign rEFInd binary
-			
+
 			[Service]
 			Type=oneshot
 			ExecStart=/usr/sbin/sbctl sign -s /boot/efi/EFI/refind/refind_x64.efi
@@ -2430,11 +2459,11 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         cat > /etc/systemd/system/refind-update.path <<- EOF
 			[Unit]
 			Description=rEFInd binary changed, re-sign
-			
+
 			[Path]
 			PathChanged=/boot/efi/EFI/refind/refind_x64.efi
 			Unit=refind-update.service
-			
+
 			[Install]
 			WantedBy=multi-user.target
 			WantedBy=system-update.target
@@ -2446,7 +2475,6 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
             systemctl enable zfsbootmenu-update-initramfs-bootmenu.path
             systemctl enable refind-update.path
         fi
-
     fi # SecureBoot
 
 
@@ -2456,9 +2484,11 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     # Configure google authenticator if we have a config
     if [ "${GOOGLE}" = "y" ]; then
         apt-get -qq --no-install-recommends --yes install python3-qrcode qrencode libpam-google-authenticator
-        cp /root/google_auth.txt /home/${USERNAME}/.google_authenticator
-        chmod 400 /home/${USERNAME}/.google_authenticator
-        chown ${USERNAME}:${USERNAME} /home/${USERNAME}/.google_authenticator
+        if [ "${WIPE_FRESH}" = "y" ] ; then     # <<<<<------------------------------------------------ WIPE_FRESH ------ VVVVV
+            cp /root/google_auth.txt /home/${USERNAME}/.google_authenticator
+            chmod 400 /home/${USERNAME}/.google_authenticator
+            chown ${USERNAME}:${USERNAME} /home/${USERNAME}/.google_authenticator
+        fi # WIPE_FRESH                         # <<<<<------------------------------------------------ WIPE_FRESH ------ ^^^^^
 
         # TODO: parameterize the nullok bits
         # Set pam to use google authenticator for ssh
@@ -2489,12 +2519,12 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 		[Unit]
 		Description=Add IP address(es) to /etc/issue
 		After=network-online.target
-		
+
 		[Service]
 		Type=oneshot
 		ExecStart=/usr/local/bin/showip.sh
 		RemainAfterExit=true
-		
+
 		[Install]
 		WantedBy=multi-user.target
 	EOF
@@ -2502,12 +2532,12 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
     cat > /usr/local/bin/showip.sh <<- 'EOF'
 		#!/bin/bash
-		
+
 		# Creates a normal /etc/issue file but populates the bottom with a list
 		# of all network interfaces found. The /4{} gets filled in with IPv4 addresses
 		# as they are obtained, so the splash screen is always live with correct info
 		# Exclude lo, virtual and docker interfaces - they're just messy
-		
+
 		echo -e "$(lsb_release -d -s) \\\n \l\n" > /etc/issue
 		echo "$(ls -1 /sys/class/net | grep -E -v 'lo|vir|docker|tap|veth|br-|zt?' | xargs -I {} echo '   {} : \4{{}}')" >> /etc/issue
 		echo "" >> /etc/issue
@@ -2521,12 +2551,12 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         if [ ! -d /etc/apt/keyrings ] ; then
             mkdir /etc/apt/keyrings
         fi
-    
+
         # Install zrepl for zfs snapshot management
         zrepl_apt_key_url=https://zrepl.cschwarz.com/apt/apt-key.asc
         zrepl_apt_key_dst=/etc/apt/keyrings/zrepl.gpg
         curl -fsSL "$zrepl_apt_key_url" | tee | gpg --dearmor | tee "$zrepl_apt_key_dst" > /dev/null
-    
+
         # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
         cat > /etc/apt/sources.list.d/zrepl.sources <<- EOF
 			Architectures: amd64
@@ -2534,7 +2564,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 			Enabled: yes
 			X-Repolib-Name: zrepl ZFS replication
 			Signed-By: ${zrepl_apt_key_dst}
-			Suites:${SUITE} 
+			Suites:${SUITE}
 			Types: deb
 			URIs: https://zrepl.cschwarz.com/apt/ubuntu
 		EOF
@@ -2555,7 +2585,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 			    - type: syslog
 			      format: human
 			      level: warn
-			
+
 			jobs:
 			  - name: snaproot
 			    type: snap
@@ -2602,7 +2632,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 			      - type: regex
 			        negate: true
 			        regex: "^(zrepl|apt)_.*"
-			
+
 			  - name: snaphome
 			    type: snap
 			    filesystems: {
@@ -2633,24 +2663,24 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         cat > /usr/local/bin/zrepl_threshold_check.sh <<- 'EOF'
 			#!/usr/bin/env bash
 			set -e
-			
+
 			# Checks the data-written threshold of a zfs dataset for use with zrepl
 			# Returns 0 if over threshold so should be snapshot'd
 			# Returns 255 if amount written has not reached threshold
 			# If no threshold property set in dataset default yes, take snapshot
-			
+
 			# Set threshold in bytes like this :
 			# zfs set com.zrepl:snapshot-threshold=6000000 pool/dataset
-			
+
 			WRITTEN=$(zfs get -Hpo value written ${ZREPL_FS})
 			THRESH=$(zfs get -Hpo value com.zrepl:snapshot-threshold ${ZREPL_FS})
-			
+
 			[ "$ZREPL_DRYRUN" = "true" ] && DRYRUN="echo DRYRUN (WRITTEN ${WRITTEN} THRESH ${THRESH}) : "
-			
+
 			pre_snapshot() {
 			    echo -n "pre_snap "
 			    $DRYRUN date
-			
+
 			    if [ "$ZREPL_DRYRUN" != "true" ] ; then
 			        # [[ $( $(zfs get -Hpo value written ${ZREPL_FS}) -gt ($(zfs get -Hpo value com.zrepl:snapshot-threshold ${ZREPL_FS}) +0)) ]] && RC=0 || RC=255
 			        if [ "${THRESH}" = "-" ]; then
@@ -2663,12 +2693,12 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 			        fi
 			    fi
 			}
-			
+
 			post_snapshot() {
 			    echo -n "post_snap "
 			    $DRYRUN date
 			}
-			
+
 			case "$ZREPL_HOOKTYPE" in
 			    pre_snapshot|post_snapshot)
 			        "$ZREPL_HOOKTYPE"
@@ -2678,7 +2708,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 			        exit 255
 			        ;;
 			esac
-			
+
 			exit $RC
 		EOF
         chmod +x /usr/local/bin/zrepl_threshold_check.sh
@@ -2691,7 +2721,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 		# Snapshot main dataset before installing or removing packages
 		# We use a DATE variable to ensure all snaps have SAME date
 		# Use df to find root dataset
-		
+
 		# Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; ${ZFSLOCATION} snap \$(${ZFSLOCATION} list -o name | /usr/bin/grep -E 'ROOT/.*$' | sort | head -1)@apt_\${DATE}"; };
 		Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; ${ZFSLOCATION} snap \$(/usr/bin/df | /usr/bin/grep -E '/\$' | /usr/bin/cut -d' ' -f1)@apt_\${DATE}"; };
 	EOF
@@ -2712,7 +2742,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     # Install main ubuntu gnome desktop, plus maybe HWE packages
     if [ "${GNOME}" = "y" ] ; then
         # NOTE: bionic has an xserver-xorg-hwe-<distro> package, focal does NOT
-        case ${SUITE} in 
+        case ${SUITE} in
             focal | jammy | noble)
                 apt-get -qq --yes install ubuntu-desktop vulkan-tools
                 ;;
@@ -2816,7 +2846,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         ####  mkdir /usr/local/share/DisplayLink-5.6.1
         ####  cd /usr/local/share/DisplayLink-5.6.1
         ####  unzip /tmp/DisplayLink-5.6.1.zip
-        ####  ./displaylink-driver-5.6.1-59.184.run --accept --noprogress --nox11 
+        ####  ./displaylink-driver-5.6.1-59.184.run --accept --noprogress --nox11
 
     fi # GNOME KDE NEON XFCE
 
@@ -2828,7 +2858,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 			Identity=unix-user:*
 			Action=org.freedesktop.upower.hibernate
 			ResultActive=yes
-			
+
 			[Re-enable hibernate by default in logind]
 			Identity=unix-user:*
 			Action=org.freedesktop.login1.hibernate;org.freedesktop.login1.handle-hibernate-key;org.freedesktop.login1;org.freedesktop.login1.hibernate-multiple-sessions;org.freedesktop.login1.hibernate-ignore-inhibit
@@ -2931,7 +2961,7 @@ if [ "${WIPE_FRESH}" = "y" ] ; then
     partition_disks
     setup_swap_partition
     luks_encrypt_root
-    create_rool_pool
+    create_root_pool
     create_zfs_datasets
 else
     # If not wiping fresh, just creating a new ROOT dataset, we need to find
@@ -2939,7 +2969,11 @@ else
     find_zfs_config
 
     # Actual dataset for suite we are installing now
-    zfs create -o canmount=noauto -o mountpoint=/ ${POOLNAME}/ROOT/${SUITE}
+    # COMPLETELY clear out build dir
+    rm -rf ${ZFSBUILD}
+    mkdir -p ${ZFSBUILD}
+    zfs create -o canmount=noauto -o mountpoint=${ZFSBUILD} ${POOLNAME}/ROOT/${SUITE}
+    zfs mount ${POOLNAME}/ROOT/${SUITE}
 fi
 
 # debootstrap the new root filesystem
@@ -2950,7 +2984,22 @@ if [ "${WIPE_FRESH}" = "y" ] ; then
     setup_boot_partition
 else
     # Not wiping fresh - just use existing fstab which has /boot/efi mount in it
+    # Also need the encryption keys from existing setup
     cp /etc/fstab {ZFSBUILD}/etc/fstab
+fi
+
+# Grab config files from exiting setup if NOT wipe_fresh
+if [ "${WIPE_FRESH}" = "n" ] ; then
+    mkdir -p ${ZFSBUILD}/etc/zfs
+    cp /etc/zfs/zroot.rawkey ${ZFSBUILD}/etc/zfs/zroot.rawkey
+    cp /etc/zfs/zroot.key ${ZFSBUILD}/etc/zfs/zroot.key
+    cp /etc/zfs/zroot.homekey ${ZFSBUILD}/etc/zfs/zroot.homekey
+    if [ "${DISCENC}" = "LUKS" ] ; then
+        cp /etc/crypttab ${ZFSBUILD}/etc/crypttab
+        cp /etc/zfsbootmenu/dracut.conf.d/luks_zbm.conf ${ZFSBUILD}/etc/zfsbootmenu/dracut.conf.d/
+        mkdir -p ${ZFSBUILD}/usr/local/bin
+        cp /usr/local/bin/zfsbootmenu_luks_unlock.sh ${ZFSBUILD}/usr/local/bin/
+    fi
 fi
 
 # Set up network config and apt sources
@@ -2982,19 +3031,24 @@ rm -f ${ZFSBUILD}/var/crash/*
 
 umount -n ${ZFSBUILD}/{dev/pts,dev,sys,proc}
 
-# Copy setup log to built system
-# Copy created Setup.sh to live CD (in case of error easier to see what line it failed on)
-cp /root/ZFS-setup.log ${ZFSBUILD}/home/${USERNAME}
-cp ${ZFSBUILD}/root/Setup.sh /root/Setup.sh
+if [ "${WIPE_FRESH}" = "y" ] ; then
+    # Copy setup log to built system
+    # Copy created Setup.sh to live CD (in case of error easier to see what line it failed on)
+    cp /root/ZFS-setup.log ${ZFSBUILD}/home/${USERNAME}
+    cp ${ZFSBUILD}/root/Setup.sh /root/Setup.sh
 
-# umount to be ready for export
-zfs umount -a
+    # umount to be ready for export
+    zfs umount -a
 
-# Back in livecd - unmount filesystems we may have missed
-# Have to escape any / in path
-ZFSBUILD_C=$(echo ${ZFSBUILD} | sed -e 's!/!\\/!'g)
-# mount | grep -v zfs | tac | awk '/\/mnt/ {print \$3}' | xargs -i{} umount -lf {}
-mount | grep -v zfs | tac | awk '/${ZFSBUILD_C}/ {print $3}' | xargs -i{} umount -lf {}
-zpool export ${POOLNAME}
-
+    # Back in livecd - unmount filesystems we may have missed
+    # Have to escape any / in path
+    ZFSBUILD_C=$(echo ${ZFSBUILD} | sed -e 's!/!\\/!'g)
+    # mount | grep -v zfs | tac | awk '/\/mnt/ {print \$3}' | xargs -i{} umount -lf {}
+    mount | grep -v zfs | tac | awk '/${ZFSBUILD_C}/ {print $3}' | xargs -i{} umount -lf {}
+    zpool export ${POOLNAME}
+else
+    # For just a non-wipe new dataset, unmount and set mountpoint to / to make it bootable
+    zfs umount ${POOLNAME}/ROOT/${SUITE}
+    zfs set mountpoint=/ ${POOLNAME}/ROOT/${SUITE}
+fi
 
