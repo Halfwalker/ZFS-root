@@ -3229,12 +3229,12 @@ rm -f ${ZFSBUILD}/var/crash/*
 
 umount -n ${ZFSBUILD}/{dev/pts,dev,sys,proc}
 
-if [ "${WIPE_FRESH}" == "y" ] ; then
-    # Copy setup log to built system
-    # Copy created Setup.sh to live CD (in case of error easier to see what line it failed on)
-    cp /root/ZFS-setup.log ${ZFSBUILD}/home/${USERNAME}
-    cp ${ZFSBUILD}/root/Setup.sh /root/Setup.sh
+# Copy setup log to built system
+# Copy created Setup.sh to live CD (in case of error easier to see what line it failed on)
+cp /root/ZFS-setup.log ${ZFSBUILD}/home/${USERNAME}/ZFS-setup-${SUITE}-$(date +%F-%H-%M-%S).log
+cp ${ZFSBUILD}/root/Setup.sh ${ZFSBUILD}/home/${USERNAME}/ZFS-setup-${SUITE}-chroot-$(date +%F-%H-%M-%S).sh
 
+if [ "${WIPE_FRESH}" == "y" ] ; then
     # umount to be ready for export
     zfs umount -a
 
