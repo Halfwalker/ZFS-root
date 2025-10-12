@@ -11,7 +11,7 @@
 #   n - Only creates a new dataset under <pool>/ROOT/<suite>
 #       This is then selectable under zfsbootmenu
 #
-WIPE_FRESH=y
+# WIPE_FRESH=y
 
 # Proxy config - apt-cacher-ng
 #
@@ -225,7 +225,8 @@ SOF_VERSION=2024.06
 ##    QyNTUxOQAAACBckxO9i08hCtufRbx/3I9SnA5hqtjgV12p/feHZXzK2gAAAJhy0ygJctMo
 ##    CQAAAAtzc2gtZWQyNTUxOQAAACBckxO9i08hCtufRbx/3I9SnA5hqtjgV12p/feHZXzK2g
 ##    AAAEAif3Z2Yf5YpmESEK10UpcXvBv+hqhxZ54h+H5hJjJJcVyTE72LTyEK259FvH/cj1Kc
-##    DmGq2OBXXan994dlfMraAAAAEnJvb3RAdWJ1bnR1LXNlcnZlcgECAw=='
+##    DmGq2OBXXan994dlfMraAAAAEnJvb3RAdWJ1bnR1LXNlcnZlcgECAw==
+##    -----END OPENSSH PRIVATE KEY-----'
 ##    # Be sure to use DOUBLE quotes for public key
 ##    HOST_ED25519_KEY_PUB="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFyTE72LTyEK259FvH/cj1KcDmGq2OBXXan994dlfMra root@ubuntu-server"
 ##    #
