@@ -1200,6 +1200,11 @@ create_zfs_datasets() {
     # Actual dataset for suite we are installing now
     zfs create -o canmount=noauto -o mountpoint=/ ${POOLNAME}/ROOT/${SUITE}
 
+    # Even though we set the bootfs option below, we also set the root dataset commandline
+    # to point to the root dataset.  This will allow this root dataset to be booted normally
+    # if the bootfs option is ever changed to a different root dataset
+    # via the WIPE_FRESH=n to install a different Ubuntu distro
+    zfs set org.zfsbootmenu:commandline="rw quiet root=zfs:${POOLNAME}/ROOT/${SUITE}" ${POOLNAME}/ROOT/${SUITE}
     zpool set bootfs=${POOLNAME}/ROOT/${SUITE} ${POOLNAME}
     zfs mount ${POOLNAME}/ROOT/${SUITE}
 
