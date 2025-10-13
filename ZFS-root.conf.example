@@ -228,7 +228,7 @@ SOF_VERSION=2024.06
 ##    DmGq2OBXXan994dlfMraAAAAEnJvb3RAdWJ1bnR1LXNlcnZlcgECAw==
 ##    -----END OPENSSH PRIVATE KEY-----'
 ##    # Be sure to use DOUBLE quotes for public key
-##    HOST_ED25519_KEY_PUB="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFyTE72LTyEK259FvH/cj1KcDmGq2OBXXan994dlfMra root@ubuntu-server"
+##    HOST_ED25519_KEY_PUB="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFyTE72LTyEK259FvH/cj1KcDmGq2OBXXan994dlfMra root@installerbox"
 ##    #
 ##    ####################################################################
 
