@@ -68,36 +68,36 @@ NOTE: There may be problems with SecureBoot.  Your mileage may vary.
 Using a clean (**WIPE_FRESH=y**) install of Ubuntu Noble/24.04 as an example, the following ZFS datasets would be created
 
 - _**`<poolname>/ROOT`**_
-    Container for all root datasets.  This may contain multiple full root installs, of different - or the same - Ubuntu distro versions.
-    If ZFS encryption is enabled, this container will be encrypted so all child root datasets will also be encrypted.  The passphrase must be entered on the console (or via Dropbear)i when ZFSBootMenu attempts to boot any root dataset under this.
+    > Container for all root datasets.  This may contain multiple full root installs, of different - or the same - Ubuntu distro versions.
+    > If ZFS encryption is enabled, this container will be encrypted so all child root datasets will also be encrypted.  The passphrase must be entered on the console (or via Dropbear)i when ZFSBootMenu attempts to boot any root dataset under this.
 - _**`<poolname>/ROOT/noble`**_
-    Root install dataset for Ubuntu Noble/24.04.  This will be a full install of Noble/24.04 _without_ the home directory of the main user or root user.  Or `/boot/efi` which is the ESP partition mentioned above - that is simply mounted when the system boots.
-    This root dataset will be set as the ZFSBootMenu default via the **bootfs** option for the `<poolname>` pool.  See the `create_zfs_datasets()` function.
+    > Root install dataset for Ubuntu Noble/24.04.  This will be a full install of Noble/24.04 _without_ the home directory of the main user or root user.  Or `/boot/efi` which is the ESP partition mentioned above - that is simply mounted when the system boots.
+    > This root dataset will be set as the ZFSBootMenu default via the **bootfs** option for the `<poolname>` pool.  See the `create_zfs_datasets()` function.
 - _**`<poolname>/ROOT/noble@base_install`**_
-    Snapshot of the main Noble root dataset, as of the completion of the install.
+    > Snapshot of the main Noble root dataset, as of the completion of the install.
 - _**`<poolname>/ROOT/noble_rescue_base`**_
-    Clone of the Noble **base_install** snapshot.  In the event of real problems, one can boot into this for a working system.
+    > Clone of the Noble **base_install** snapshot.  In the event of real problems, one can boot into this for a working system.
 - _**`<poolname>/ROOT/noble@apt_2025-10-12-144318`**_
-    Automatic snapshots taken before any `apt install <package>` or other **apt** operation that modifies the systemm.
+    > Automatic snapshots taken before any `apt install <package>` or other **apt** operation that modifies the systemm.
 - _**`<poolname>/home`**_
-    Container for all home user datasets.  If ZFS encryption is enabled, this container and all child datasets will be encrypted using the key `/etc/zfs/zroot.homekey`.  This key is safe because it's housed in an encrypted dataset (`<poolname>/ROOT/noble`) so cannot be accessed until the main system is decrypted.
+    > Container for all home user datasets.  If ZFS encryption is enabled, this container and all child datasets will be encrypted using the key `/etc/zfs/zroot.homekey`.  This key is safe because it's housed in an encrypted dataset (`<poolname>/ROOT/noble`) so cannot be accessed until the main system is decrypted.
 - _**`<poolname>/home/root`**_
-    Main root user home dataset/directory - `/root`
+    > Main root user home dataset/directory - `/root`
 - _**`<poolname>/home/<username>`**_
-    Main user home dataset/directory - `/home/<username`
+    > Main user home dataset/directory - `/home/<username`
 - _**`<poolname>/swap`**_
-    For non-LUKS encrypted or non-HIBERNATE enabled systems, a swap dataset is created.
+    > For non-LUKS encrypted or non-HIBERNATE enabled systems, a swap dataset is created.
 - _**`<poolname>/docker`**_
-    With **Docker** using a dedicated dataset is recommended.
+    > With **Docker** using a dedicated dataset is recommended.
 
 If a subsequent run is made with **WIPE_FRESH=n** then a new root dataset will be created.  For example, one could install Ubuntu Plucky/25.04, which would create these datasets in the existing Noble/24.04 system
 
 - _**`<poolname>/ROOT/plucky`**_
-    Root install dataset for Ubuntu Plucky/25.04.  If ZFS encryption was enabled for the Noble/24.04 main system, then this dataset will inherit that and also be encrypted.
+    > Root install dataset for Ubuntu Plucky/25.04.  If ZFS encryption was enabled for the Noble/24.04 main system, then this dataset will inherit that and also be encrypted.
 - _**`<poolname>/ROOT/plucky@base_install`**_
-    Snapshot of the Plucky root dataset, as of the completion of the install.
+    > Snapshot of the Plucky root dataset, as of the completion of the install.
 - _**`<poolname>/ROOT/plucky_rescue_base`**_
-    Clone of the Plucky **base_install** snapshot.  In the event of real problems, one can boot into this for a working system.
+    > Clone of the Plucky **base_install** snapshot.  In the event of real problems, one can boot into this for a working system.
 
 To change the ZFSBootMenu default dataset to boot from the original Noble/24.04 to the new Plucky/25.04
 
