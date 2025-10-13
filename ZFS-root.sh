@@ -773,7 +773,7 @@ show_options() {
     # selected above and we do not want to pause here for
     #
     if [ "${WIPE_FRESH}" == "y" ] ; then
-        box_height=$(( ${#zfsdisks[@]} + 30 ))
+        box_height=$(( ${#zfsdisks[@]} + 31 ))
         # shellcheck disable=SC2086,SC2116
         whiptail --title "WIPING DISK(s) - Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
         Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
@@ -781,9 +781,10 @@ show_options() {
         Disk $(for disk in $(seq 0 $(( ${#zfsdisks[@]}-1)) ) ; do \
           if [ ${disk} -ne 0 ] ; then echo -n "              " ; fi ; echo ${zfsdisks[${disk}]} ; done)\n \
         Raid $([ ${RAIDLEVEL} ] && echo ${RAIDLEVEL} || echo vdevs)\n \
-        Hostname $(echo $MYHOSTNAME)\n \
-        Poolname $(echo $POOLNAME)\n \
-        User $(echo $USERNAME $UCOMMENT)\n\n \
+        Hostname   = $(echo $MYHOSTNAME)\n \
+        Host keys  = $([[ -v HOST_RSA_KEY || -v HOST_ECDSA_KEY || -v HOST_ED25519_KEY ]] && echo Pre-defined || echo Generate new)\n \
+        Poolname   = $(echo $POOLNAME)\n \
+        User       = $(echo $USERNAME $UCOMMENT)\n\n \
         SECUREBOOT = $SECUREBOOT  : Enable UEFI SecureBoot\n \
         AUTOSIGN   = ${AUTOSIGN}  : Enable auto-signing of bootable .efi bundles\n \
         RESCUE     = $(echo $RESCUE)  : Create rescue dataset by cloning install\n \
@@ -805,14 +806,15 @@ show_options() {
         [[ ${RET} = 1 ]] && exit 1
     else
         # Not wiping fresh, so no need for Disk, Raid, Secureboot, Autosign, Hibernate
-        box_height=$(( ${#zfsdisks[@]} + 25 ))
+        box_height=$(( ${#zfsdisks[@]} + 26 ))
         # shellcheck disable=SC2086,SC2116
         whiptail --title "New dataset - Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
         Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
         $(echo $SUITE $SUITE_NUM) $([ ${HWE} ] && echo WITH || echo without) $(echo hwe kernel ${HWE})\n \
-        Hostname $(echo $MYHOSTNAME)\n \
-        Poolname $(echo $POOLNAME)\n \
-        User $(echo $USERNAME $UCOMMENT)\n\n \
+        Hostname   = $(echo $MYHOSTNAME)\n \
+        Host keys  = $([[ -v HOST_RSA_KEY || -v HOST_ECDSA_KEY || -v HOST_ED25519_KEY ]] && echo Pre-defined || echo Generate new)\n \
+        Poolname   = $(echo $POOLNAME)\n \
+        User       = $(echo $USERNAME $UCOMMENT)\n\n \
         RESCUE     = $(echo $RESCUE)  : Create rescue dataset by cloning install\n \
         DELAY      = $(echo $DELAY)  : Enable delay before importing zpool\n \
         ZREPL      = $(echo $ZREPL)  : Install Zrepl zfs snapshot manager\n \
@@ -1498,17 +1500,22 @@ prep_setup() {
 
     # Add SSHPUBKEY and Host keys from ZFS-root.conf if defined
     [[ -v SSHPUBKEY ]] && echo "export SSHPUBKEY=\"${SSHPUBKEY}\"" >> ${ZFSBUILD}/root/Setup.sh
-    [[ -v HOST_ECDSA_KEY_PUB ]] && echo "export HOST_ECDSA_KEY_PUB=\"${HOST_ECDSA_KEY_PUB}\"" >> ${ZFSBUILD}/root/Setup.sh
-    [[ -v HOST_RSA_KEY_PUB ]] && echo "export HOST_RSA_KEY_PUB=\"${HOST_RSA_KEY_PUB}\"" >> ${ZFSBUILD}/root/Setup.sh
     # Ugly hack to get multiline variable into Setup.sh
     # Note using single quotes like this  HOST_RSA_KEY='blahblah' surrounded by double quotes
+    [[ -v HOST_ECDSA_KEY_PUB ]] && echo "export HOST_ECDSA_KEY_PUB=\"${HOST_ECDSA_KEY_PUB}\"" >> ${ZFSBUILD}/root/Setup.sh
     if [[ -v HOST_ECDSA_KEY ]] ; then
         echo -n "export HOST_ECDSA_KEY='" >> ${ZFSBUILD}/root/Setup.sh
         echo "${HOST_ECDSA_KEY}'" >> ${ZFSBUILD}/root/Setup.sh
     fi
+    [[ -v HOST_RSA_KEY_PUB ]] && echo "export HOST_RSA_KEY_PUB=\"${HOST_RSA_KEY_PUB}\"" >> ${ZFSBUILD}/root/Setup.sh
     if [[ -v HOST_RSA_KEY ]] ; then
         echo -n "export HOST_RSA_KEY='" >> ${ZFSBUILD}/root/Setup.sh
         echo "${HOST_RSA_KEY}'" >> ${ZFSBUILD}/root/Setup.sh
+    fi
+    [[ -v HOST_ED25519_KEY_PUB ]] && echo "export HOST_ED25519_KEY_PUB=\"${HOST_ED25519_KEY_PUB}\"" >> ${ZFSBUILD}/root/Setup.sh
+    if [[ -v HOST_ED25519_KEY ]] ; then
+        echo -n "export HOST_ED25519_KEY='" >> ${ZFSBUILD}/root/Setup.sh
+        echo "${HOST_ED25519_KEY}'" >> ${ZFSBUILD}/root/Setup.sh
     fi
 } # prep_setup()
 
@@ -3229,12 +3236,16 @@ rm -f ${ZFSBUILD}/var/crash/*
 
 umount -n ${ZFSBUILD}/{dev/pts,dev,sys,proc}
 
-# Copy setup log to built system
-# Copy created Setup.sh to live CD (in case of error easier to see what line it failed on)
-cp /root/ZFS-setup.log ${ZFSBUILD}/home/${USERNAME}/ZFS-setup-${SUITE}-$(date +%F-%H-%M-%S).log
-cp ${ZFSBUILD}/root/Setup.sh ${ZFSBUILD}/home/${USERNAME}/ZFS-setup-${SUITE}-chroot-$(date +%F-%H-%M-%S).sh
+# Copy setup log and chroot Setup.sh to originating system (livecd or local /root dir)
+DATETIME=$(date +%F-%H-%M-%S)
+cp /root/ZFS-setup.log ZFS-setup-${SUITE}-${DATETIME}.log
+cp ${ZFSBUILD}/root/Setup.sh ZFS-setup-${SUITE}-${DATETIME}.chroot.sh
 
 if [ "${WIPE_FRESH}" == "y" ] ; then
+    # Copy setup log and chroot Setup.sh to built system
+    cp /root/ZFS-setup.log ${ZFSBUILD}/home/${USERNAME}/ZFS-setup-${SUITE}-${DATETIME}.log
+    cp ${ZFSBUILD}/root/Setup.sh ${ZFSBUILD}/home/${USERNAME}/ZFS-setup-${SUITE}-${DATETIME}.chroot.sh
+
     # umount to be ready for export
     zfs umount -a
 
