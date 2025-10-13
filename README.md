@@ -2,17 +2,25 @@
 
 This script is meant to be run from an Ubuntu Live CD.  It will build an Ubuntu system on the local system or VM using root-on-ZFS, with optional LUKS whole-disk encryption or ZFS native encryption.  It can create a raidz or n-way mirror of disks to boot from.  UEFI SecureBoot with local keys is also available.
 
+It can also be used to create a new `<poolname>/ROOT/<distro>` dataset for testing other Ubuntu distros on an existing system.  See **WIPE_FRESH** below.
+
 _Current issue: SecureBoot with locally-built kernel/initramfs for ZFSBootMenu is not working yet._
 
 ## tl;dr
 
 - Boot an Ubuntu live-cd, like [ubuntu-24.04.1-live-server-amd64.iso](https://releases.ubuntu.com/noble/ubuntu-24.04.1-live-server-amd64.iso) and select *Try or install Ubuntu server*
-- At the language selection prompt, type in `ctrl-z` to put the installer into the background and get a root shell
+- At the language selection prompt, hit `ctrl-z` to put the installer into the background and get a root shell
 - Clone the **ZFS-root** repo
     ```
     git clone https://github.com/Halfwalker/ZFS-root.git
     ```
 - Optionally copy the `ZFS-root.conf.example` to `ZFS-root.conf` and edit to suit.
+    NOTE: The **WIPE_FRESH** parameter determines if this will be a full system wipe for a fresh install, or just the creation of a new distro dataset
+    - WIPE_FRESH=y
+        Wipe the selected disks and do a full clean install.  It will not touch unselected disks.
+    - WIPE_FRESH=n
+        Only create a new dataset like `<poolname>/ROOT/plucky` with a clean root install.  This will utilize the existing `/boot/efi` ESP partition mount, as well as the existing `<poolname>/home/<username>` default user home dataset/directory and `<poolname>/home/root` main _root_ user dataset/directory.
+    The new dataset will be selectable via ZFSBootMenu
 - Run the `ZFS-root.sh` script - it will prompt for everything it needs.
     ```
     cd ZFS-root
@@ -42,11 +50,11 @@ Number  Start (sector)  End        Size        Code  Name
 
 ### Additional partitions
 
-To add additional partitions, see the `ZFS-root.sh` script and search for 'Partition layout'.  Note that the last partition created (Main data partition for root) uses **:0:0** to tell `sgdisk` to use the rest of the space on the disk.  You will have to change that to **:0:+500G** for example to create a 500G partition.  Use whatever size you deem fit.
+To add additional partitions, see the `ZFS-root.sh` script and search for '_Partition layout_' in the `partition_disks()` function.  Note that the last partition created (Main data partition for root) uses **:0:0** to tell `sgdisk` to use the rest of the space on the disk.  You will have to change that to **:0:+500G** for example to create a 500G partition.  Use whatever size you deem fit.
 
 There is already **PARTITION_WIND** and **PARTITION_RCVR** variables defined to correctly number extra partitions, so use them to create the partitions.  Use **:0:0** to utilize the rest of the disk for the last partition.
 
-For example, to create Window partitions for data (500G) and recovery (rest of disk), add these lines to the _Partition layout_ section after the _Main data partition for root_ lines.  Adjust the _Main data partition for root_ size as mentioned above, and set the Window partition size in the sample line below.
+For example, to create Windows partitions for data (500G) and recovery (rest of disk), add these lines to the _Partition layout_ section after the _Main data partition for root_ lines.  Adjust the _Main data partition for root_ size as mentioned above, and set the Window partition size in the sample line below.
 
 ```
 sgdisk -n ${PARTITION_WIND}:0:+500G -c ${PARTITION_WIND}:"WIN11_${disk}" -t ${PARTITION_WIND}:C12A /dev/disk/by-id/${zfsdisks[${disk}]}
@@ -55,10 +63,50 @@ sgdisk -n ${PARTITION_RCVR}:0:0     -c ${PARTITION_RCVR}:"RCVR_${disk}"  -t ${PA
 
 NOTE: There may be problems with SecureBoot.  Your mileage may vary.
 
+## Datasets
+
+Using a clean (**WIPE_FRESH=y**) install of Ubuntu Noble/24.04 as an example, the following ZFS datasets would be created
+
+- _**`<poolname>/ROOT`**_
+    Container for all root datasets.  This may contain multiple full root installs, of different - or the same - Ubuntu distro versions.
+    If ZFS encryption is enabled, this container will be encrypted so all child root datasets will also be encrypted.  The passphrase must be entered on the console (or via Dropbear)i when ZFSBootMenu attempts to boot any root dataset under this.
+- _**`<poolname>/ROOT/noble`**_
+    Root install dataset for Ubuntu Noble/24.04.  This will be a full install of Noble/24.04 _without_ the home directory of the main user or root user.  Or `/boot/efi` which is the ESP partition mentioned above - that is simply mounted when the system boots.
+    This root dataset will be set as the ZFSBootMenu default via the **bootfs** option for the `<poolname>` pool.  See the `create_zfs_datasets()` function.
+- _**`<poolname>/ROOT/noble@base_install`**_
+    Snapshot of the main Noble root dataset, as of the completion of the install.
+- _**`<poolname>/ROOT/noble_rescue_base`**_
+    Clone of the Noble **base_install** snapshot.  In the event of real problems, one can boot into this for a working system.
+- _**`<poolname>/ROOT/noble@apt_2025-10-12-144318`**_
+    Automatic snapshots taken before any `apt install <package>` or other **apt** operation that modifies the systemm.
+- _**`<poolname>/home`**_
+    Container for all home user datasets.  If ZFS encryption is enabled, this container and all child datasets will be encrypted using the key `/etc/zfs/zroot.homekey`.  This key is safe because it's housed in an encrypted dataset (`<poolname>/ROOT/noble`) so cannot be accessed until the main system is decrypted.
+- _**`<poolname>/home/root`**_
+    Main root user home dataset/directory - `/root`
+- _**`<poolname>/home/<username>`**_
+    Main user home dataset/directory - `/home/<username`
+- _**`<poolname>/swap`**_
+    For non-LUKS encrypted or non-HIBERNATE enabled systems, a swap dataset is created.
+- _**`<poolname>/docker`**_
+    With **Docker** using a dedicated dataset is recommended.
+
+If a subsequent run is made with **WIPE_FRESH=n** then a new root dataset will be created.  For example, one could install Ubuntu Plucky/25.04, which would create these datasets in the existing Noble/24.04 system
+
+- _**`<poolname>/ROOT/plucky`**_
+    Root install dataset for Ubuntu Plucky/25.04.  If ZFS encryption was enabled for the Noble/24.04 main system, then this dataset will inherit that and also be encrypted.
+- _**`<poolname>/ROOT/plucky@base_install`**_
+    Snapshot of the Plucky root dataset, as of the completion of the install.
+- _**`<poolname>/ROOT/plucky_rescue_base`**_
+    Clone of the Plucky **base_install** snapshot.  In the event of real problems, one can boot into this for a working system.
+
+To change the ZFSBootMenu default dataset to boot from the original Noble/24.04 to the new Plucky/25.04
+
+> `zfs set bootfs=<poolname>/ROOT/plucky <poolname>`
+
 ## Features
 
 * Will accommodate any number of disks for ZFS, and offer options for the raid level to be used.
-* Uses [zfsbootmenu](https://github.com/zbm-dev/zfsbootmenu/) to handle the actual booting of the ZFS pool.
+* Uses [zfsbootmenu](https://github.com/zbm-dev/zfsbootmenu/) to handle the actual booting of the ZFS root dataset(s).
 * Can enable and configure UEFI SecureBoot using locally-generated keys.  The **rEFInd** binary and **zfsbootmenu** EFI bundle will be signed.
 * Can optionally clone the installed ROOT dataset as a rescue dataset. This will be selectable in the **zfsbootmenu** menu in the event the main ROOT dataset ever gets corrupted.
 * When using encryption it can also optionally install [dropbear](https://matt.ucc.asn.au/dropbear/dropbear.html) to allow remote unlocking of system. `ssh -p 222 root@<ip addr>`  **NOTE:** do not enable Dropbear for laptops - it wants to see the network in place, and if it's missing (usb-ethernet etc) then it will just sit and wait.
@@ -90,8 +138,12 @@ The *ZFS-root.sh* script will prompt for all details it needs.  In addition, you
 > <dl>
 >   <dt>SSHPUBKEY
 >   <dd> Any SSH pubkey to add to the new system main user `~/.ssh/authorized_keys` file.
->   <dt>HOST_ECDSA_KEY or HOST_RSA_KEY
->   <dd> Can specify the host ECDSA or RSA keys if desired.  Comes in handy for repeated runs of the script in testing, so you don't have to keep editing your `~/.ssh/known_hosts`.
+>   <dt>HOST_ECDSA_KEY and HOST_ECDSA_KEY_PUB
+>   <dd> Can specify a predefined host ECDSA key if desired.  Comes in handy for repeated runs of the script in testing, so you don't have to keep editing your `~/.ssh/known_hosts`.
+>   <dt>HOST_RSA_KEY and HOST_RSA_KEY_PUB
+>   <dd> Predefined Host RSA key and associated pubkey
+>   <dt>HOST_ED25519_KEY and HOST_ED25519_KEY_PUB
+>   <dd> Predefined Host ed25519 key and associated pubkey
 > </dl>
 
 There are a few parameters that are defaulted in the script, but can be overridden in the `ZFS-root.conf` file
@@ -154,7 +206,7 @@ Host unlock-foobox
     RemoteCommand zfsbootmenu
 ```
 
-This will run the `zfsbootmenu` command upon login automagically.  NOTE: one problem is that the ssh session remains after unlocking - need a clean way to ensure it exits after the unlock is finished
+This will run the `zfsbootmenu` command upon login automagically.  NOTE: one problem is that the ssh session might remain after unlocking - need a clean way to ensure it exits after the unlock is finished
 
 NOTE: Enabling encryption and Dropbear will _force_ the **ZFSBOOTMENU_BINARY_TYPE** in the config file to be **LOCAL**.  This will build _zfsbootmenu_ locally from scratch, including Dropbear into the _zfsbootmenu_ initramfs.
 
