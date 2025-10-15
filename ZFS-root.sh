@@ -614,12 +614,13 @@ query_suite() {
     echo "${FUNCNAME[0]}"
     # Suite to install - bionic focal jammy noble
     if [[ ! -v SUITE ]] ; then
-        SUITE=$(whiptail --title "Select Ubuntu distribtion" --radiolist "Choose distro" 13 40 7 \
-            plucky "25.04 plucky" OFF \
-            noble "24.04 noble" ON \
-            jammy "22.04 jammy" OFF \
-            focal "20.04 focal" OFF \
-            bionic "18.04 Bionic" OFF \
+        SUITE=$(whiptail --title "Select Ubuntu distribtion" --radiolist "Choose distro" 15 42 8 \
+            questing "25.10 Questing Quokka" OFF \
+            plucky "25.04 Plucky Puffin" OFF \
+            noble "24.04 Noble Numbat" ON \
+            jammy "22.04 Jammy Jellyfish" OFF \
+            focal "20.04 Focal Fossa" OFF \
+            bionic "18.04 Bionic Beaver" OFF \
             3>&1 1>&2 2>&3)
         RET=${?}
         [[ ${RET} = 1 ]] && exit 1
@@ -629,6 +630,18 @@ query_suite() {
     # TODO: Make use of SUITE_EXTRAS maybe
     #
     case ${SUITE} in
+        questing)
+            SUITE_NUM="25.10"
+            SUITE_EXTRAS="netplan.io expect"
+            SUITE_BOOTSTRAP="wget,whois,rsync,gdisk,netplan.io,gpg-agent"
+            # Install HWE packages - set to blank or to "-hwe-25.04"
+            # Gets tacked on to various packages below
+            # TODO: No HWE packages for 25.04 yet - use this when/if available
+            # [ "${HWE}" = "y" ] && HWE="-hwe-${SUITE_NUM}" || HWE=
+            HWE=
+            # Specific zpool features available in jammy
+            SUITE_ROOT_POOL="-O dnodesize=auto"
+            ;;
         plucky)
             SUITE_NUM="25.04"
             SUITE_EXTRAS="netplan.io expect"
@@ -1364,34 +1377,6 @@ setup_apt_config() {
 
 # sources - NOTE: MUST have actual TABs for each heredoc line because of <<-
     case ${SUITE} in
-        focal | jammy | noble | plucky)
-            # TABs for this
-            cat > ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu.sources <<- EOF
-				Types: deb
-				URIs: http://us.archive.ubuntu.com/ubuntu/
-				Suites: ${SUITE} ${SUITE}-updates ${SUITE}-backports
-				Components: main restricted universe multiverse
-				Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-
-				Types: deb
-				URIs: http://security.ubuntu.com/ubuntu/
-				Suites: ${SUITE}-security
-				Components: main restricted universe multiverse
-				Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
-			EOF
-
-            # Backup any existing sources.list
-            [ -e ${ZFSBUILD}/etc/apt/sources.list ] && mv ${ZFSBUILD}/etc/apt/sources.list ${ZFSBUILD}/etc/apt/sources.list.orig
-
-            # Create new empty sources.list
-            # TABs for this
-            cat > ${ZFSBUILD}/etc/apt/sources.list <<- EOF
-				# Ubuntu sources have moved to the /etc/apt/sources.list.d/ubuntu.sources
-				# file, which uses the deb822 format. Use deb822-formatted .sources files
-				# to manage package sources in the /etc/apt/sources.list.d/ directory.
-				# See the sources.list(5) manual page for details.
-			EOF
-            ;;
         bionic)
             # Old sources setup before deb822
             # TABs for this
@@ -1423,6 +1408,35 @@ setup_apt_config() {
 
 				deb http://archive.ubuntu.com/ubuntu ${SUITE}-backports universe
 				deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-backports universe
+			EOF
+            ;;
+        *)
+            # Everything later than bionic can use the deb822 format
+            # TABs for this
+            cat > ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu.sources <<- EOF
+				Types: deb
+				URIs: http://us.archive.ubuntu.com/ubuntu/
+				Suites: ${SUITE} ${SUITE}-updates ${SUITE}-backports
+				Components: main restricted universe multiverse
+				Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+
+				Types: deb
+				URIs: http://security.ubuntu.com/ubuntu/
+				Suites: ${SUITE}-security
+				Components: main restricted universe multiverse
+				Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
+			EOF
+
+            # Backup any existing sources.list
+            [ -e ${ZFSBUILD}/etc/apt/sources.list ] && mv ${ZFSBUILD}/etc/apt/sources.list ${ZFSBUILD}/etc/apt/sources.list.orig
+
+            # Create new empty sources.list
+            # TABs for this
+            cat > ${ZFSBUILD}/etc/apt/sources.list <<- EOF
+				# Ubuntu sources have moved to the /etc/apt/sources.list.d/ubuntu.sources
+				# file, which uses the deb822 format. Use deb822-formatted .sources files
+				# to manage package sources in the /etc/apt/sources.list.d/ directory.
+				# See the sources.list(5) manual page for details.
 			EOF
             ;;
     esac
@@ -1535,6 +1549,10 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     # Setup inside chroot
 
     case ${SUITE} in
+        questing)
+            SUITE_NUM="25.10"
+            SUITE_BSDUTILS="bsdextrautils"
+            ;;
         plucky)
             SUITE_NUM="25.04"
             SUITE_BSDUTILS="bsdextrautils"
@@ -1558,8 +1576,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     esac
 
     # Make sure we're using a tmpfs for /tmp
-    # mkdir -p /usr/share/systemd/tmp.mount
-    systemctl enable /usr/share/systemd/tmp.mount
+    # Up to noble/24.04 use /usr/share/systemd while plucky/25.04 and above is /usr/lib/systemd
+    [ -e /usr/share/systemd/tmp.mount ] && systemctl enable /usr/share/systemd/tmp.mount
+    [ -e /usr/lib/systemd/tmp.mount ] && systemctl enable /usr/lib/systemd/tmp.mount
 
     ln -s /proc/self/mounts /etc/mtab
     apt-get -qq update
@@ -2907,7 +2926,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     if [ "${GNOME}" = "y" ] ; then
         # NOTE: bionic has an xserver-xorg-hwe-<distro> package, focal does NOT
         case ${SUITE} in
-            focal | jammy | noble | plucky)
+            focal | jammy | noble | plucky | questing)
                 apt-get -qq --yes install ubuntu-desktop vulkan-tools
                 ;;
             bionic)
@@ -3136,8 +3155,8 @@ select_encryption
 
 # Query for install options
 query_install_options
-# zrepl has no release for 25.05/plucky yet
-[ "${SUITE}" == "plucky" ] && ZREPL=n
+# zrepl has no release for 25.04/plucky or 25.10/questing yet
+[ "${SUITE}" == "plucky" ] || [ "${SUITE}" == "questing" ] && ZREPL=n
 
 query_nvidia
 query_google_auth
