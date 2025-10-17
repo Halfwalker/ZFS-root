@@ -2924,9 +2924,15 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
     # Install main ubuntu gnome desktop, plus maybe HWE packages
     if [ "${GNOME}" = "y" ] ; then
-        # NOTE: bionic has an xserver-xorg-hwe-<distro> package, focal does NOT
+        # NOTE: bionic has an xserver-xorg-hwe-<distro> package, focal and above do NOT
         case ${SUITE} in
             focal | jammy | noble | plucky | questing)
+                # Don't install kdump-tools
+                cat > /tmp/kdump-selections <<- EOF
+					# Should kdump-tools be enabled by default?
+					kdump-tools     kdump-tools/use_kdump   boolean false
+				EOF
+                cat /tmp/kdump-selections | debconf-set-selections
                 apt-get -qq --yes install ubuntu-desktop vulkan-tools
                 ;;
             bionic)
@@ -2941,16 +2947,34 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
     # Install main ubuntu kde desktop
     if [ "${KDE}" = "y" ] ; then
+        # Don't install kdump-tools
+        cat > /tmp/kdump-selections <<- EOF
+			# Should kdump-tools be enabled by default?
+			kdump-tools     kdump-tools/use_kdump   boolean false
+		EOF
+        cat /tmp/kdump-selections | debconf-set-selections
         apt-get -qq --yes install kde-full vulkan-tools
     fi # KDE
 
     # Install main ubuntu xfce4 desktop
     if [ "${XFCE}" = "y" ] ; then
+        # Don't install kdump-tools
+        cat > /tmp/kdump-selections <<- EOF
+			# Should kdump-tools be enabled by default?
+			kdump-tools     kdump-tools/use_kdump   boolean false
+		EOF
+        cat /tmp/kdump-selections | debconf-set-selections
         apt-get -qq --yes install xfce4 xfce4-goodies vulkan-tools
     fi # XFCE
 
     # Install main Neon KDE desktop
     if [ "${NEON}" = "y" ] ; then
+        # Don't install kdump-tools
+        cat > /tmp/kdump-selections <<- EOF
+			# Should kdump-tools be enabled by default?
+			kdump-tools     kdump-tools/use_kdump   boolean false
+		EOF
+        cat /tmp/kdump-selections | debconf-set-selections
         # Ensure the keyrings dir exists - it should, but be sure
         mkdir -p /usr/share/keyrings
         wget -qO /usr/share/keyrings/neon.key 'https://archive.neon.kde.org/public.key'
