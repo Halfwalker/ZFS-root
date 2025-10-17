@@ -133,9 +133,9 @@ preflight() {
         fi
     fi
 
-    # For SOF binaries, default to 2024.06
+    # For SOF binaries, default to 2025.05.1
     if [[ ! -v $SOF_VERSION ]] ; then
-        SOF_VERSION=2024.06
+        SOF_VERSION=2025.05.1
     fi
 
     # No magenta overrides for whiptail dialogs please
