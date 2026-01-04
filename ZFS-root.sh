@@ -1163,7 +1163,6 @@ create_root_pool() {
             # shellcheck disable=SC2086  # quoting here kills the zpool create
             zpool create -f -o ashift=12 -o autotrim=on ${SUITE_ROOT_POOL} \
                  -O acltype=posixacl -O canmount=off -O compression=lz4 \
-                 -O atime=off \
                  -O normalization=formD -O relatime=on -O xattr=sa \
                  -O mountpoint=/ -R ${ZFSBUILD} \
                  ${POOLNAME} ${RAIDLEVEL} ${ZPOOLDISK}
@@ -1180,7 +1179,6 @@ create_root_pool() {
             # shellcheck disable=SC2086  # quoting here kills the zpool create
             zpool create -f -o ashift=12 -o autotrim=on ${SUITE_ROOT_POOL} \
               -O acltype=posixacl -O canmount=off -O compression=lz4 \
-              -O atime=off \
               -O normalization=formD -O relatime=on -O xattr=sa \
               -O mountpoint=none -R ${ZFSBUILD} \
               ${POOLNAME} ${RAIDLEVEL} ${ZPOOLDISK}
@@ -1230,9 +1228,9 @@ create_zfs_datasets() {
 
     # zfs create pool/home and main user home dataset - possibly zfs native encrypted
     if [ "${DISCENC}" = "ZFSENC" ] ; then
-        echo "${PASSPHRASE}" | zfs create -o canmount=off -o mountpoint=none -o compression=lz4 -o atime=off ${ZFSENC_HOME_OPTIONS} ${POOLNAME}/home
+        echo "${PASSPHRASE}" | zfs create -o canmount=off -o mountpoint=none ${ZFSENC_HOME_OPTIONS} ${POOLNAME}/home
     else
-        zfs create -o canmount=off -o mountpoint=none -o compression=lz4 -o atime=off ${POOLNAME}/home
+        zfs create -o canmount=off -o mountpoint=none ${POOLNAME}/home
     fi
     zfs create -o canmount=on -o mountpoint=/home/${USERNAME} ${POOLNAME}/home/${USERNAME}
     zfs create -o canmount=on -o mountpoint=/root ${POOLNAME}/home/root
