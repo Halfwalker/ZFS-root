@@ -1075,8 +1075,6 @@ setup_swap_partition() {
     # Create SWAP volume for HIBERNATE, encrypted maybe
     # Just using individual swap partitions - could use mdadm to mirror/raid
     # them up, but meh, why ?
-    # NOTE: Need --disable-keyring so we can pull the derived key from the encrypted partition
-    #       otherwise it's in the kernel keyring
     if [ "${HIBERNATE}" = "y" ] ; then
         # Hibernate, so we need a real swap partition(s)
         for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
@@ -1084,18 +1082,10 @@ setup_swap_partition() {
             case ${DISCENC} in
                 LUKS)
                     echo "Encrypting swap partition ${disk} size ${SIZE_SWAP}M"
-                    echo "${PASSPHRASE}" | cryptsetup luksFormat --type luks2 --disable-keyring -c aes-xts-plain64 -s 512 -h sha256 /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP}
-                    echo "${PASSPHRASE}" | cryptsetup luksOpen --disable-keyring /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} swap_crypt${disk}
+                    echo "${PASSPHRASE}" | cryptsetup luksFormat --type luks2 -c aes-xts-plain64 -s 512 -h sha256 /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP}
+                    echo "${PASSPHRASE}" | cryptsetup luksOpen /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} swap_crypt${disk}
                     mkswap -f /dev/mapper/swap_crypt${disk}
 
-                    if [ ${disk} -eq 0 ] ; then
-                        # Get derived key to insert into other encrypted devices
-                        # To be more secure do this into a small ramdisk
-                        # swap must be opened 1st to enable resume from hibernation
-                        /lib/cryptsetup/scripts/decrypt_derived swap_crypt${disk} > /tmp/key
-                    fi
-                    # Add the derived key to all the other devices
-                    echo "${PASSPHRASE}" | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} /tmp/key
                     # Add the generated key from /etc/zfs/zroot.rawkey
                     echo "${PASSPHRASE}" | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} /etc/zfs/zroot.rawkey
                     ;;
@@ -1121,8 +1111,6 @@ luks_encrypt_root() {
     echo "-----------------------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # Encrypt root volume maybe
-    # NOTE: Need --disable-keyring so we can pull the derived key from the encrypted partition
-    #       otherwise it's in the kernel keyring
     if [ "${DISCENC}" = "LUKS" ] ; then
         for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
             # Encrypted LUKS root
@@ -1130,16 +1118,6 @@ luks_encrypt_root() {
             echo "${PASSPHRASE}" | cryptsetup luksFormat --type luks2 -c aes-xts-plain64 -s 512 -h sha256 /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA}
             echo "${PASSPHRASE}" | cryptsetup luksOpen /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} root_crypt${disk}
 
-            # If no encrypted SWAP then use 1st root device as derived key
-            # otherwise assume derived key was created above in "Create SWAP volume"
-            if [ ${disk} -eq 0 ] && [ "${HIBERNATE}" == "n" ] ; then
-                # Get derived key to insert into other encrypted devices
-                # To be more secure do this into a small ramdisk
-                /lib/cryptsetup/scripts/decrypt_derived root_crypt${disk} > /tmp/key
-            fi
-
-            # Add the derived key to all the other devices
-            echo "${PASSPHRASE}" | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} /tmp/key
             # Add the generated key from /etc/zfs/zroot.rawkey
             echo "${PASSPHRASE}" | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} /etc/zfs/zroot.rawkey
         done
@@ -2485,7 +2463,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
     # For LUKS point to the larger 32-byte (zfs enc compatible) /etc/zfs/zroot.rawkey in the initramfs
     if [ "${DISCENC}" = "LUKS" ] ; then
-        echo 'install_items+=" /etc/zfs/zroot.rawkey "' >> /etc/dracut.conf.d/zfskey.conf
+        echo 'install_items+=" /etc/crypttab /etc/zfs/zroot.rawkey "' >> /etc/dracut.conf.d/zfskey.conf
     fi
 
     # Generate an initramfs
