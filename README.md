@@ -121,7 +121,7 @@ To change the ZFSBootMenu default dataset to boot from the original Noble/24.04 
 
 ## UEFI SecureBoot
 
-For SecureBoot to be enabled and configured, the system must first be put into Setup Mode.  This will vary by system, but generally it means that any existing keys must be deleted in the bios config for UEFI SecureBoot.
+For SecureBoot to be enabled and configured, the system must first be put into Setup Mode.  This will vary by system, but generally it means that any existing keys must be deleted in the bios config for UEFI SecureBoot.  For Virtualbox you can delete the `.nvram` file before starting the VM.  You will have to hit `del` to get into the bios, get to the SecureBoot section and delete the keys.  There is an option to do this in the Virtualbox gui, but it doesn't seem to work (needs a magic incantation/process), doing it directly in the bios works.
 
 [sbctl](https://github.com/Foxboron/sbctl) will be installed to manage the setup and configuration.  If the system is in Setup mode, the general process is as follows :
 
@@ -172,7 +172,7 @@ There are a few parameters that are defaulted in the script, but can be overridd
 >   <dd>Default "zbm.skip_hooks=90-xhci-unbind.sh"
 >   <dt>SOF_VERSION
 >   <dd> Sound Open Firmware binaries (for laptops)
->   <dd> Default "2024.06"
+>   <dd> Default "2025.05.1"
 > </dl>
 
 NOTE: It will _always_ prompt for the list of disks to install to, and will pause with a textbox showing the selected options.
