@@ -942,15 +942,15 @@ install_zfs() {
 
     # Create an encryption key for LUKs partitions
     if [ "${DISCENC}" = "LUKS" ] ; then
-        dd if=/dev/urandom of=/etc/zfs/zroot.rawkey bs=32 count=1
-        chmod 0400 /etc/zfs/zroot.rawkey
+        dd if=/dev/urandom of=/etc/zfs/zroot.lukskey bs=32 count=1
+        chmod 0400 /etc/zfs/zroot.lukskey
     fi
     # Put zfs encryption key into place
     # We use two keys so the user can change the home dataset to something else if desired
     if [ "${DISCENC}" = "ZFSENC" ] ; then
-        echo "${PASSPHRASE}" > /etc/zfs/zroot.key
+        echo "${PASSPHRASE}" > /etc/zfs/zroot.rootkey
         echo "${PASSPHRASE}" > /etc/zfs/zroot.homekey
-        chmod 000 /etc/zfs/zroot.key /etc/zfs/zroot.homekey
+        chmod 000 /etc/zfs/zroot.rootkey /etc/zfs/zroot.homekey
     fi
 } # install_zfs()
 
@@ -1096,8 +1096,8 @@ setup_swap_partition() {
                     echo "${PASSPHRASE}" | cryptsetup luksOpen /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} swap_crypt${disk}
                     mkswap -f /dev/mapper/swap_crypt${disk}
 
-                    # Add the generated key from /etc/zfs/zroot.rawkey
-                    echo "${PASSPHRASE}" | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} /etc/zfs/zroot.rawkey
+                    # Add the generated key from /etc/zfs/zroot.lukskey
+                    echo "${PASSPHRASE}" | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP} /etc/zfs/zroot.lukskey
                     ;;
 
                 ZFSENC)
@@ -1128,8 +1128,8 @@ luks_encrypt_root() {
             echo "${PASSPHRASE}" | cryptsetup luksFormat --type luks2 -c aes-xts-plain64 -s 512 -h sha256 /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA}
             echo "${PASSPHRASE}" | cryptsetup luksOpen /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} root_crypt${disk}
 
-            # Add the generated key from /etc/zfs/zroot.rawkey
-            echo "${PASSPHRASE}" | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} /etc/zfs/zroot.rawkey
+            # Add the generated key from /etc/zfs/zroot.lukskey
+            echo "${PASSPHRASE}" | cryptsetup luksAddKey /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA} /etc/zfs/zroot.lukskey
         done
     fi
 } # luks_encrypt_root()
@@ -2034,9 +2034,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         #
         if [ "${DISCENC}" == "LUKS" ] ; then
             for DISK in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
-                echo "root_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) /etc/zfs/zroot.rawkey discard,luks,keyfile-timeout=10s" >> /etc/crypttab
+                echo "root_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) /etc/zfs/zroot.lukskey discard,luks,keyfile-timeout=10s" >> /etc/crypttab
                 if [ "${HIBERNATE}" == "y" ] ; then
-                    echo "swap_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_SWAP}) /etc/zfs/zroot.rawkey discard,luks,keyfile-timeout=10s" >> /etc/crypttab
+                    echo "swap_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_SWAP}) /etc/zfs/zroot.lukskey discard,luks,keyfile-timeout=10s" >> /etc/crypttab
                 fi
             done
 
@@ -2477,18 +2477,18 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
       echo 'ip=dhcp rd.neednet=0' > /etc/cmdline.d/dracut-network.conf
     fi # DROPBEAR
 
-    # For ZFS encryption point to the /etc/zfs/zroot.key files in the initramfs
+    # For ZFS encryption point to the /etc/zfs/zroot.rootkey files in the initramfs
     # These keys should have been copied into place above outside the chroot
     if [ "${DISCENC}" = "ZFSENC" ] ; then
-        echo 'install_items+=" /etc/zfs/zroot.key /etc/zfs/zroot.homekey"' >> /etc/dracut.conf.d/zfskey.conf
+        echo 'install_items+=" /etc/zfs/zroot.rootkey /etc/zfs/zroot.homekey"' >> /etc/dracut.conf.d/zfskey.conf
         if [ "${WIPE_FRESH}" == "y" ] ; then     # <<<<<------------------------------------------------ WIPE_FRESH ------ VVVVV
-            zfs change-key -o keylocation=file:///etc/zfs/zroot.key -o keyformat=passphrase ${POOLNAME}/ROOT
+            zfs change-key -o keylocation=file:///etc/zfs/zroot.rootkey -o keyformat=passphrase ${POOLNAME}/ROOT
         fi # WIPE_FRESH                          # <<<<<------------------------------------------------ WIPE_FRESH ------ ^^^^^
     fi
 
-    # For LUKS point to the larger 32-byte (zfs enc compatible) /etc/zfs/zroot.rawkey in the initramfs
+    # For LUKS point to the larger 32-byte (zfs enc compatible) /etc/zfs/zroot.lukskey in the initramfs
     if [ "${DISCENC}" = "LUKS" ] ; then
-        echo 'install_items+=" /etc/crypttab /etc/zfs/zroot.rawkey "' >> /etc/dracut.conf.d/zfskey.conf
+        echo 'install_items+=" /etc/crypttab /etc/zfs/zroot.lukskey "' >> /etc/dracut.conf.d/zfskey.conf
     fi
 
     # Generate an initramfs
@@ -3287,8 +3287,8 @@ fi
 # Grab config files from exiting setup if NOT wipe_fresh
 if [ "${WIPE_FRESH}" == "n" ] ; then
     mkdir -p ${ZFSBUILD}/etc/zfs
-    [ -e /etc/zfs/zroot.rawkey ] && cp /etc/zfs/zroot.rawkey ${ZFSBUILD}/etc/zfs/zroot.rawkey
-    [ -e /etc/zfs/zroot.key ] && cp /etc/zfs/zroot.key ${ZFSBUILD}/etc/zfs/zroot.key
+    [ -e /etc/zfs/zroot.lukskey ] && cp /etc/zfs/zroot.lukskey ${ZFSBUILD}/etc/zfs/zroot.lukskey
+    [ -e /etc/zfs/zroot.rootkey ] && cp /etc/zfs/zroot.rootkey ${ZFSBUILD}/etc/zfs/zroot.rootkey
     [ -e /etc/zfs/zroot.homekey ] && cp /etc/zfs/zroot.homekey ${ZFSBUILD}/etc/zfs/zroot.homekey
     if [ "${DISCENC}" == "LUKS" ] ; then
         [ -e /etc/crypttab ] && cp /etc/crypttab ${ZFSBUILD}/etc/crypttab
