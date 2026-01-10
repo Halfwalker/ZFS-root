@@ -1225,6 +1225,7 @@ create_zfs_datasets() {
     # If no HIBERNATE partition (not laptop, no resume etc) then just create
     # a zvol for swap.  Could not create this in the block above for swap because
     # the root pool didn't exist yet.
+    # Put it under ${POOLNAME}/ROOT so it gets encrypted if we're using ZFSENC
     if [ "${HIBERNATE}" = "n" ] && [ ${SIZE_SWAP} -ne 0 ] ; then
         # No Hibernate, so just use a zfs volume for swap
         echo "Creating swap zfs dataset size ${SIZE_SWAP}M"
@@ -1232,7 +1233,7 @@ create_zfs_datasets() {
         zfs create -V ${SIZE_SWAP}M -o compression=zle \
           -o logbias=throughput -o sync=always \
           -o primarycache=metadata -o secondarycache=none \
-          -o com.sun:auto-snapshot=false ${POOLNAME}/swap
+          -o com.sun:auto-snapshot=false ${POOLNAME}/ROOT/swap
     fi #HIBERNATE
 } # create_zfs_datasets()
 
@@ -2145,10 +2146,10 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
         else
             # No swap partition - maybe using a zvol for swap
-            echo "Enabling swap size ${SIZE_SWAP} on /dev/zvol/${POOLNAME}/swap"
-            mkswap -f /dev/zvol/${POOLNAME}/swap
+            echo "Enabling swap size ${SIZE_SWAP} on /dev/zvol/${POOLNAME}/ROOT/swap"
+            mkswap -f /dev/zvol/${POOLNAME}/ROOT/swap
             if [ ${SIZE_SWAP} -ne 0 ] ; then
-                echo "/dev/zvol/${POOLNAME}/swap none swap discard,sw 0 0" >> /etc/fstab
+                echo "/dev/zvol/${POOLNAME}/ROOT/swap none swap discard,sw 0 0" >> /etc/fstab
             fi
         fi # HIBERNATE
     fi # WIPE_FRESH                         # <<<<<------------------------------------------------ WIPE_FRESH ------ ^^^^^
