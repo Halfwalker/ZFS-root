@@ -1037,7 +1037,7 @@ partition_disks() {
         if [ "${DISCENC}" = "LUKS" ] ; then
             # LUKS Encrypted - should be partition type 8309 (Linux LUKS)
             # wipefs --all --force /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA}
-            zpool labelclear -f /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA}
+            # zpool labelclear -f /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_DATA}
             sgdisk -n ${PARTITION_DATA}:0:0 -c ${PARTITION_DATA}:"ZFS_${disk}" -t ${PARTITION_DATA}:8300 /dev/disk/by-id/${zfsdisks[${disk}]}
             apt-get -qq --no-install-recommends --yes install cryptsetup
         else
