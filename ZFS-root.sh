@@ -1795,7 +1795,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
     # Assign command-line arguments to be used when booting the final kernel
     # For hibernation and resume to work we have to specify which device to resume from
-    # Can only reume from ONE device though, so we default to the 1st disk swap partition
+    # Can only resume from ONE device though, so we default to the 1st disk swap partition
     # ZFS native encryption and non-encrypted can use SWAP partition directly
     # LUKS encryption uses the 1st swap_crypt0 device
     if [ "${HIBERNATE}" = "y" ] ; then
@@ -1812,16 +1812,24 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
             zfs set org.zfsbootmenu:commandline="rw quiet ${USE_ZSWAP} resume=/dev/mapper/swap_crypt0" ${POOLNAME}/ROOT/${SUITE}
 
             # NOTE: be sure to use real TABS for this heredoc
-            cat <<- END > /etc/dracut.conf.d/resume-swap-uuid.conf
-				# add_device+=" UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP}) "
+            cat <<- END > /etc/dracut.conf.d/resume-swap-crypt.conf
+				# Needed for resuming from encrypted swap
 				add_device+=" /dev/mapper/swap_crypt0 "
-				add_dracutmodules+=" crypt systemd "
-				install_items+=" /usr/lib/systemd/system/systemd-hibernate-resume.service "
+				add_dracutmodules+=" crypt "
 			END
         else
             zfs set org.zfsbootmenu:commandline="rw quiet ${USE_ZSWAP} resume=UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP})" ${POOLNAME}/ROOT
             zfs set org.zfsbootmenu:commandline="rw quiet ${USE_ZSWAP} resume=UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP})" ${POOLNAME}/ROOT/${SUITE}
         fi
+
+        # Needed for any hibernation resume to work, encrypted or not
+        # NOTE: be sure to use real TABS for this heredoc
+        cat <<- END > /etc/dracut.conf.d/resume-swap-systemd.conf
+			# Ensure systemd-hibernate-resume is available
+			# add_device+=" UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP}) "
+			add_dracutmodules+=" systemd "
+			install_items+=" /usr/lib/systemd/system/systemd-hibernate-resume.service "
+		END
     else
         zfs set org.zfsbootmenu:commandline="rw quiet" ${POOLNAME}/ROOT
         zfs set org.zfsbootmenu:commandline="rw quiet" ${POOLNAME}/ROOT/${SUITE}
