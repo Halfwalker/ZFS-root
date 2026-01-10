@@ -379,7 +379,7 @@ select_encryption() {
     else
         # NOT wiping fresh, so LUKS doesn't make sense
         if [[ ! -v DISCENC ]] ; then
-            DISCENC=$(whiptail --title "Encryption ZFS datasets" --radiolist "Choose whether to ncrypt the new ROOT dataset" 11 60 4 \
+            DISCENC=$(whiptail --title "Encryption ZFS datasets" --radiolist "Choose whether to encrypt the new ROOT dataset" 11 60 4 \
                 NOENC "No disk encryption" ON \
                 ZFSENC "Enable ZFS dataset encryption" OFF \
                 3>&1 1>&2 2>&3)
@@ -389,13 +389,14 @@ select_encryption() {
     fi
 
     # ZFSBOOTMENU_BINARY_TYPE - use a downloaded binary or build locally
+    # = KERNEL (default - use vmlinuz/initrd pair from downloaded binary)
     # = EFI    (use EFI binary - NOTE: precludes syslinux from working)
-    # = KERNEL (use vmlinuz/initrd pair from downloaded binary)
     # = LOCAL  (built locally)
     #
     # NOTE: If Dropbear is required for remote unlocking of LUKS or ZFS enecryption
     #       then this will be forced to LOCAL below in the Dropbear config section.
     #       This is because Dropbear must be included in the initramfs for zfsbootmenu.
+    #       Same for LUKS encryption since we need the early-stage script to unlock
     [[ ! -v ZFSBOOTMENU_BINARY_TYPE ]] && ZFSBOOTMENU_BINARY_TYPE=KERNEL
 
     # If encryption enabled, need a passphrase
@@ -713,6 +714,9 @@ query_suite() {
 # Determine if SecureBoot may be set up.  Uses sbctl which is only (currently) available for noble 24.04
 # Later may clone the repo and build sbctl locally
 # Only called when WIPE_FRESH = y
+# Local building requires golang asciidoc-base pkgconf pkgconf-bin libpcsclite-dev
+# NOTE: 'sbctl verify' does not work - fails with 'failed to find EFI system partition' due to ESP
+#       being on a mdadm device for multiple boot devices
 query_secureboot() {
     echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
@@ -1238,10 +1242,10 @@ install_debootstrap() {
     echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # Show what we got before installing
-    echo "---------- $(tput setaf 1)About to debootstrap into ${ZFSBUILD}$(tput sgr0) -----------"
+    echo "- $(tput setaf 1)About to debootstrap into ${ZFSBUILD}$(tput sgr0) -----------"
     zfs list -t all
     df -h
-    echo "---------- $(tput setaf 1)About to debootstrap into ${ZFSBUILD}$(tput sgr0) -----------"
+    echo "- $(tput setaf 1)About to debootstrap into ${ZFSBUILD}$(tput sgr0) -----------"
     read -r -t 15 -p "Press <enter> to continue (auto-continue in 15secs)"
 
     # Install basic system
@@ -2052,6 +2056,8 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 				# Read passphrase for LUKS encryption into $REPLY
 				read -s -p "LUKS encryption passphrase : "
 
+				tput clear
+				colorize red "${header}\n\n"
 				for idx in ${!ZFS_PARTS[@]} ; do
 				    # Grab just ZFS_0 or SWAP_0
 				    test_luks=$(basename ${ZFS_PARTS[$idx]})
@@ -2073,15 +2079,13 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
 				    header="$( center_string "[CTRL-C] cancel luksOpen attempts" )"
 
-				    tput clear
-				    colorize red "${header}\n\n"
-
 				    # https://fossies.org/linux/cryptsetup/docs/Keyring.txt
 				    echo $REPLY | cryptsetup luksOpen ${luks} ${dm}
 				    ret=$?
 
 				    # successfully entered a passphrase
 				    if [ "${ret}" -eq 0 ] ; then
+                        echo "${luks} opened as ${dm}"
 				        zdebug "$(
 				            cryptsetup status "${dm}"
 				        )"
@@ -2105,6 +2109,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 				        fi
 				    fi
 				done
+                sleep 5  # Allow user to see unlocked partitions
 			EOF
             chmod +x /usr/local/bin/zfsbootmenu_luks_unlock.sh
 
@@ -2423,9 +2428,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     #
     mkdir -p /etc/cmdline.d /etc/zfsbootmenu/dracut.conf.d
     if [ "${DROPBEAR}" = "y" ] ; then
-      echo "------------------------------------------------------------"
+      echo "---------------------------------------------------"
       echo " Installing dropbear for remote unlocking"
-      echo "------------------------------------------------------------"
+      echo "---------------------------------------------------"
 
       apt-get install --yes dracut-network dropbear-bin
       rm -rf /tmp/dracut-crypt-ssh && mkdir -p /tmp/dracut-crypt-ssh
