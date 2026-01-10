@@ -1624,7 +1624,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
     # Configure Dracut to load ZFS support
     # Need gcc to get libgcc_s.so for dracut_install to work
-    apt-get --yes install dracut-core zfs-dracut ${SUITE_BSDUTILS} gcc
+    apt-get -qq --yes install dracut-core zfs-dracut ${SUITE_BSDUTILS} gcc
 
     # NOTE: tabs as first char to handle indented heredoc
     cat <<- END > /etc/dracut.conf.d/100-zol.conf
@@ -1676,9 +1676,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 		refind  refind/install_to_esp   boolean false
 	EOFREF
     debconf-set-selections < /tmp/selectionsref
-    DEBIAN_FRONTEND=noninteractive apt-get --yes install refind efi-shell-x64
+    DEBIAN_FRONTEND=noninteractive apt-get -qq --yes install refind efi-shell-x64
 
-    apt-get install --yes syslinux syslinux-common extlinux dosfstools unzip
+    apt-get -qq --yes install syslinux syslinux-common extlinux dosfstools unzip
 
     # For a non-wipe_fresh, we don't actually need to install refind since it's already
     # there in /boot/efi - so only do this if we're wiping fresh
@@ -1785,7 +1785,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     # Install and configure ZFSBootMenu
     #
     DEBIAN_FRONTEND=noninteractive apt-get --yes install kexec-tools
-    apt-get --yes install libconfig-inifiles-perl libsort-versions-perl libboolean-perl fzf mbuffer make curl bsdextrautils git
+    apt-get -qq --yes install libconfig-inifiles-perl libsort-versions-perl libboolean-perl fzf mbuffer make curl bsdextrautils git
 
     # Assign command-line arguments to be used when booting the final kernel
     # For hibernation and resume to work we have to specify which device to resume from
@@ -2433,7 +2433,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
       echo " Installing dropbear for remote unlocking"
       echo "---------------------------------------------------"
 
-      apt-get install --yes dracut-network dropbear-bin
+      apt-get -qq --yes install dracut-network dropbear-bin
       rm -rf /tmp/dracut-crypt-ssh && mkdir -p /tmp/dracut-crypt-ssh
       cd /tmp/dracut-crypt-ssh && curl -L https://github.com/dracut-crypt-ssh/dracut-crypt-ssh/tarball/master | tar xz --strip=1
 
