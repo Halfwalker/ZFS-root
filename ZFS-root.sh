@@ -2502,6 +2502,8 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     # Test above only allows y if /sys/firmware/efi exists
     #
     # If UEFI SecureBoot should be enabled - NOTE: only available for noble/24.04
+    # Local building requires golang asciidoc-base pkgconf pkgconf-bin libpcsclite-dev
+    # To build locally need libpcsclite-dev libpcsclite1 golang-go sbsigntool
     if [[ ! -v SECUREBOOT || "$SECUREBOOT" != "n" ]]; then
         if [[ -d /sys/firmware/efi && "${SUITE}" == "noble" ]] ; then
             # Create apt sources for sbctl
@@ -2516,6 +2518,46 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 				Suites: /
 				Enabled: yes
 				Architectures: amd64
+			EOF
+
+            # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+            # We put /var/lib/sbctl into /boot/efi/sbctl, so need a config file to reflect that
+            cat > /etc/sbctl <<- EOF
+				keydir: /boot/efi/sbctl/keys
+				guid: /boot/efi/sbctl/GUID
+				files_db: /boot/efi/sbctl/files.json
+				bundles_db: /boot/efi/sbctl/bundles.json
+				landlock: true
+				db_additions:
+				- microsoft
+				files:
+				- path: /boot/vmlinuz-linux
+				  output: /boot/vmlinuz-linux
+				- path: /efi/EFI/Linux/arch-linux.efi
+				  output: /efi/EFI/Linux/arch-linux.efi
+				keys:
+				  pk:
+				    privkey: /boot/efi/sbctl/keys/PK/PK.key
+				    pubkey: /boot/efi/sbctl/keys/PK/PK.pem
+				    type: file
+				  kek:
+				    privkey: /boot/efi/sbctl/keys/KEK/KEK.key
+				    pubkey: /boot/efi/sbctl/keys/KEK/KEK.pem
+				    type: file
+				  db:
+				    privkey: /boot/efi/sbctl/keys/db/db.key
+				    pubkey: /boot/efi/sbctl/keys/db/db.pem
+				    type: file
+				- path: /boot/efi/EFI/refind/refind_x64.efi
+				  output: /boot/efi/EFI/refind/refind_x64.efi
+				- path: /boot/efi/EFI/tools/memtest86/memtest86.efi
+				  output: "/boot/efi/EFI/tools/memtest86/memtest86.efi
+				- path: /boot/efi/EFI/tools/shellx64.efi
+				  output: "/boot/efi/EFI/tools/shellx64.efi
+				- path: /boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu
+				  output: "/boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu
+				- path: /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
+				  output: "/boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
 			EOF
 
             apt-get -qq update
