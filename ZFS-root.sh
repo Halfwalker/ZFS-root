@@ -100,7 +100,7 @@
 # -------------------------------------------------------------------------------------------------------
 # Preflight - initial setup
 preflight() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     if [[ $EUID -ne 0 ]]; then
         echo "This script must be run as root" 1>&2
@@ -164,7 +164,7 @@ preflight() {
 # Query the user if we're wiping the system to start fresh, or just going to
 # install/create a new ROOT dataset in an existing system
 wipe_fresh() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     if [ "$1" = "packerci" ] ; then
         export WIPE_FRESH=y
@@ -184,7 +184,7 @@ wipe_fresh() {
 # -------------------------------------------------------------------------------------------------------
 # Query the user for any cacher (apt-cacher-ng for example)
 setup_cacher() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # Check for a local apt-cacher-ng system - looking for these hosts
     # aptcacher.local
@@ -227,7 +227,7 @@ setup_cacher() {
 # -------------------------------------------------------------------------------------------------------
 # Query the user for general settings
 query_user() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # Get userid and full name of main user
     # First see if USERNAME or UCOMMENT are already set in ZFS-root.conf
@@ -281,7 +281,7 @@ query_user() {
 # Select which disk(s) to install to
 # Only called when WIPE_FRESH = y
 select_disks() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     #
     # If script was started with one parameter "packerci" then we're running under CI/CD
@@ -364,7 +364,7 @@ select_disks() {
 # Query the user for any disk encryption
 # Only called when WIPE_FRESH = y
 select_encryption() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     if [ "${WIPE_FRESH}" == "y" ] ; then
         if [[ ! -v DISCENC ]] ; then
@@ -434,7 +434,7 @@ select_encryption() {
 # -------------------------------------------------------------------------------------------------------
 # Select install options
 query_install_options() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # We check /sys/power/state - if no "disk" in there, then HIBERNATE is disabled
     grep disk < /sys/power/state > /dev/null
@@ -494,7 +494,7 @@ query_install_options() {
 # -------------------------------------------------------------------------------------------------------
 # Possibly offer Nvidia driver install
 query_nvidia() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # See if we need to install Nvidia drivers, notify if so
     # shellcheck disable=SC2046,SC2086  # Don't need quotes or double-quotes
@@ -522,7 +522,7 @@ query_nvidia() {
 # -------------------------------------------------------------------------------------------------------
 # Query for Google Authenticator, create secret for install
 query_google_auth() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # Show google authenticator info - file in /root/google_auth.txt is like
     # AGNGG2UOIDJXDJNZ
@@ -560,7 +560,7 @@ query_google_auth() {
 # -------------------------------------------------------------------------------------------------------
 # Query for any additional SSH keys to add to authorized_keys
 query_ssh_auth() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # SSH authorized keys from github for dropbear and ssh
     if [[ ! -v AUTHKEYS ]] ; then
@@ -581,7 +581,7 @@ query_ssh_auth() {
 # -------------------------------------------------------------------------------------------------------
 # Query for any swap usage, determine proper size for hibernation
 query_swap() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # Swap size - if HIBERNATE enabled then this will be an actual disk partition.
     # If DISCENC == LUKS then partition will be encrypted.  If SIZE_SWAP is not
@@ -610,7 +610,7 @@ query_swap() {
 # -------------------------------------------------------------------------------------------------------
 # Query for which Ubuntu suite to install (plucky, noble, etc)
 query_suite() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # Suite to install - bionic focal jammy noble
     if [[ ! -v SUITE ]] ; then
@@ -714,7 +714,7 @@ query_suite() {
 # Later may clone the repo and build sbctl locally
 # Only called when WIPE_FRESH = y
 query_secureboot() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
 
     # To build locally need libpcsclite-dev libpcsclite1 golang-go sbsigntool
@@ -778,7 +778,7 @@ query_secureboot() {
 # -------------------------------------------------------------------------------------------------------
 # Show what we're about to install
 show_options() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     #
     # If script was started with one parameter "packerci" then we're running under CI/CD
@@ -814,7 +814,7 @@ show_options() {
         DISCENC    = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
         DROPBEAR   = $(echo $DROPBEAR)  : Enable Dropbear unlocking of encrypted disks\n \
         Swap size  = $(echo $SIZE_SWAP)M $([ ${SIZE_SWAP} -eq 0 ] && echo ': DISABLED')\n" \
-        ${box_height} 76
+        ${box_height} 79
         RET=${?}
         [[ ${RET} = 1 ]] && exit 1
     else
@@ -841,7 +841,7 @@ show_options() {
         DISCENC    = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
         DROPBEAR   = $(echo $DROPBEAR)  : Enable Dropbear unlocking of encrypted disks\n \
         Swap size  = $(echo $SIZE_SWAP)M $([ ${SIZE_SWAP} -eq 0 ] && echo ': DISABLED')\n" \
-        ${box_height} 76
+        ${box_height} 79
         RET=${?}
         [[ ${RET} = 1 ]] && exit 1
     fi # Check for WIPE_FRESH
@@ -850,7 +850,7 @@ show_options() {
 
 # -------------------------------------------------------------------------------------------------------
 log_options() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # Log all the variables used
     # NOTE: tabs as first char to handle indented heredoc
@@ -900,7 +900,7 @@ log_options() {
 # Install ZFS to local system (livecd)
 # Only called when WIPE_FRESH = y
 install_zfs() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # Pre-OK the zfs-dkms licenses notification
     # NOTE: tabs as first char to handle indented heredoc
@@ -950,7 +950,7 @@ install_zfs() {
 # poolname, hostname, username
 # This assumes we're being run from the system in question
 find_zfs_config() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # Current root filesystem is on the pool we want
     POOLNAME=$(/usr/bin/df | /usr/bin/grep -E '/$' | /usr/bin/cut -d' ' -f1 | cut -d'/' -f1)
@@ -984,7 +984,7 @@ find_zfs_config() {
 # -------------------------------------------------------------------------------------------------------
 # Only called when wiping fresh
 partition_disks() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # Unmount any mdadm disks that might have been automounted
     # Stop all found mdadm arrays - again, just in case.  Sheesh.
@@ -1070,7 +1070,7 @@ partition_disks() {
 # -------------------------------------------------------------------------------------------------------
 # Only called when WIPE_FRESH = y
 setup_swap_partition() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # Create SWAP volume for HIBERNATE, encrypted maybe
     # Just using individual swap partitions - could use mdadm to mirror/raid
@@ -1108,7 +1108,7 @@ setup_swap_partition() {
 # -------------------------------------------------------------------------------------------------------
 # Only called when WIPE_FRESH = y
 luks_encrypt_root() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # Encrypt root volume maybe
     if [ "${DISCENC}" = "LUKS" ] ; then
@@ -1128,7 +1128,7 @@ luks_encrypt_root() {
 # -------------------------------------------------------------------------------------------------------
 # Only called when WIPE_FRESH = y
 create_root_pool() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # COMPLETELY clear out build dir
     rm -rf ${ZFSBUILD}
@@ -1176,7 +1176,7 @@ create_root_pool() {
 # -------------------------------------------------------------------------------------------------------
 # Only called when WIPE_FRESH = y
 create_zfs_datasets() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # Main filesystem datasets
 
@@ -1235,7 +1235,7 @@ create_zfs_datasets() {
 
 # -------------------------------------------------------------------------------------------------------
 install_debootstrap() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # Show what we got before installing
     echo "---------- $(tput setaf 1)About to debootstrap into ${ZFSBUILD}$(tput sgr0) -----------"
@@ -1258,7 +1258,7 @@ install_debootstrap() {
 # -------------------------------------------------------------------------------------------------------
 # Only called when WIPE_FRESH = y
 setup_boot_partition() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # Set up boot partition (UEFI) potentially as mdadm mirror for multi-disk
     if [ ${#zfsdisks[@]} -eq 1 ] ; then
@@ -1287,7 +1287,7 @@ setup_boot_partition() {
 
 # -------------------------------------------------------------------------------------------------------
 setup_network_config() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     echo "${MYHOSTNAME}" > ${ZFSBUILD}/etc/hostname
     echo "127.0.1.1  ${MYHOSTNAME}" >> ${ZFSBUILD}/etc/hosts
@@ -1346,7 +1346,7 @@ setup_network_config() {
 
 # -------------------------------------------------------------------------------------------------------
 setup_apt_config() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     if [ "${PROXY}" ]; then
         # This is for apt-get
@@ -1423,7 +1423,7 @@ setup_apt_config() {
 
 # -------------------------------------------------------------------------------------------------------
 setup_googleauth_refind() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     # Google Authenticator config - put to /root to be moved to /home/${USERNAME} in setup.sh
     if [ "${GOOGLE}" = "y" ] ; then
@@ -1441,7 +1441,7 @@ setup_googleauth_refind() {
 # -------------------------------------------------------------------------------------------------------
 # Begin building the Setup.sh that will run the chroot
 prep_setup() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     echo "Creating Setup.sh in new system for chroot"
     cat > ${ZFSBUILD}/root/Setup.sh <<- EOF
@@ -1520,7 +1520,7 @@ prep_setup() {
 # -------------------------------------------------------------------------------------------------------
 # The rest of the Setup.sh to run in the chroot
 build_setup() {
-    echo "-----------------------------------------------------------------------------------------------"
+    echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     mkdir -p ${ZFSBUILD}/root
 cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
