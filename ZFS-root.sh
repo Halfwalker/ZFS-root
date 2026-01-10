@@ -400,35 +400,40 @@ select_encryption() {
     [[ ! -v ZFSBOOTMENU_BINARY_TYPE ]] && ZFSBOOTMENU_BINARY_TYPE=KERNEL
 
     # If encryption enabled, need a passphrase
-    if [ "${DISCENC}" != "NOENC" ] ; then
-        if [[ ! -v PASSPHRASE ]] ; then
-            DONE=false
-            until ${DONE} ; do
-                PW1=$(whiptail --passwordbox "Please enter a good long encryption passphrase" 8 70 --title "Encryption passphrase" 3>&1 1>&2 2>&3)
-                PW2=$(whiptail --passwordbox "Please re-enter the encryption passphrase" 8 70 --title "Encryption passphrase confirmation" 3>&1 1>&2 2>&3)
-                [ "$PW1" = "$PW2" ] && DONE=true
-            done
-            PASSPHRASE="$PW1"
-        fi # If PASSPHRASE not already set in ZFS-root.conf
+    case ${DISCENC} in
+        LUKS|ZFSENC)
+            if [[ ! -v PASSPHRASE ]] ; then
+                DONE=false
+                until ${DONE} ; do
+                    PW1=$(whiptail --passwordbox "Please enter a good long encryption passphrase" 8 70 --title "Encryption passphrase" 3>&1 1>&2 2>&3)
+                    PW2=$(whiptail --passwordbox "Please re-enter the encryption passphrase" 8 70 --title "Encryption passphrase confirmation" 3>&1 1>&2 2>&3)
+                    [ "$PW1" = "$PW2" ] && DONE=true
+                done
+                PASSPHRASE="$PW1"
+            fi # If PASSPHRASE not already set in ZFS-root.conf
 
-        # retcode 0 = YES, 1 = NO
-        if [[ ! -v DROPBEAR ]] ; then
-            DROPBEAR=$(whiptail --title "Enable Dropbear ?" --yesno "Should Dropbear be enabled for remote unlocking of encrypted disks ?\n\nNOTE: Dropbear requires use of ZFSBOOTMENU_BINARY_TYPE as LOCAL, so it can be built locally" 12 60 \
-            3>&1 1>&2 2>&3)
-            RET=${?}
-            [[ ${RET} = 0 ]] && DROPBEAR=y
-            [[ ${RET} = 1 ]] && DROPBEAR=n
-        fi
-        # If we have encryption and want Dropbear, then we HAVE to have the LOCAL
-        # version of zfsbootmenu, so we can rebuild the zfsbootmenu initramfs to
-        # include Dropbear
-        if [ "${DROPBEAR}" == "y" ] ; then
-            ZFSBOOTMENU_BINARY_TYPE=LOCAL
-        fi
-    else
-        # Default Dropbear to NO
-        DROPBEAR=n
-    fi
+            # retcode 0 = YES, 1 = NO
+            if [[ ! -v DROPBEAR ]] ; then
+                DROPBEAR=$(whiptail --title "Enable Dropbear ?" --yesno "Should Dropbear be enabled for remote unlocking of encrypted disks ?\n\nNOTE: Dropbear requires use of ZFSBOOTMENU_BINARY_TYPE as LOCAL, so it can be built locally" 12 60 \
+                3>&1 1>&2 2>&3)
+                RET=${?}
+                [[ ${RET} = 0 ]] && DROPBEAR=y
+                [[ ${RET} = 1 ]] && DROPBEAR=n
+            fi
+            # If we have encryption and want Dropbear, then we HAVE to have the LOCAL
+            # version of zfsbootmenu, so we can rebuild the zfsbootmenu initramfs to
+            # include Dropbear.  If DISCENC is LUKS then we need LOCAL as well, so we
+            # get the early-stage script to unlock LUKS-encrypted partitions.
+            if [ "${DROPBEAR}" == "y" ] || [ "${DISCENC}" == "LUKS" ] ; then
+                ZFSBOOTMENU_BINARY_TYPE=LOCAL
+            fi
+            ;;
+
+        NOENC)
+            # Default Dropbear to NO
+            DROPBEAR=n
+            ;;
+    esac
 } # select_encryption()
 
 
@@ -938,6 +943,7 @@ install_zfs() {
     # Create an encryption key for LUKs partitions
     if [ "${DISCENC}" = "LUKS" ] ; then
         dd if=/dev/urandom of=/etc/zfs/zroot.rawkey bs=32 count=1
+        chmod 0400 /etc/zfs/zroot.rawkey
     fi
     # Put zfs encryption key into place
     # We use two keys so the user can change the home dataset to something else if desired
@@ -1798,6 +1804,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 			add_dracutmodules+=" resume "
 		END
 
+        # Although we have systemd-hibernate, also install pm-utils for pm-hibernate
+        apt-get -qq --yes install pm-utils
+
         if [ "${DISCENC}" = "LUKS" ] ; then
             zfs set org.zfsbootmenu:commandline="rw quiet ${USE_ZSWAP} resume=/dev/mapper/swap_crypt0" ${POOLNAME}/ROOT
             zfs set org.zfsbootmenu:commandline="rw quiet ${USE_ZSWAP} resume=/dev/mapper/swap_crypt0" ${POOLNAME}/ROOT/${SUITE}
@@ -1806,6 +1815,8 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
             cat <<- END > /etc/dracut.conf.d/resume-swap-uuid.conf
 				# add_device+=" UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP}) "
 				add_device+=" /dev/mapper/swap_crypt0 "
+				add_dracutmodules+=" crypt systemd "
+				install_items+=" /usr/lib/systemd/system/systemd-hibernate-resume.service "
 			END
         else
             zfs set org.zfsbootmenu:commandline="rw quiet ${USE_ZSWAP} resume=UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP})" ${POOLNAME}/ROOT
@@ -1859,6 +1870,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
             echo "--- Using zfsbootmenu KERNEL files"
             curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v3.0.1/zfsbootmenu-recovery-x86_64-v3.0.1-linux6.12.tar.gz -o /usr/local/share/zfsbootmenu.tar.gz
             tar xvzf /usr/local/share/zfsbootmenu.tar.gz --strip-components=1 -C /boot/efi/EFI/zfsbootmenu
+            rm -f /usr/local/share/zfsbootmenu.tar.gz
         fi
 
         # For a binary release setup we still need the syslinux-update.sh script from the repo
@@ -2014,9 +2026,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         #
         if [ "${DISCENC}" == "LUKS" ] ; then
             for DISK in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
-                echo "root_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) /etc/zfs/zroot.rawkey discard,keyfile-timeout=10s" >> /etc/crypttab
+                echo "root_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) /etc/zfs/zroot.rawkey discard,luks,keyfile-timeout=10s" >> /etc/crypttab
                 if [ "${HIBERNATE}" == "y" ] ; then
-                    echo "swap_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_SWAP}) /etc/zfs/zroot.rawkey discard,keyfile-timeout=10s" >> /etc/crypttab
+                    echo "swap_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_SWAP}) /etc/zfs/zroot.rawkey discard,luks,keyfile-timeout=10s" >> /etc/crypttab
                 fi
             done
 
@@ -2045,13 +2057,12 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 				done
 				unset src sources
 
-				# We only unlock the ZFS partition(s) since the SWAP ones can use the
-				# /etc/zfs/zroot.rawkey to unlock once main pool is open
-				# ZFS_PARTS=(/dev/disk/by-partlabel/{SWAP_*,ZFS_*})
-				ZFS_PARTS=(/dev/disk/by-partlabel/ZFS_*)
+				# Ensure glob expands to nothing for non-matches
+				shopt -s nullglob
+				ZFS_PARTS=(/dev/disk/by-partlabel/{SWAP_*,ZFS_*})
 
 				echo "Found these partitions for LUKS encryption"
-				echo $ZFS_PARTS
+				for idx in ${!ZFS_PARTS[@]} ; do echo "${ZFS_PARTS[$idx]}" ; done
 				echo ""
 
 				# Read passphrase for LUKS encryption into $REPLY
