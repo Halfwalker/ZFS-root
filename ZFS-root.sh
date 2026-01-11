@@ -964,7 +964,7 @@ find_zfs_config() {
     echo "${FUNCNAME[0]}"
     # Current root filesystem is on the pool we want
     POOLNAME=$(/usr/bin/df | /usr/bin/grep -E '/$' | /usr/bin/cut -d' ' -f1 | cut -d'/' -f1)
-    HOSTNAME=$(/usr/bin/hostname)
+    MYHOSTNAME=$(/usr/bin/hostname)
     # Get userid and full name of main user
     # First see if USERNAME or UCOMMENT are already set in ZFS-root.conf
     if [[ ! -v USERNAME ]] || [[ ! -v UCOMMENT ]] ; then
