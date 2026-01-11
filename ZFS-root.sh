@@ -591,7 +591,7 @@ query_swap() {
     echo "${FUNCNAME[0]}"
     # Swap size - if HIBERNATE enabled then this will be an actual disk partition.
     # If DISCENC == LUKS then partition will be encrypted.  If SIZE_SWAP is not
-    # defined here, then will be calculated to accomodate memory size (plus fudge factor).
+    # defined here, then will be calculated to accommodate memory size (plus fudge factor).
     if [[ ! -v SIZE_SWAP ]] ; then
         # shellcheck disable=SC2002  # Using cat is clearer to understand
         MEMTOTAL=$(cat /proc/meminfo | grep -F MemTotal | tr -s ' ' | cut -d' ' -f2)
@@ -600,7 +600,7 @@ query_swap() {
         # So don't even prompt the user for a size. Her own silly fault if it's
         # enabled but she doesn't want a swap partition
         if [ "${HIBERNATE}" = "n" ] ; then
-            SIZE_SWAP=$(whiptail --inputbox "If HIBERNATE enabled then this will be a disk partition otherwise it will be a regular ZFS dataset. If LUKS enabled then the partition will be encrypted.\nIf SWAP size not set here (left blank), then it will be calculated to accomodate memory size. Set to zero (0) to disable swap.\n\nSize of swap space in megabytes (default is calculated value)\nSet to zero (0) to disable swap" \
+            SIZE_SWAP=$(whiptail --inputbox "If HIBERNATE enabled then this will be a disk partition otherwise it will be a regular ZFS dataset. If LUKS enabled then the partition will be encrypted.\nIf SWAP size not set here (left blank), then it will be calculated to accommodate memory size. Set to zero (0) to disable swap.\n\nSize of swap space in megabytes (default is calculated value)\nSet to zero (0) to disable swap" \
             --title "SWAP size" 15 70 $(echo $SIZE_SWAP) 3>&1 1>&2 2>&3)
             RET=${?}
             [[ ${RET} = 1 ]] && exit 1
