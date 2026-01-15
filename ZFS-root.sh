@@ -1567,7 +1567,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     # Make sure we're using a tmpfs for /tmp
     # Up to noble/24.04 use /usr/share/systemd while plucky/25.04 and above is /usr/lib/systemd
     [ -e /usr/share/systemd/tmp.mount ] && systemctl enable /usr/share/systemd/tmp.mount
-    [ -e /usr/lib/systemd/tmp.mount ] && systemctl enable /usr/lib/systemd/tmp.mount
+    [ -e /usr/lib/systemd/system/tmp.mount ] && systemctl enable /usr/lib/systemd/system/tmp.mount
 
     ln -s /proc/self/mounts /etc/mtab
     apt-get -qq update
