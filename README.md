@@ -21,11 +21,31 @@ _Current issue: SecureBoot with locally-built kernel/initramfs for ZFSBootMenu i
     - WIPE_FRESH=n
         Only create a new dataset like `<poolname>/ROOT/plucky` with a clean root install.  This will utilize the existing `/boot/efi` ESP partition mount, as well as the existing `<poolname>/home/<username>` default user home dataset/directory and `<poolname>/home/root` main _root_ user dataset/directory.
     The new dataset will be selectable via ZFSBootMenu
-- Run the `ZFS-root.sh` script - it will prompt for everything it needs.
+- Run the `ZFS-root.sh` script - it will prompt for everything it needs.  You can create a `ZFS-root.conf` from the example `ZFS-root.conf.example` or specify another configfile with `-c <file>` to provide default values.
     ```
     cd ZFS-root
-    ./ZFS-root.sh
+    ./ZFS-root.sh  (defaults to `ZFS-root.conf` if it exists)
     ```
+
+## Parameters
+
+You can a couple of parameters on the command-line
+
+- `-c <config file>`
+
+    Pass in a specific config file to override the default `ZFS-root.conf`
+
+- `-p`
+
+    Use the default `ZFS-root.conf.packerci` config file for Packer builds
+
+- `-p <config file>`
+
+    Use a specific config file for a Packer build
+
+- `-d`
+
+    Enable DEBUG mode - literally just `set -x` in the script to see everything it does
 
 ## Partition layout
 
@@ -69,7 +89,7 @@ Using a clean (**WIPE_FRESH=y**) install of Ubuntu Noble/24.04 as an example, th
 
 - _**`<poolname>/ROOT`**_
     > Container for all root datasets.  This may contain multiple full root installs, of different - or the same - Ubuntu distro versions.
-    > If ZFS encryption is enabled, this container will be encrypted so all child root datasets will also be encrypted.  The passphrase must be entered on the console (or via Dropbear)i when ZFSBootMenu attempts to boot any root dataset under this.
+    > If ZFS encryption is enabled, this container will be encrypted so all child root datasets will also be encrypted.  The passphrase must be entered on the console (or via Dropbear) when ZFSBootMenu attempts to boot any root dataset under this.
 - _**`<poolname>/ROOT/noble`**_
     > Root install dataset for Ubuntu Noble/24.04.  This will be a full install of Noble/24.04 _without_ the home directory of the main user or root user.  Or `/boot/efi` which is the ESP partition mentioned above - that is simply mounted when the system boots.
     > This root dataset will be set as the ZFSBootMenu default via the **bootfs** option for the `<poolname>` pool.  See the `create_zfs_datasets()` function.
@@ -85,8 +105,8 @@ Using a clean (**WIPE_FRESH=y**) install of Ubuntu Noble/24.04 as an example, th
     > Main root user home dataset/directory - `/root`
 - _**`<poolname>/home/<username>`**_
     > Main user home dataset/directory - `/home/<username`
-- _**`<poolname>/swap`**_
-    > For non-LUKS encrypted or non-HIBERNATE enabled systems, a swap dataset is created.
+- _**`<poolname>/ROOT/swap`**_
+    > For non-LUKS encrypted or non-HIBERNATE enabled systems, a swap dataset is created instead.
 - _**`<poolname>/docker`**_
     > With **Docker** using a dedicated dataset is recommended.
 

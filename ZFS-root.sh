@@ -62,7 +62,7 @@
 # 4) Make it executable (chmod +x ZFS-root.sh)
 # 5) Run it (./ZFS-root.sh)
 # 6) Add -d to enable set -x debugging (./ZFS-root.sh -d)
-# 7) Add packerci to run in a CI/CD pipeline using ZFS-root.conf.packerci
+# 7) Add "-p" to run in a CI/CD pipeline using ZFS-root.conf.packerci
 #
 # It will ask a few questions (username, which disk, bionic/focal etc)
 # and then fully install a minimal Ubuntu system. Depending on the choices
@@ -107,9 +107,63 @@ preflight() {
         exit 1
     fi
 
-    # Grab any possible pre-config settings in ZFS-root.conf
-    if [ -e ZFS-root.conf ] ; then
+    while getopts "dpc:" opt ; do
+        case $opt in
+            d)
+                DEBUG=true
+                ;;
+            p)
+                # Optional param for Packer config file - defaults to ZFS-root.conf.packerci below
+                eval NEXT_OPT=\${$OPTIND}
+                # Check if the next parameter exists and does not start with a dash (-)
+                if [[ -n $NEXT_OPT ]] && [[ $NEXT_OPT != -* ]]; then
+                    # If it's a valid argument, consume it and increment OPTIND
+                    PACKERCI=$NEXT_OPT
+                    OPTIND=$((OPTIND + 1))
+                else
+                    PACKERCI=false
+                fi
+                ;;
+            c)
+                CONFIG_FILE=$OPTARG
+                ;;
+            \?)
+                echo "Invalid option: $OPTARG" >&2
+                exit 1
+                ;;
+        esac
+    done
+
+    # [[ -v PACKERCI ]] && echo "Packer $PACKERCI" || echo "Packer was NOT set"
+    # [[ -v CONFIG_FILE ]] && echo "Config file $CONFIG_FILE" || echo "No config file"
+    # [[ -v DEBUG ]] && echo "Debug mode set" || echo "Debug mode NOT set"
+
+    # Fugly logic ...
+    #   -p          : Default to ZFS-root.conf.packerci
+    #   -p <file>   : Use <file> for packer config
+    if [[ -v PACKERCI ]] ; then
+        if [[ -e ${PACKERCI} ]] ; then
+            echo "Packer sourcing ${PACKERCI}"
+            . ./${PACKERCI}
+        elif [[ "${PACKERCI}" == false ]] && [[ -e ZFS-root.conf.packerci ]] ; then
+            echo "Packer sourcing ZFS-root.conf.packerci"
+            . ZFS-root.conf.packerci
+        else
+            echo "No valid Packer config file found"
+            exit 1
+        fi
+    fi
+
+    # Grab any possible pre-config settings in ZFS-root.conf or passed-in config file
+    if [[ -v CONFIG_FILE ]] && [[ -e ${CONFIG_FILE} ]] ; then
+        echo "Main sourcing ${CONFIG_FILE}"
+        . ./${CONFIG_FILE}
+    elif [[ -e ZFS-root.conf ]] ; then
+        echo "Main sourcing ZFS-root.conf"
         . ZFS-root.conf
+    else
+        echo "No valid config file found"
+        exit 1
     fi
 
     # ZFSBOOTMENU_REPO_TYPE - use the tagged git release or latest git clone
@@ -121,17 +175,6 @@ preflight() {
     # May need options to skip xhci-unbind - see ZFS-root.conf.example
     # See https://docs.zfsbootmenu.org/en/v3.0.x/man/zfsbootmenu.7.html
     [[ ! -v ZFSBOOTMENU_CMDLINE ]] && ZFSBOOTMENU_CMDLINE=""
-
-    if [ "$1" = "packerci" ] ; then
-        # Ensure we pick up the packerci-specific config
-        if [ -e ZFS-root.conf.packerci ] ; then
-            echo "Setting ZFS-root packerci variables"
-            . ZFS-root.conf.packerci
-        else
-            echo "ZFS-root.conf.packerci is MISSING - cannot run packer in CI/CD"
-            exit 1
-        fi
-    fi
 
     # For SOF binaries, default to 2025.05.1
     if [[ ! -v $SOF_VERSION ]] ; then
@@ -166,7 +209,7 @@ preflight() {
 wipe_fresh() {
     echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
-    if [ "$1" = "packerci" ] ; then
+    if [[ -v PACKERCI ]] ; then
         export WIPE_FRESH=y
     else
         if [[ ! -v WIPE_FRESH ]] ; then
@@ -288,7 +331,7 @@ select_disks() {
     # and using packer to build an image via qemu. That means a single disk /dev/vda
     # We need to create the symlink in /dev/disk/by-id for it
     #
-    if [ "$1" = "packerci" ] ; then
+    if [[ -v PACKERCI ]] ; then
         echo "Setting single disk scsi-0QEMU_QEMU_HARDDISK_drive0"
         readarray -t zfsdisks < <(echo "scsi-0QEMU_QEMU_HARDDISK_drive0")
     else
@@ -865,6 +908,8 @@ log_options() {
     # NOTE: tabs as first char to handle indented heredoc
     cat <<- EOF
 	==========================================================================
+       DEBUG                   = ${DEBUG}
+       PACKERCI                = ${PACKERCI}
 	   MYHOSTNAME              = ${MYHOSTNAME}
 	   RESCUE                  = ${RESCUE}
 	   DELAY                   = ${DELAY}
@@ -1458,6 +1503,8 @@ prep_setup() {
     cat > ${ZFSBUILD}/root/Setup.sh <<- EOF
 		#!/bin/bash
 
+        export DEBUG=${DEBUG}
+        export PACKERCI=${PACKERCI}
 		export RESCUE=${RESCUE}
 		export BOOTDEVRAW=${BOOTDEVRAW}
 		export DELAY=${DELAY}
@@ -1494,8 +1541,8 @@ prep_setup() {
 		export USE_ZSWAP="${USE_ZSWAP}"
 		export WIPE_FRESH="${WIPE_FRESH}"
 
-		[ "$1" = "-d" ] && set -x
-		[ "$1" = "packerci" ] && set -x
+        [[ -v DEBUG ]] && set -x
+        [[ -v PACKERCI ]] && set -x
 
 	EOF
 
@@ -3205,7 +3252,6 @@ wipe_fresh "$@"
 if [ "${WIPE_FRESH}" == "y" ] ; then
     # Setup proxy to apt-cacher if available
     setup_cacher
-
     query_user
 fi
 
@@ -3232,15 +3278,15 @@ query_google_auth
 query_ssh_auth
 query_swap
 
-if [ "$1" != "packerci" ] ; then
+if [[ -v PACKERCI ]] ; then
     show_options
 fi
 
 # Log everything we do
 rm -f /root/ZFS-setup.log
 exec > >(tee -a "/root/ZFS-setup.log") 2>&1
-[ "$1" = "-d" ] && set -x
-[ "$1" = "packerci" ] && set -x
+[[ -v DEBUG ]] && set -x
+[[ -v PACKERCI ]] && set -x
 
 log_options
 
