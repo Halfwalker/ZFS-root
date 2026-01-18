@@ -2127,7 +2127,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 				colorize red "${header}\n\n"
 				for idx in ${!ZFS_PARTS[@]} ; do
 				    # Grab just ZFS_0 or SWAP_0
-				    test_luks=$(basename ${ZFS_PARTS[$idx]})
+				    test_luks=${ZFS_PARTS[$idx]#/dev/disk/by-partlabel/}
 				    # luks is the full path to the disk partition
 				    luks=${ZFS_PARTS[$idx]}
 				    # Set $dm to root_crypt0 or swap_crypt0 depending on basename
