@@ -3377,13 +3377,14 @@ umount -n ${ZFSBUILD}/{dev/pts,dev,sys,proc}
 
 # Copy setup log and chroot Setup.sh to originating system (livecd or local /root dir)
 DATETIME=$(date +%F-%H-%M-%S)
-cp /root/ZFS-setup.log ZFS-setup-${SUITE}-${DATETIME}.log
-cp ${ZFSBUILD}/root/Setup.sh ZFS-setup-${SUITE}-${DATETIME}.chroot.sh
+# Copy setup log and chroot Setup.sh to local install dir
+cp /root/ZFS-setup.log       ZFS-${MYHOSTNAME}-${SUITE}-wipe_${WIPE_FRESH}-${DATETIME}.log
+cp ${ZFSBUILD}/root/Setup.sh ZFS-${MYHOSTNAME}-${SUITE}-wipe_${WIPE_FRESH}-${DATETIME}.chroot.sh
 
 if [ "${WIPE_FRESH}" == "y" ] ; then
     # Copy setup log and chroot Setup.sh to built system
-    cp /root/ZFS-setup.log ${ZFSBUILD}/home/${USERNAME}/ZFS-setup-${SUITE}-${DATETIME}.log
-    cp ${ZFSBUILD}/root/Setup.sh ${ZFSBUILD}/home/${USERNAME}/ZFS-setup-${SUITE}-${DATETIME}.chroot.sh
+    cp /root/ZFS-setup.log       ${ZFSBUILD}/home/${USERNAME}/ZFS-${MYHOSTNAME}-${SUITE}-wipe_${WIPE_FRESH}-${DATETIME}.log
+    cp ${ZFSBUILD}/root/Setup.sh ${ZFSBUILD}/home/${USERNAME}/ZFS-${MYHOSTNAME}-${SUITE}-wipe_${WIPE_FRESH}-${DATETIME}.chroot.sh
 
     # umount to be ready for export
     zfs umount -a
