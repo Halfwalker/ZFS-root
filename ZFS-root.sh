@@ -1503,8 +1503,8 @@ prep_setup() {
     cat > ${ZFSBUILD}/root/Setup.sh <<- EOF
 		#!/bin/bash
 
-        export DEBUG=${DEBUG}
-        export PACKERCI=${PACKERCI}
+		export DEBUG=${DEBUG}
+		export PACKERCI=${PACKERCI}
 		export RESCUE=${RESCUE}
 		export BOOTDEVRAW=${BOOTDEVRAW}
 		export DELAY=${DELAY}
@@ -1541,8 +1541,8 @@ prep_setup() {
 		export USE_ZSWAP="${USE_ZSWAP}"
 		export WIPE_FRESH="${WIPE_FRESH}"
 
-        [[ -v DEBUG ]] && set -x
-        [[ -v PACKERCI ]] && set -x
+		[[ -v DEBUG ]] && set -x
+		[[ -v PACKERCI ]] && set -x
 
 	EOF
 
@@ -1676,7 +1676,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     ZFSLOCATION=$(which zfs)
 
     if [ "${DISCENC}" != "NOENC" ] ; then
-        apt-get -qq --yes install cryptsetup keyutils
+        apt-get -qq --yes --no-install-recommends install cryptsetup keyutils
     fi
 
     # Ensure cachefile exists and zfs-import-cache is active
