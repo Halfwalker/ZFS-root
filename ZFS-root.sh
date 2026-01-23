@@ -1655,6 +1655,12 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     ln -fs /usr/share/zoneinfo/US/Mountain /etc/localtime
     dpkg-reconfigure -f noninteractive tzdata
 
+    # NOTE: Very important
+    #       Do NOT install initramfs-tools next to dracut
+    #       They wrestle and knock each other out
+    #       Same with grub - fighting rEFInd
+    apt-mark hold cryptsetup-initramfs zfs-initramfs initramfs-tools initramfs-tools-bin initramfs-tools-core grub-efi-amd64 grub-efi-amd64-signed grub-efi-amd64-bin grub-common grub2-common lilo
+
     # Make sure the kernel is installed and configured before ZFS
     apt-get -qq --yes --no-install-recommends install linux-generic${HWE} linux-headers-generic${HWE} linux-image-generic${HWE}
 
@@ -1701,12 +1707,6 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     # /usr/lib/dracut/modules.d/90zfs/zfs-snapshot-bootfs.service
     sed -i 's/-ExecStart=/ExecStart=-/ ; s/BOOTFS" SNAPNAME/BOOTFS"; SNAPNAME/' /usr/lib/dracut/modules.d/90zfs/zfs-snapshot-bootfs.service
     sed -i 's/-ExecStart=/ExecStart=-/ ; s/BOOTFS" SNAPNAME/BOOTFS"; SNAPNAME/' /usr/lib/dracut/modules.d/90zfs/zfs-rollback-bootfs.service
-
-    # NOTE: Very important
-    #       Do NOT install initramfs-tools next to dracut
-    #       They wrestle and knock each other out
-    #       Same with grub - fighting rEFInd
-    apt-mark hold zfs-initramfs initramfs-tools grub-efi-amd64 grub-efi-amd64-signed grub-efi-amd64-bin grub-common grub2-common lilo
 
 
     #
