@@ -1584,18 +1584,22 @@ build_setup() {
 cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     # Setup inside chroot
 
+    # efi-shell-x64 (shellx64.efi) only from noble/24.04 on
     case ${SUITE} in
         questing)
             SUITE_NUM="25.10"
             SUITE_BSDUTILS="bsdextrautils"
+            EFI_SHELL="efi-shell-x64"
             ;;
         plucky)
             SUITE_NUM="25.04"
             SUITE_BSDUTILS="bsdextrautils"
+            EFI_SHELL="efi-shell-x64"
             ;;
         noble)
             SUITE_NUM="24.04"
             SUITE_BSDUTILS="bsdmainutils"
+            EFI_SHELL="efi-shell-x64"
             ;;
         jammy)
             SUITE_NUM="22.04"
@@ -1729,7 +1733,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 		refind  refind/install_to_esp   boolean false
 	EOFREF
     debconf-set-selections < /tmp/selectionsref
-    DEBIAN_FRONTEND=noninteractive apt-get -qq --yes install refind efi-shell-x64
+    # efi-shell-x64 (shellx64.efi) only from noble/24.04 on
+    # EFI_SHELL set above to either efi-shell-x64 or left blank
+    DEBIAN_FRONTEND=noninteractive apt-get -qq --yes install refind efibootmgr ${EFI_SHELL}
 
     apt-get -qq --yes install syslinux syslinux-common extlinux dosfstools unzip
 
