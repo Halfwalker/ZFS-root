@@ -2653,15 +2653,25 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 				    type: file
 				- path: /boot/efi/EFI/refind/refind_x64.efi
 				  output: /boot/efi/EFI/refind/refind_x64.efi
-				- path: /boot/efi/EFI/tools/memtest86/memtest86.efi
-				  output: "/boot/efi/EFI/tools/memtest86/memtest86.efi
-				- path: /boot/efi/EFI/tools/shellx64.efi
-				  output: "/boot/efi/EFI/tools/shellx64.efi
 				- path: /boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu
 				  output: "/boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu
 				- path: /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
 				  output: "/boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
 			EOF
+
+            # Only add shellx64.efi and memtest86.efi if they exist
+            if [ -e /boot/efi/EFI/tools/shellx64.efi ] ; then
+                cat >> /etc/sbctl <<- EOF
+					- path: /boot/efi/EFI/tools/shellx64.efi
+					  output: "/boot/efi/EFI/tools/shellx64.efi
+				EOF
+            fi
+            if [ -e /boot/efi/EFI/tools/memtest86/memtest86.efi ] ; then
+                cat >> /etc/sbctl <<- EOF
+					- path: /boot/efi/EFI/tools/memtest86/memtest86.efi
+					  output: "/boot/efi/EFI/tools/memtest86/memtest86.efi
+				EOF
+            fi
 
             apt-get -qq update
             apt-get -qq --yes --no-install-recommends install systemd-boot-efi
@@ -2685,8 +2695,8 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
                 /usr/sbin/sbctl create-keys
                 /usr/sbin/sbctl enroll-keys --microsoft
                 /usr/sbin/sbctl sign -s /boot/efi/EFI/refind/refind_x64.efi
-                /usr/sbin/sbctl sign -s /boot/efi/EFI/tools/memtest86/memtest86.efi
-                /usr/sbin/sbctl sign -s /boot/efi/EFI/tools/shellx64.efi
+                [ -e /boot/efi/EFI/tools/memtest86/memtest86.efi ] && /usr/sbin/sbctl sign -s /boot/efi/EFI/tools/memtest86/memtest86.efi
+                [ -e /boot/efi/EFI/tools/shellx64.efi ] && /usr/sbin/sbctl sign -s /boot/efi/EFI/tools/shellx64.efi
                 /usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
                 if [ "${ZFSBOOTMENU_BINARY_TYPE}" != "EFI" ] ; then
                     /usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu
