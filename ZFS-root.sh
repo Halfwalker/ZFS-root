@@ -1793,37 +1793,35 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 				@echo -off
 				cls
 
-				# List all mapped file systems (disks/partitions)
-				echo -n "Enumerating filesystems... "
+				echo "Searching for rEFInd boot manager..."
+				echo ""
+
+				# Try to enumerate filesystems by attempting to access fs0:
+				# This is just a basic check that the shell can access drives
 				fs0:
-				if %lasterror% == 0 then
-				    echo "OK"
-				else
-				    echo "No filesystems found."
-				    goto error
+				if %lasterror% != 0 then
+				    echo "ERROR: Cannot access filesystem mappings."
+				    goto end
 				endif
 
-				set found 0
-
-				for %i in (fs*) do (
-				    echo -n "Checking %i for /EFI/refind/refind_x64.efi ... "
-				    if exist %i:\EFI\refind\refind_x64.efi then
-				        echo "FOUND"
-				        echo "Launching rEFInd from %i:"
-				        %i:\EFI\refind\refind_x64.efi
-				        goto done
+				# Search through all filesystem mappings
+				for %i in 0 1 2 3 4 5 6 7 8 9 do
+				    echo -n "Checking fs%i: for /EFI/refind/refind_x64.efi ... "
+				    if exist fs%i:\EFI\refind\refind_x64.efi then
+				        echo "FOUND - Launching rEFInd from fs%i:"
+				        echo ""
+				        fs%i:\EFI\refind\refind_x64.efi
+				        # If we reach here, rEFInd failed to launch
+				        echo "ERROR: rEFInd launch failed."
+				        goto end
 				    else
 				        echo "not present"
 				    endif
-				)
+				endfor
 
-				:error
+				# If we get here, rEFInd was not found anywhere
+				echo ""
 				echo "ERROR: Could not find /EFI/refind/refind_x64.efi on any filesystem."
-				goto end
-
-				:done
-				echo "rEFInd launched successfully."
-				goto end
 
 				:end
 			EOF
