@@ -2537,35 +2537,39 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     #
     mkdir -p /etc/cmdline.d /etc/zfsbootmenu/dracut.conf.d
     if [ "${DROPBEAR}" = "y" ] ; then
-      echo "---------------------------------------------------"
-      echo " Installing dropbear for remote unlocking"
-      echo "---------------------------------------------------"
+        echo "---------------------------------------------------"
+        echo " Installing dropbear for remote unlocking"
+        echo "---------------------------------------------------"
 
-      apt-get -qq --yes install dracut-network dropbear-bin
-      rm -rf /tmp/dracut-crypt-ssh && mkdir -p /tmp/dracut-crypt-ssh
-      download_with_retry "https://github.com/dracut-crypt-ssh/dracut-crypt-ssh/tarball/master" "/tmp/dracut-crypt-ssh.tar.gz"
-      tar xvzf /tmp/dracut-crypt-ssh.tar.gz --strip-components=1 --directory /tmp/dracut-crypt-ssh
-      rm -f /tmp/dracut-crypt-ssh.tar.gz
+        apt-get -qq --yes install dracut-network dropbear-bin
+        rm -rf /tmp/dracut-crypt-ssh && mkdir -p /tmp/dracut-crypt-ssh
+        download_with_retry "https://github.com/dracut-crypt-ssh/dracut-crypt-ssh/tarball/master" "/tmp/dracut-crypt-ssh.tar.gz"
+        tar xvzf /tmp/dracut-crypt-ssh.tar.gz --strip-components=1 --directory /tmp/dracut-crypt-ssh
+        rm -f /tmp/dracut-crypt-ssh.tar.gz
 
-      ##comment out references to /helper/ folder from module-setup.sh
-      sed -i '/inst \"\$moddir/s/^\(.*\)$/#&/' /tmp/dracut-crypt-ssh/modules/60crypt-ssh/module-setup.sh
-      cp -r /tmp/dracut-crypt-ssh/modules/60crypt-ssh /usr/lib/dracut/modules.d
+        ##comment out references to /helper/ folder from module-setup.sh
+        sed -i '/inst \"\$moddir/s/^\(.*\)$/#&/' /tmp/dracut-crypt-ssh/modules/60crypt-ssh/module-setup.sh
+        cp -r /tmp/dracut-crypt-ssh/modules/60crypt-ssh /usr/lib/dracut/modules.d
 
-      echo 'install_items+=" /etc/cmdline.d/dracut-network.conf "' >  /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
-      echo 'add_dracutmodules+=" crypt-ssh "'                      >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
-      # Have dracut use main user authorized_keys for access
-      echo "dropbear_acl=/home/${USERNAME}/.ssh/authorized_keys"   >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
+        echo 'install_items+=" /etc/cmdline.d/dracut-network.conf "' >  /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
+        echo 'add_dracutmodules+=" crypt-ssh "'                      >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
+        # Have dracut use main user authorized_keys for access
+        echo "dropbear_acl=/home/${USERNAME}/.ssh/authorized_keys"   >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
 
-      # With rd.neednet=1 it will fail to boot if no network available
-      # This can be a problem with laptops and docking stations, if the dock
-      # is not connected (no ethernet) it can fail to boot. Yay dracut.
-      # Network really only needed for Dropbear/ssh access unlocking
-      # Since we chose to use Dropbear, in this block set neednet=1
-      echo 'ip=dhcp rd.neednet=1' > /etc/cmdline.d/dracut-network.conf
+        # With rd.neednet=1 it will fail to boot if no network available
+        # This can be a problem with laptops and docking stations, if the dock
+        # is not connected (no ethernet) it can fail to boot. Yay dracut.
+        # Network really only needed for Dropbear/ssh access unlocking
+        # Since we chose to use Dropbear, in this block set neednet=1
+        echo 'ip=dhcp rd.neednet=1' > /etc/cmdline.d/dracut-network.conf
     else
-      # Not using Dropbear, so set neednet=0
-      echo 'install_items+=" /etc/cmdline.d/dracut-network.conf "' > /etc/zfsbootmenu/dracut.conf.d/network.conf
-      echo 'ip=dhcp rd.neednet=0' > /etc/cmdline.d/dracut-network.conf
+        # Not using Dropbear, so set neednet=0
+        echo 'install_items+=" /etc/cmdline.d/dracut-network.conf "' > /etc/zfsbootmenu/dracut.conf.d/network.conf
+        echo 'ip=dhcp rd.neednet=0' > /etc/cmdline.d/dracut-network.conf
+
+        # We do NOT need crypt-ssh in the main system initrd
+        echo '# We do NOT need crypt-ssh in the main system initrd' > /etc/dracut.conf.d/no-crypt-ssh.conf
+        echo 'omit_dracutmodules+=" crypt-ssh "' >> /etc/dracut.conf.d/no-crypt-ssh.conf
     fi # DROPBEAR
 
     # For ZFS encryption point to the /etc/zfs/zroot.rootkey files in the initramfs
