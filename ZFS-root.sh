@@ -233,6 +233,11 @@ wipe_fresh() {
 setup_cacher() {
     echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
+
+    apt-get -qq update
+    # We need libnss-mdns to resolve names like bondi.local etc.
+    apt-get -qq --no-install-recommends --yes install libnss-mdns wget gpg
+
     # Check for a local apt-cacher-ng system - looking for these hosts
     # aptcacher.local
     # bondi.local
@@ -908,8 +913,8 @@ log_options() {
     # NOTE: tabs as first char to handle indented heredoc
     cat <<- EOF
 	==========================================================================
-       DEBUG                   = ${DEBUG}
-       PACKERCI                = ${PACKERCI}
+	   DEBUG                   = ${DEBUG}
+	   PACKERCI                = ${PACKERCI}
 	   MYHOSTNAME              = ${MYHOSTNAME}
 	   RESCUE                  = ${RESCUE}
 	   DELAY                   = ${DELAY}
