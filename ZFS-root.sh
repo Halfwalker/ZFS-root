@@ -1589,6 +1589,35 @@ build_setup() {
 cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     # Setup inside chroot
 
+    # -------------------------------------------------------------------------------------------------------
+    # Helper to download from a URL to a location with retries
+    download_with_retry() {
+        local url=$1
+        local output_file=$2
+        # Number of retries
+        MAX_RETRIES=5
+        # Initial delay between retries (in seconds)
+        DELAY=10
+    
+        for i in $(seq 1 $MAX_RETRIES); do
+            echo "Attempt $i to download from $url..."
+            if curl --silent --show-error -L "$url" -o "$output_file"; then
+                echo "Successfully downloaded to $output_file."
+                break
+            else
+                if [ $i -eq $MAX_RETRIES ]; then
+                    echo "Failed to download from $url after $MAX_RETRIES attempts."
+                    rm -f "$output_file"  # Clean up partially downloaded file if it exists
+                    exit 1
+                else
+                    echo "Retrying in $DELAY seconds..."
+                    sleep $DELAY
+                fi
+            fi
+        done
+    }
+
+
     # efi-shell-x64 (shellx64.efi) only from noble/24.04 on
     case ${SUITE} in
         questing)
@@ -1915,7 +1944,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         ##       vmlinuz/initrd files to boot with
         if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "EFI" ] ; then
             echo "--- Using zfsbootmenu EFI image"
-            curl -L https://get.zfsbootmenu.org/efi/recovery -o /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
+            download_with_retry "https://get.zfsbootmenu.org/efi/recovery" "/boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi"
 
             # Add rEFInd entry for ZFSBootMenu
             # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
@@ -1934,8 +1963,8 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         ##       Fetch github releases json and parse, like in ansible-git_tools
         if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "KERNEL" ] ; then
             echo "--- Using zfsbootmenu KERNEL files"
-            curl -L https://github.com/zbm-dev/zfsbootmenu/releases/download/v3.0.1/zfsbootmenu-recovery-x86_64-v3.0.1-linux6.12.tar.gz -o /usr/local/share/zfsbootmenu.tar.gz
-            tar xvzf /usr/local/share/zfsbootmenu.tar.gz --strip-components=1 -C /boot/efi/EFI/zfsbootmenu
+            download_with_retry "https://github.com/zbm-dev/zfsbootmenu/releases/download/v3.1.0/zfsbootmenu-recovery-x86_64-v3.1.0-linux6.18.tar.gz" "/usr/local/share/zfsbootmenu.tar.gz"
+            tar xvzf /usr/local/share/zfsbootmenu.tar.gz --strip-components=1 --directory /boot/efi/EFI/zfsbootmenu
             rm -f /usr/local/share/zfsbootmenu.tar.gz
         fi
 
@@ -1944,7 +1973,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         #       For a LOCAL install it is in /etc/zfsbootmenu/generate-zbm.post.d/syslinux-update.sh
         #       and run via generate-zbm.sh
         if [ "${ZFSBOOTMENU_BINARY_TYPE}" != "LOCAL" ] ; then
-            curl -L https://raw.githubusercontent.com/zbm-dev/zfsbootmenu/master/contrib/syslinux-update.sh -o /boot/efi/syslinux-update.sh
+            download_with_retry "https://raw.githubusercontent.com/zbm-dev/zfsbootmenu/master/contrib/syslinux-update.sh" "/boot/efi/syslinux-update.sh"
             chmod +x /boot/efi/syslinux-update.sh
             sed -i '
               s/^SYSLINUX_ROOT.*/SYSLINUX_ROOT="\/boot\/efi"/
@@ -1968,7 +1997,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     # Get latest tagged release, sure to work. Base git repo may be in flux
     if [ "${ZFSBOOTMENU_REPO_TYPE}" = "TAGGED" ] ; then
         echo "--- Using zfsbootmenu TAGGED repo"
-        curl -L https://get.zfsbootmenu.org/source | tar xz --strip=1 --directory /usr/local/share/zfsbootmenu
+        download_with_retry "https://get.zfsbootmenu.org/source" "/usr/local/share/zfsbootmenu.tar.gz"
+        tar xvzf /usr/local/share/zfsbootmenu.tar.gz --strip-components=1 --directory /usr/local/share/zfsbootmenu
+        rm -f /usr/local/share/zfsbootmenu.tar.gz
     fi
 
     #### OR For latest just clone
@@ -2063,8 +2094,8 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         # EFI version is latest v11, syslinux version is v4
         rm -rf /tmp/memtest86 && mkdir -p /tmp/memtest86/mnt
         mkdir -p /boot/efi/EFI/tools/memtest86
-        curl -L https://www.memtest86.com/downloads/memtest86-usb.zip -o /tmp/memtest86/memtest86-usb.zip
-        curl -L https://www.memtest86.com/downloads/memtest86-4.3.7-iso.zip -o /tmp/memtest86/memtest86-iso.zip
+        download_with_retry "https://www.memtest86.com/downloads/memtest86-usb.zip" "/tmp/memtest86/memtest86-usb.zip"
+        download_with_retry "https://www.memtest86.com/downloads/memtest86-4.3.7-iso.zip" "/tmp/memtest86/memtest86-iso.zip"
         # For EFI
            unzip -d /tmp/memtest86 /tmp/memtest86/memtest86-usb.zip memtest86-usb.img
            losetup -P /dev/loop33 /tmp/memtest86/memtest86-usb.img
@@ -2512,7 +2543,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
       apt-get -qq --yes install dracut-network dropbear-bin
       rm -rf /tmp/dracut-crypt-ssh && mkdir -p /tmp/dracut-crypt-ssh
-      cd /tmp/dracut-crypt-ssh && curl -L https://github.com/dracut-crypt-ssh/dracut-crypt-ssh/tarball/master | tar xz --strip=1
+      download_with_retry "https://github.com/dracut-crypt-ssh/dracut-crypt-ssh/tarball/master" "/tmp/dracut-crypt-ssh.tar.gz"
+      tar xvzf /tmp/dracut-crypt-ssh.tar.gz --strip-components=1 --directory /tmp/dracut-crypt-ssh
+      rm -f /tmp/dracut-crypt-ssh.tar.gz
 
       ##comment out references to /helper/ folder from module-setup.sh
       sed -i '/inst \"\$moddir/s/^\(.*\)$/#&/' /tmp/dracut-crypt-ssh/modules/60crypt-ssh/module-setup.sh
