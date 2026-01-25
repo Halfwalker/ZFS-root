@@ -200,6 +200,10 @@ preflight() {
     # NOTE: for keyfile, put key in local /etc/zfs, then later copy to target /etc/zfs
     #       to be used for encrypting /home
     ZFSENC_HOME_OPTIONS="-o encryption=aes-256-gcm -o keylocation=file:///etc/zfs/zroot.homekey -o keyformat=passphrase"
+
+    # Use zswap compressed page cache in front of swap ? https://wiki.archlinux.org/index.php/Zswap
+    # Only used for swap partition (encrypted or not)
+    USE_ZSWAP="zswap.enabled=1 zswap.compressor=lz4 zswap.max_pool_percent=25"
 } # preflight()
 
 
@@ -649,10 +653,6 @@ query_swap() {
             [[ ${RET} = 1 ]] && exit 1
         fi
     fi # Check for Swap size in ZFS-root.conf
-
-    # Use zswap compressed page cache in front of swap ? https://wiki.archlinux.org/index.php/Zswap
-    # Only used for swap partition (encrypted or not)
-    USE_ZSWAP="zswap.enabled=1 zswap.compressor=lz4 zswap.max_pool_percent=25"
 } # query_swap()
 
 
