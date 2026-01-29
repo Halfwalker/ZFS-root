@@ -2581,7 +2581,22 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
     # For LUKS point to the larger 32-byte (zfs enc compatible) /etc/zfs/zroot.lukskey in the initramfs
     if [ "${DISCENC}" = "LUKS" ] ; then
-        echo 'install_items+=" /etc/crypttab /etc/zfs/zroot.lukskey "' >> /etc/dracut.conf.d/zfskey.conf
+        echo 'install_items+=" /etc/crypttab /etc/zfs/zroot.lukskey "' > /etc/dracut.conf.d/lukskey.conf
+    fi
+
+    # For 22.10 and lower we may need to ensure the "casesensitive" mount option is
+    # removed. This may be added when creating a lower release dataset on a higher release
+    # system.  22.10 and lower will fail to mount /sysroot during boot if that option
+    # is present. The 95zfs-rootflags-fix dracut module ensures that it is removed if present.
+    # This is safe to run at any time.
+    if ! compare_versions "$SUITE_NUM" "23.04" ; then
+        cp -av /root/95zfs-rootflags-fix /usr/lib/dracut/modules.d/
+        chmod +x /usr/lib/dracut/modules.d/95zfs-rootflags-fix/*.sh
+        # NOTE: be sure to use real TABS for this heredoc
+        cat <<- END > /etc/dracut.conf.d/remove-casesensitive.conf
+			# For 23.10 and lower, ensure "casesensitive" option is removed from rootflags cmdline
+			add_dracutmodules+=" zfs-rootflags-fix "
+		END
     fi
 
     # Generate an initramfs
@@ -3415,6 +3430,11 @@ prep_setup "$@"
 build_setup "$@"
 
 chmod +x ${ZFSBUILD}/root/Setup.sh
+
+# We may need the rootflags fix for 'casesensitive' mount option
+# See the README.md in the 95zfs-rootflags-fix dir, which is
+# copied to /usr/lib/dracut/modules.d/ in Setup.sh
+cp -av 95zfs-rootflags-fix ${ZFSBUILD}/root
 
 # Bind mount virtual filesystem, create Setup.sh, then chroot
 mount -t proc /proc ${ZFSBUILD}/proc
