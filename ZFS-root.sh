@@ -556,26 +556,53 @@ query_nvidia() {
     echo "${FUNCNAME[0]}"
     # See if we need to install Nvidia drivers, notify if so
     # shellcheck disable=SC2046,SC2086  # Don't need quotes or double-quotes
-    if [[ ! -v NVIDIA ]] ; then
-        NVIDIA=none
-        if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] || [ "${NEON}" = "y" ] || [ "${XFCE}" = "y" ] ; then
-            if [ $(lspci | grep -ic nvidia) -gt 0 ] ; then
-                # Installing Nvidia PPA here just so we can search for versions
-                apt-add-repository --yes --update ppa:graphics-drivers/ppa
-                NVIDIA_LATEST=$(apt-cache search nvidia-driver- | cut -d ' ' -f1 | grep -e "nvidia-driver-...$" | cut -d'-' -f3 | sort | tail -1)
-                NVIDIA=$(whiptail --title "Nvidia Hardware detected - install latest driver ?" --radiolist "Gnome/KDE/NEON was selected, and Nvidia graphics HW was detected on this system.  The ppa:graphics-drivers/ppa repo could be installed in order to get the binary Nvidia driver\n\nNOTE: Be sure to select the correct driver - the latest (${NVIDIA_LATEST}) may not support older legacy HW.  See\n\nhttps://www.nvidia.com/en-us/drivers/unix/legacy-gpu/\n\nfor more information on legacy HW.  It is safe to select NONE if you are unsure.  You can always install the appropriate driver later via Additional Drivers" 22 70 4 \
-                    ${NVIDIA_LATEST} "Latest ${NVIDIA_LATEST}" OFF \
-                    470    "Legacy 470 driver" OFF \
-                    390    "Legacy 390 driver" OFF \
-                    none   "No Nvidia driver" ON \
-                    3>&1 1>&2 2>&3)
-                RET=${?}
-                [[ ${RET} = 1 ]] && exit 1
-            fi
+    if [[ -v NVIDIA || -v NVIDIA_OPEN ]] ; then return 0; fi
+
+    NVIDIA=none
+    if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] || [ "${NEON}" = "y" ] || [ "${XFCE}" = "y" ] ; then
+        if [ $(lspci | grep -ic nvidia) -gt 0 ] ; then
+            # Installing Nvidia PPA here just so we can search for versions
+            apt-add-repository --yes --update ppa:graphics-drivers/ppa
+            NVIDIA_LATEST=$(apt-cache search nvidia-driver- | cut -d ' ' -f1 | grep -e "nvidia-driver-...$" | cut -d'-' -f3 | sort | tail -1)
+            NVIDIA=$(whiptail --title "Nvidia Hardware detected - install latest driver ?" --radiolist "Gnome/KDE/NEON was selected, and Nvidia graphics HW was detected on this system.  The ppa:graphics-drivers/ppa repo could be installed in order to get the binary Nvidia driver\n\nNOTE: Be sure to select the correct driver - the latest (${NVIDIA_LATEST}) may not support older legacy HW.  See\n\nhttps://www.nvidia.com/en-us/drivers/unix/legacy-gpu/\n\nfor more information on legacy HW.  It is safe to select NONE if you are unsure.  You can always install the appropriate driver later via Additional Drivers" 22 70 4 \
+                ${NVIDIA_LATEST} "Latest ${NVIDIA_LATEST}" OFF \
+                470    "Legacy 470 driver" OFF \
+                390    "Legacy 390 driver" OFF \
+                none   "No Nvidia driver" ON \
+                3>&1 1>&2 2>&3)
+            RET=${?}
+            [[ ${RET} = 1 ]] && exit 1
         fi
     fi
 } # query_nvidia()
 
+
+# -------------------------------------------------------------------------------------------------------
+# Possibly offer Nvidia driver install
+query_nvidia_open() {
+    echo "--------------------------------------------------------------------------------"
+    echo "${FUNCNAME[0]}"
+    # See if we need to install Nvidia drivers, notify if so
+    # shellcheck disable=SC2046,SC2086  # Don't need quotes or double-quotes
+    if [[ -v NVIDIA || -v NVIDIA_OPEN ]] ; then return 0; fi
+
+    NVIDIA=none
+    if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] || [ "${NEON}" = "y" ] || [ "${XFCE}" = "y" ] ; then
+        if [ $(lspci | grep -ic nvidia) -gt 0 ] ; then
+            # Installing Nvidia PPA here just so we can search for versions
+            apt-add-repository --yes --update ppa:graphics-drivers/ppa
+            NVIDIA_LATEST=$(apt-cache search nvidia-driver- | cut -d ' ' -f1 | grep -e "nvidia-driver-...$" | cut -d'-' -f3 | sort | tail -1)
+            NVIDIA=$(whiptail --title "Nvidia Hardware detected - install latest driver ?" --radiolist "Gnome/KDE/NEON was selected, and Nvidia graphics HW was detected on this system.  The ppa:graphics-drivers/ppa repo could be installed in order to get the binary Nvidia driver\n\nNOTE: Be sure to select the correct driver - the latest (${NVIDIA_LATEST}) may not support older legacy HW.  See\n\nhttps://www.nvidia.com/en-us/drivers/unix/legacy-gpu/\n\nfor more information on legacy HW.  It is safe to select NONE if you are unsure.  You can always install the appropriate driver later via Additional Drivers" 22 70 4 \
+                ${NVIDIA_LATEST} "Latest ${NVIDIA_LATEST}" OFF \
+                470    "Legacy 470 driver" OFF \
+                390    "Legacy 390 driver" OFF \
+                none   "No Nvidia driver" ON \
+                3>&1 1>&2 2>&3)
+            RET=${?}
+            [[ ${RET} = 1 ]] && exit 1
+        fi
+    fi
+} # query_nvidia_open()
 
 # -------------------------------------------------------------------------------------------------------
 # Query for Google Authenticator, create secret for install
@@ -866,6 +893,7 @@ show_options() {
         KDE        = $(echo $KDE)  : Install Ubuntu KDE Plasma desktop\n \
         NEON       = $(echo $NEON)  : Install Neon KDE Plasma desktop\n \
         NVIDIA     = $(echo $NVIDIA)  : Install Nvidia drivers\n \
+        NVIDIA_OPEN= $(echo $NVIDIA_OPEN)  : Install Nvidia Open drivers\n \
         SOF        = $(echo $SOF)  : Install Sound Open Firmware ${SOF_VERSION} binaries\n \
         HIBERNATE  = $(echo $HIBERNATE)  : Enable SWAP disk partition for hibernation\n \
         DISCENC    = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
@@ -894,6 +922,7 @@ show_options() {
         KDE        = $(echo $KDE)  : Install Ubuntu KDE Plasma desktop\n \
         NEON       = $(echo $NEON)  : Install Neon KDE Plasma desktop\n \
         NVIDIA     = $(echo $NVIDIA)  : Install Nvidia drivers\n \
+        NVIDIA_OPEN= $(echo $NVIDIA)  : Install Nvidia Open drivers\n \
         SOF        = $(echo $SOF)  : Install Sound Open Firmware ${SOF_VERSION} binaries\n \
         DISCENC    = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
         DROPBEAR   = $(echo $DROPBEAR)  : Enable Dropbear unlocking of encrypted disks\n \
@@ -938,6 +967,7 @@ log_options() {
 	   NEON                    = ${NEON}
 	   KDE                     = ${KDE}
 	   NVIDIA                  = ${NVIDIA}
+	   NVIDIA_OPEN             = ${NVIDIA_OPEN}
 	   HIBERNATE               = ${HIBERNATE}
 	   SIZE_SWAP               = ${SIZE_SWAP}
 	   PARTITION_BOOT          = ${PARTITION_BOOT}
@@ -1535,6 +1565,7 @@ prep_setup() {
 		export NEON=${NEON}
 		export KDE=${KDE}
 		export NVIDIA=${NVIDIA}
+		export NVIDIA_OPEN=${NVIDIA_OPEN}
 		export HIBERNATE=${HIBERNATE}
 		export SIZE_SWAP=${SIZE_SWAP}
 		export PARTITION_BOOT=${PARTITION_BOOT}
@@ -3181,9 +3212,20 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
         # Check for Nvidia graphics - if so, install from the ppa:graphics-drivers/ppa
         # The NVIDIA var should be set to the appropriate version from the menu query
-        if [ "${NVIDIA}" != "none" ] ; then
+        if [[ -v NVIDIA && -v NVIDIA_OPEN ]] ; then
+            echo "Set NVIDIA for Ubuntu PPA or NVIDIA_OPEN for Nvidia PPA" 1>&2
+            echo "But not both!" 1>&2
+            exit 1;
+        fi
+        if [ -v NVIDIA ] && [ "${NVIDIA}" != "none" ] ; then
             apt-add-repository --yes --update ppa:graphics-drivers/ppa
             apt-get -qq --yes install nvidia-driver-${NVIDIA} libxnvctrl0
+        fi
+        if [ -v NVIDIA_OPEN ] && [ "${NVIDIA_OPEN}" != "none" ] ; then
+            wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu${SUITE_NUM//.}/x86_64/cuda-keyring_1.1-1_all.deb
+            dpkg -i cuda-keyring_1.1-1_all.deb
+            apt update
+            apt-get -qq --yes install ${NVIDIA_OPEN}
         fi
 
         ####
@@ -3275,6 +3317,7 @@ __EOF__
 ## select_encryption() {
 ## query_install_options() {
 ## query_nvidia() {
+## query_nvidia_open() {
 ## query_google_auth() {
 ## query_ssh_auth() {
 ## query_swap() {
@@ -3329,7 +3372,13 @@ query_install_options
 # zrepl has no release for 25.04/plucky or 25.10/questing yet
 [ "${SUITE}" == "plucky" ] || [ "${SUITE}" == "questing" ] && ZREPL=n
 
+if [[ -v NVIDIA && -v NVIDIA_OPEN ]] ; then
+    echo "Set NVIDIA for Ubuntu PPA or NVIDIA_OPEN for Nvidia PPA" 1>&2
+    echo "But not both!" 1>&2
+    exit 1;
+fi
 query_nvidia
+query_nvidia_open
 query_google_auth
 query_ssh_auth
 query_swap
