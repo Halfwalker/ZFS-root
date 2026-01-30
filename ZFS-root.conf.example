@@ -158,6 +158,14 @@ XFCE=n
 # 390 or 470 for legacy driver
 # 550 for current latest, or whatever version you prefer
 NVIDIA=none
+# If you want Nvidia drivers from their PPA, you can instead specify NVIDIA_OPEN.
+# Setting both NVIDIA and NVIDIA open will cause the install to fail.
+# See the repository for available versions:
+# https://developer.download.nvidia.com/compute/cuda/repos
+# Or take the latest open driver by selecting "nvidia-open"
+# Please note, older hardware may not be supported in the latest.
+#
+# NVIDIA_OPEN=nvidia-open
 
 # If installing Sound Open Firmware binaries (mostly for laptops) choose
 # the version here.  Defaults to 2025.05.1
