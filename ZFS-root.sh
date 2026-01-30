@@ -1884,6 +1884,42 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
         # Copy logo for syslinux if there
         [ -e /root/logo_sm.jpg ] && cp /root/logo_sm.jpg /boot/efi/syslinux
+
+
+        # Using a swap partition ?  If so set up /etc/fstab
+        if [ "${HIBERNATE}" == "y" ] ; then
+
+            # Hibernate is enabled - we HAVE to use a swap partition
+            # Also, only works with a single disk (as in laptop)
+#-#            if [ "${DISCENC}" = "LUKS" ] || [ "${DISCENC}" = "ZFSENC" ] ; then
+            if [ "${DISCENC}" = "LUKS" ] ; then
+
+                # LUKS encrypted
+                for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
+                    echo "/dev/mapper/swap_crypt${disk} none swap discard,sw 0 0" >> /etc/fstab
+                done
+
+            else
+
+                # Not LUKS encrypted
+                for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
+                    echo "UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP}) none swap discard,sw 0 0  # SWAP_${disk}" >> /etc/fstab
+                done
+
+            fi # DISCENC for LUKS
+
+            # If using zswap enable lz4 compresstion
+            if [ "ZZ${USE_ZSWAP}" != "ZZ" ]; then
+                echo "lz4" >> /etc/modules-load.d/zfs-lz4.conf
+            fi
+
+        else
+            # No swap partition - maybe using a zvol for swap
+            echo "Enabling swap size ${SIZE_SWAP} on /dev/zvol/${POOLNAME}/ROOT/swap"
+            if [ ${SIZE_SWAP} -ne 0 ] ; then
+                echo "/dev/zvol/${POOLNAME}/ROOT/swap none swap discard,sw 0 0" >> /etc/fstab
+            fi
+        fi # HIBERNATE
     fi # WIPE_FRESH                         # <<<<<------------------------------------------------ WIPE_FRESH ------ ^^^^^
 
 
@@ -2237,42 +2273,6 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
             echo 'zfsbootmenu_early_setup+=" /usr/local/bin/zfsbootmenu_luks_unlock.sh "' > /etc/zfsbootmenu/dracut.conf.d/luks_zbm.conf
         fi #DISCENC
-
-
-        # Using a swap partition ?
-        if [ "${HIBERNATE}" == "y" ] ; then
-
-            # Hibernate is enabled - we HAVE to use a swap partition
-            # Also, only works with a single disk (as in laptop)
-            if [ "${DISCENC}" = "LUKS" ] ; then
-
-                # LUKS encrypted
-                for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
-                    echo "/dev/mapper/swap_crypt${disk} none swap discard,sw 0 0" >> /etc/fstab
-                done
-
-            else
-
-                # Not LUKS encrypted
-                for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
-                    echo "UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${disk}]}-part${PARTITION_SWAP}) none swap discard,sw 0 0" >> /etc/fstab
-                done
-
-            fi # DISCENC for LUKS
-
-            # If using zswap enable lz4 compresstion
-            if [ "ZZ${USE_ZSWAP}" != "ZZ" ]; then
-                echo "lz4" >> /etc/modules-load.d/zfs-lz4.conf
-            fi
-
-        else
-            # No swap partition - maybe using a zvol for swap
-            echo "Enabling swap size ${SIZE_SWAP} on /dev/zvol/${POOLNAME}/ROOT/swap"
-            mkswap -f /dev/zvol/${POOLNAME}/ROOT/swap
-            if [ ${SIZE_SWAP} -ne 0 ] ; then
-                echo "/dev/zvol/${POOLNAME}/ROOT/swap none swap discard,sw 0 0" >> /etc/fstab
-            fi
-        fi # HIBERNATE
     fi # WIPE_FRESH                         # <<<<<------------------------------------------------ WIPE_FRESH ------ ^^^^^
 
 
