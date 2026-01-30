@@ -1601,14 +1601,29 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     
         for i in $(seq 1 $MAX_RETRIES); do
             echo "Attempt $i to download from $url..."
-            if curl --silent --show-error -L "$url" -o "$output_file"; then
+            # Odd, curl fails for memtest86 downloads
+            # if curl --silent --show-error -L "$url" -o "$output_file"; then
+            if wget --quiet "$url" -O "$output_file"; then
                 echo "Successfully downloaded to $output_file."
-                break
+                return 0
             else
                 if [ $i -eq $MAX_RETRIES ]; then
-                    echo "Failed to download from $url after $MAX_RETRIES attempts."
+                    cat <<- EOF
+						|=============================================================================
+						| Failed to download from $url after $MAX_RETRIES attempts.
+						|
+						| Pausing here so you can attempt a manual download in another terminal window
+						| Hit enter when ready. One of these commands should work
+						|
+						| wget --quiet "$url" -O $output_file"
+						| curl --silent --show-error -L "$url" -o "$output_file"
+						|
+						| If it won't download, then kill this script and figure out why
+						|=============================================================================
+					EOF
                     rm -f "$output_file"  # Clean up partially downloaded file if it exists
-                    exit 1
+                    read -r -p "Press <enter> to continue "
+                    return 1
                 else
                     echo "Retrying in $DELAY seconds..."
                     sleep $DELAY
