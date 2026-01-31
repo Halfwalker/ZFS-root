@@ -695,6 +695,8 @@ query_suite() {
             HWE=
             # Specific zpool features available in jammy
             SUITE_ROOT_POOL="-O dnodesize=auto"
+            # Ensure we have the questing/25.10 signing key in place
+            wget -qO - https://archive.ubuntu.com/ubuntu/dists/questing/InRelease | sudo gpg --dearmor -o /etc/apt/keyrings/questing_keyring.gpg
             ;;
         plucky)
             SUITE_NUM="25.04"
@@ -707,6 +709,12 @@ query_suite() {
             HWE=
             # Specific zpool features available in jammy
             SUITE_ROOT_POOL="-O dnodesize=auto"
+            # Plucky for now has issues with the removed-keys keyring, so move it out of the way, then get the release signing key
+            # Adding plucky as a new dataset seems to work OK though, so no need to play keys-around-the-rosie
+            if [ "${WIPE_FRESH}" = "y" ] ; then
+                [[ ! -e /etc/apt/keyrings/plucky_8719.gpg ]] && wget -qO - 'https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x871920d1991bc93c' | sudo gpg --dearmor -o /usr/share/keyrings/plucky_8719.gpg
+                mv /usr/share/keyrings/ubuntu-archive-removed-keys.gpg /usr/share/keyrings/ubuntu-archive-removed-keys.gpg.old
+            fi
             ;;
         noble)
             SUITE_NUM="24.04"
@@ -1305,9 +1313,9 @@ install_debootstrap() {
     echo "- $(tput setaf 1)About to debootstrap into ${ZFSBUILD}$(tput sgr0) -----------"
     read -r -t 15 -p "Press <enter> to continue (auto-continue in 15secs)"
 
-    # Install basic system
+    # Install basic system - use main archive as source
     echo "debootstrap to build initial system"
-    debootstrap --include=${SUITE_BOOTSTRAP} ${SUITE} ${ZFSBUILD}
+    debootstrap --include=${SUITE_BOOTSTRAP} ${SUITE} ${ZFSBUILD} http://archive.ubuntu.com/ubuntu
 
     # Ensure device files cannot be created in main POOL
     if [ "${WIPE_FRESH}" == "y" ] ; then
