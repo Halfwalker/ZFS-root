@@ -1595,6 +1595,32 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     # Setup inside chroot
 
     # -------------------------------------------------------------------------------------------------------
+    # Helper to compare Ubuntu release numbers
+    compare_versions() {
+        checked_version=$1
+        compare_version=$2
+
+        # Split the versions into major and minor parts
+        IFS='.' read -r -a checked_parts <<< "$checked_version"
+        IFS='.' read -r -a compare_parts <<< "$compare_version"
+
+        # Compare major versions
+        if (( ${checked_parts[0]} > ${compare_parts[0]} )); then
+            return 0  # true
+        elif (( ${checked_parts[0]} < ${compare_parts[0]} )); then
+            return 1  # false
+        else
+            # Major versions are equal, compare minor versions
+            if (( ${checked_parts[1]} >= ${compare_parts[1]} )); then
+                return 0  # true
+            else
+                return 1  # false
+            fi
+        fi
+    } # compare_versions
+
+
+    # -------------------------------------------------------------------------------------------------------
     # Helper to download from a URL to a location with retries
     download_with_retry() {
         local url=$1
