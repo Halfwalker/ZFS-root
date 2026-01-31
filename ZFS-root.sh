@@ -2328,7 +2328,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
 					    # successfully entered a passphrase
 					    if [ "${ret}" -eq 0 ] ; then
-                        echo "${luks} opened as ${dm}"
+					        echo "${luks} opened as ${dm}"
 					        zdebug "$(
 					            cryptsetup status "${dm}"
 					        )"
@@ -2352,7 +2352,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 					        fi
 					    fi
 					done
-                sleep 5  # Allow user to see unlocked partitions
+				sleep 5  # Allow user to see unlocked partitions
 				EOF
                 chmod +x /usr/local/bin/zfsbootmenu_luks_unlock.sh
 
