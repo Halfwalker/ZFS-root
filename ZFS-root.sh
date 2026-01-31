@@ -2213,97 +2213,107 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
             #
             # Early-stage script for zfsbootmenu - scan for ZFS_ partitions which
             # should be LUKS encrypted and try to open them all
+            # Only needed for 24.04 and below - compare_version is a >= check, so use 24.10 to compare against
             #
-            # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-            cat > /usr/local/bin/zfsbootmenu_luks_unlock.sh <<- 'EOF'
-				#!/bin/bash
+            if ! compare_versions "$SUITE_NUM" "24.10" ; then
+                # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+                cat > /usr/local/bin/zfsbootmenu_luks_unlock.sh <<- 'EOF'
+					#!/bin/bash
 
-				sources=(
-				  /lib/profiling-lib.sh
-				  /etc/zfsbootmenu.conf
-				  /lib/zfsbootmenu-core.sh
-				  /lib/kmsg-log-lib.sh
-				  /etc/profile
-				)
+					sources=(
+					  /lib/profiling-lib.sh
+					  /etc/zfsbootmenu.conf
+					  /lib/zfsbootmenu-core.sh
+					  /lib/kmsg-log-lib.sh
+					  /etc/profile
+					)
 
-				for src in "${sources[@]}"; do
-				  # shellcheck disable=SC1090
-				  if ! source "${src}" > /dev/null 2>&1 ; then
-				    echo -e "\033[0;31mWARNING: ${src} was not sourced; unable to proceed\033[0m"
-				    exit 1
-				  fi
-				done
-				unset src sources
+					for src in "${sources[@]}"; do
+					  # shellcheck disable=SC1090
+					  if ! source "${src}" > /dev/null 2>&1 ; then
+					    echo -e "\033[0;31mWARNING: ${src} was not sourced; unable to proceed\033[0m"
+					    exit 1
+					  fi
+					done
+					unset src sources
 
-				# Ensure glob expands to nothing for non-matches
-				shopt -s nullglob
-				ZFS_PARTS=(/dev/disk/by-partlabel/{SWAP_*,ZFS_*})
+					# Ensure glob expands to nothing for non-matches
+					shopt -s nullglob
+					# We only unlock the ZFS partition(s) since the SWAP ones can use the
+					# /etc/zfs/zroot.lukskey to unlock once main pool is open
+					# ZFS_PARTS=(/dev/disk/by-partlabel/{SWAP_*,ZFS_*})
+					ZFS_PARTS=(/dev/disk/by-partlabel/ZFS_*)
 
-				echo "Found these partitions for LUKS encryption"
-				for idx in ${!ZFS_PARTS[@]} ; do echo "${ZFS_PARTS[$idx]}" ; done
-				echo ""
+					echo "Found these partitions for LUKS encryption"
+					for idx in ${!ZFS_PARTS[@]} ; do echo "${ZFS_PARTS[$idx]}" ; done
+					echo ""
 
-				# Read passphrase for LUKS encryption into $REPLY
-				read -s -p "LUKS encryption passphrase : "
+					# Read passphrase for LUKS encryption into $REPLY
+					read -s -p "LUKS encryption passphrase : "
 
-				tput clear
-				colorize red "${header}\n\n"
-				for idx in ${!ZFS_PARTS[@]} ; do
-				    # Grab just ZFS_0 or SWAP_0
-				    test_luks=${ZFS_PARTS[$idx]#/dev/disk/by-partlabel/}
-				    # luks is the full path to the disk partition
-				    luks=${ZFS_PARTS[$idx]}
-				    # Set $dm to root_crypt0 or swap_crypt0 depending on basename
-				    [ "${test_luks%_*}" == "ZFS" ] && dm=root_crypt${idx}
-				    [ "${test_luks%_*}" == "SWAP" ] && dm=swap_crypt${idx}
+					tput clear
+					colorize red "${header}\n\n"
+					for idx in ${!ZFS_PARTS[@]} ; do
+					    # Grab just ZFS_0 or SWAP_0
+					    test_luks=${ZFS_PARTS[$idx]#/dev/disk/by-partlabel/}
+					    # luks is the full path to the disk partition
+					    luks=${ZFS_PARTS[$idx]}
+					    # Set $dm to root_crypt0 or swap_crypt0 depending on basename
+					    [ "${test_luks%_*}" == "ZFS" ] && dm=root_crypt${idx}
+					    [ "${test_luks%_*}" == "SWAP" ] && dm=swap_crypt${idx}
 
-				    if ! cryptsetup isLuks ${luks} >/dev/null 2>&1 ; then
-				        zwarn "LUKS device ${luks} missing LUKS partition header"
-				        exit
-				    fi
+					    if ! cryptsetup isLuks ${luks} >/dev/null 2>&1 ; then
+					        zwarn "LUKS device ${luks} missing LUKS partition header"
+					        exit
+					    fi
 
-				    if cryptsetup status "${dm}" >/dev/null 2>&1 ; then
-				        zinfo "${dm} already active, continuing"
-				        continue
-				    fi
+					    if cryptsetup status "${dm}" >/dev/null 2>&1 ; then
+					        zinfo "${dm} already active, continuing"
+					        continue
+					    fi
 
-				    header="$( center_string "[CTRL-C] cancel luksOpen attempts" )"
+					    header="$( center_string "[CTRL-C] cancel luksOpen attempts" )"
 
-				    # https://fossies.org/linux/cryptsetup/docs/Keyring.txt
-				    echo $REPLY | cryptsetup luksOpen ${luks} ${dm}
-				    ret=$?
+					    # https://fossies.org/linux/cryptsetup/docs/Keyring.txt
+					    echo $REPLY | cryptsetup luksOpen ${luks} ${dm}
+					    ret=$?
 
-				    # successfully entered a passphrase
-				    if [ "${ret}" -eq 0 ] ; then
+					    # successfully entered a passphrase
+					    if [ "${ret}" -eq 0 ] ; then
                         echo "${luks} opened as ${dm}"
-				        zdebug "$(
-				            cryptsetup status "${dm}"
-				        )"
-				        continue
-				    fi
+					        zdebug "$(
+					            cryptsetup status "${dm}"
+					        )"
+					        continue
+					    fi
 
-				    # ctrl-c'd the process
-				    if [ "${ret}" -eq 1 ] ; then
-				        zdebug "canceled luksOpen attempts via SIGINT"
-				        exit
-				    fi
+					    # ctrl-c'd the process
+					    if [ "${ret}" -eq 1 ] ; then
+					        zdebug "canceled luksOpen attempts via SIGINT"
+					        exit
+					    fi
 
-				    # failed all password attempts
-				    if [ "${ret}" -eq 2 ] ; then
-				        if timed_prompt -e "emergency shell" \
-				            -r "continue unlock attempts" \
-				            -p "Continuing in %0.2d seconds" ; then
-				            continue
-				        else
-				            emergency_shell "unable to unlock LUKS partition"
-				        fi
-				    fi
-				done
+					    # failed all password attempts
+					    if [ "${ret}" -eq 2 ] ; then
+					        if timed_prompt -e "emergency shell" \
+					            -r "continue unlock attempts" \
+					            -p "Continuing in %0.2d seconds" ; then
+					            continue
+					        else
+					            emergency_shell "unable to unlock LUKS partition"
+					        fi
+					    fi
+					done
                 sleep 5  # Allow user to see unlocked partitions
-			EOF
-            chmod +x /usr/local/bin/zfsbootmenu_luks_unlock.sh
+				EOF
+                chmod +x /usr/local/bin/zfsbootmenu_luks_unlock.sh
 
-            echo 'zfsbootmenu_early_setup+=" /usr/local/bin/zfsbootmenu_luks_unlock.sh "' > /etc/zfsbootmenu/dracut.conf.d/luks_zbm.conf
+                cat <<- END > /etc/zfsbootmenu/dracut.conf.d/luks_zbm.conf
+					# For 24.04 and below we need our own LUKS unlock setup
+					install_items+=" /usr/local/bin/zfsbootmenu_luks_unlock.sh "
+					zfsbootmenu_early_setup+=" /usr/local/bin/zfsbootmenu_luks_unlock.sh "
+				END
+            fi # 24.04 and below
         fi #DISCENC
     fi # WIPE_FRESH                         # <<<<<------------------------------------------------ WIPE_FRESH ------ ^^^^^
 
