@@ -2252,9 +2252,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         #
         if [ "${DISCENC}" == "LUKS" ] ; then
             for DISK in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
-                echo "root_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) /etc/zfs/zroot.lukskey discard,luks,keyfile-timeout=10s" >> /etc/crypttab
+                echo "root_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_DATA}) /etc/zfs/zroot.lukskey discard,luks,initramfs" >> /etc/crypttab
                 if [ "${HIBERNATE}" == "y" ] ; then
-                    echo "swap_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_SWAP}) /etc/zfs/zroot.lukskey discard,luks,keyfile-timeout=10s" >> /etc/crypttab
+                    echo "swap_crypt${DISK} UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[${DISK}]}-part${PARTITION_SWAP}) /etc/zfs/zroot.lukskey discard,luks," >> /etc/crypttab
                 fi
             done
 
@@ -2678,8 +2678,10 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     # For ZFS encryption point to the /etc/zfs/zroot.rootkey files in the initramfs
     # These keys should have been copied into place above outside the chroot
     if [ "${DISCENC}" = "ZFSENC" ] ; then
-        echo 'install_items+=" /etc/zfs/zroot.rootkey /etc/zfs/zroot.homekey"' >> /etc/dracut.conf.d/zfskey.conf
+        echo 'install_items+=" /etc/zfs/zroot.rootkey /etc/zfs/zroot.homekey"' > /etc/dracut.conf.d/zfskey.conf
         if [ "${WIPE_FRESH}" == "y" ] ; then     # <<<<<------------------------------------------------ WIPE_FRESH ------ VVVVV
+            # This allows using that zroot.rootkey to unlock the ${POOLNAME}/ROOT/${SUITE} root filesystem
+            # without needing to enter the passphrase again
             zfs change-key -o keylocation=file:///etc/zfs/zroot.rootkey -o keyformat=passphrase ${POOLNAME}/ROOT
         fi # WIPE_FRESH                          # <<<<<------------------------------------------------ WIPE_FRESH ------ ^^^^^
     fi
@@ -3026,6 +3028,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         mv /etc/zrepl/zrepl.yml /etc/zrepl/zrepl.yml.BAK
 
         # Set the main root dataset snapshot threshold to 120mb
+        # TODO: Make this a parameter
         zfs set com.zrepl:snapshot-threshold=120000000 ${POOLNAME}/ROOT/${SUITE}
 
         # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
