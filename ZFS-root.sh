@@ -268,7 +268,6 @@ setup_cacher() {
         echo "Acquire::http::proxy \"${PROXY}\";" > /etc/apt/apt.conf.d/03proxy
     fi # PROXY
 
-    apt-get -qq update
     apt-get -qq --no-install-recommends --yes install software-properties-common
     apt-add-repository -y universe
     # Need universe for debconf-utils
@@ -1258,7 +1257,8 @@ create_zfs_datasets() {
     # to point to the root dataset.  This will allow this root dataset to be booted normally
     # if the bootfs option is ever changed to a different root dataset
     # via the WIPE_FRESH=n to install a different Ubuntu distro
-    zfs set org.zfsbootmenu:commandline="rw quiet root=zfs:${POOLNAME}/ROOT/${SUITE}" ${POOLNAME}/ROOT/${SUITE}
+    zfs set org.zfsbootmenu:commandline="rw quiet ${USE_ZSWAP} root=zfs:${POOLNAME}/ROOT/${SUITE}" ${POOLNAME}/ROOT/${SUITE}
+    # Default boot system is this one installed with WIPE_FRESH=y - the first one
     zpool set bootfs=${POOLNAME}/ROOT/${SUITE} ${POOLNAME}
     zfs mount ${POOLNAME}/ROOT/${SUITE}
 
@@ -1347,7 +1347,7 @@ setup_boot_partition() {
     mkfs.vfat -v -F 32 -s 1 -n "BOOT_EFI" ${BOOTDEVRAW} > /dev/null
     echo "UUID=$(blkid -s UUID -o value ${BOOTDEVRAW}) \
           /boot/efi vfat defaults,x-systemd.after=zfs-mount.service 0 0" >> ${ZFSBUILD}/etc/fstab
-    mkdir ${ZFSBUILD}/boot/efi
+    mkdir -p ${ZFSBUILD}/boot/efi
 } # setup_boot_partition()
 
 
@@ -1995,7 +1995,6 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         cat <<- END > /etc/dracut.conf.d/resume-swap-systemd.conf
 			# Ensure systemd-hibernate-resume is available
 			# add_device+=" UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP}) "
-			add_dracutmodules+=" systemd "
 			install_items+=" /usr/lib/systemd/system/systemd-hibernate-resume.service "
 		END
     else
