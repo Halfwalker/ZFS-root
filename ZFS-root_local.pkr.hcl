@@ -120,7 +120,7 @@ build {
     execute_command = "echo 'packer' | sudo -S sh -c '{{ .Vars }} {{ .Path }}'"
     inline = [
       "cd /tmp",
-      "./ZFS-root.sh packerci",
+      "./ZFS-root.sh -p",
       "mv /root/ZFS-setup.log /tmp/ZFS-setup-packerci.log"
     ]
   }

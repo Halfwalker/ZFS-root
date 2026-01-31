@@ -4,6 +4,16 @@
 #
 
 #
+#       DANGER ZONE
+#
+# wipe_fresh - are going to NUKE this system for a new install ?
+#   y - Will query for disks to use and totally wipe them
+#   n - Only creates a new dataset under <pool>/ROOT/<suite>
+#       This is then selectable under zfsbootmenu
+#
+WIPE_FRESH=y
+
+#
 # Proxy config - apt-cacher-ng
 #
 PROXY=""
@@ -35,6 +45,7 @@ SUITE="noble"
 #
 # If multidisk, select main pool raid level
 # single, mirror, raidz1, raidz2, raidz3
+#
 RAIDLEVEL="mirror"
 
 #
@@ -46,9 +57,17 @@ RAIDLEVEL="mirror"
 SECUREBOOT=y
 
 #
+# Enable auto-signing of rEFInd and ZFSBootMenu .efi bundles when changes are made
+# NOTE: Without auto-signing, YOU must manage the signing of the .efi bundles and
+#       any other bootables in /boot/efi/EFI
+#       Forgetting to sign new bundles or mistakes may render the system unbootable
+AUTOSIGN=y
+
+#
 # Swap size in megabytes - if HIBERNATE or LUKS set then this
 # is a partition otherise it's a zfs dataset.
 # Set to 0 to disable swap
+#
 SIZE_SWAP=300
 
 #
@@ -71,18 +90,30 @@ SIZE_SWAP=300
 # It is safe to store the keys there as they're not visible until the main root
 # dataset is unlocked
 #
+# NOTE: If DROPBEAR is set to y here, then ZFSBOOTMENU_BINARY_TYPE below will
+#       be forced to LOCAL so the zfsbootmenu initramfs can be rebuilt to include
+#       Dropbear
+#
 DISCENC="NOENC"
 PASSPHRASE="password"
 DROPBEAR=y
 
 #
 # For zfsbootmenu there are 3 different ways to install
-#   EFI    : Uses a single EFI image
+#   EFI    : Uses a single EFI image - for UEFI systems only
 #   KERNEL : Same binary but with the vmlinuz/initrd extracted
+#            Can be used with legacy non-UEFI systems as well as UEFI systems
 #   LOCAL  : Built and install from the git repo
 #
 # The EFI image precludes a working syslinux config though - that requires
-# a vmlunuz/initrd set to work.  In general the KERNEL option is most flexible
+# a vmlunuz/initrd set to work.  In general the KERNEL option is most flexible.
+# If you KNOW you won't use the install in a non-UEFI system later, then the
+# EFI image is simplest.
+#
+# NOTE: If Dropbear is required for remote unlocking of LUKS or ZFS enecryption
+#       then you must select LOCAL.  This is because Dropbear must be included
+#       in the initramfs for zfsbootmenu.  If DROPBEAR above is set to y, then
+#       any value here will be overridden to LOCAL
 #
 ZFSBOOTMENU_BINARY_TYPE=KERNEL
 
@@ -99,6 +130,7 @@ ZFSBOOTMENU_REPO_TYPE=TAGGED
 # 90-xhci-unbind.sh runs, as it kills power to the USB ports.  For those we
 # disable that hook script.
 # See https://docs.zfsbootmenu.org/en/v3.0.x/man/zfsbootmenu.7.html
+#
 ZFSBOOTMENU_CMDLINE=""
 
 #
@@ -113,7 +145,6 @@ ZREPL=y
 HIBERNATE=n
 DELAY=n
 SOF=n
-NVIDIA=n
 GNOME=n
 KDE=n
 NEON=n
@@ -126,11 +157,12 @@ XFCE=n
 # none for no driver
 # 390 or 470 for legacy driver
 # 530 for current latest, or whatever version you prefer
-# NVIDIA=none
+NVIDIA=none
 
 # If installing Sound Open Firmware binaries (mostly for laptops) choose
 # the version here.  Defaults to 2024.06
-SOF_VERSION=2024.06
+# SOF_VERSION=2024.06
+SOF_VERSION=2025.05.1
 
 #
 # Below are additional options that can be set that do NOT have a menu process
