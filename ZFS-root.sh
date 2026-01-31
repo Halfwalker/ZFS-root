@@ -2019,7 +2019,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         if [ "${ZFSBOOTMENU_BINARY_TYPE}" = "KERNEL" ] ; then
             echo "--- Using zfsbootmenu KERNEL files"
             download_with_retry "https://github.com/zbm-dev/zfsbootmenu/releases/download/v3.1.0/zfsbootmenu-recovery-x86_64-v3.1.0-linux6.18.tar.gz" "/usr/local/share/zfsbootmenu.tar.gz"
-            tar xvzf /usr/local/share/zfsbootmenu.tar.gz --strip-components=1 --directory /boot/efi/EFI/zfsbootmenu
+            tar xzf /usr/local/share/zfsbootmenu.tar.gz --no-same-owner --strip-components=1 --directory /boot/efi/EFI/zfsbootmenu
             rm -f /usr/local/share/zfsbootmenu.tar.gz
         fi
 
@@ -2053,7 +2053,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     if [ "${ZFSBOOTMENU_REPO_TYPE}" = "TAGGED" ] ; then
         echo "--- Using zfsbootmenu TAGGED repo"
         download_with_retry "https://get.zfsbootmenu.org/source" "/usr/local/share/zfsbootmenu.tar.gz"
-        tar xvzf /usr/local/share/zfsbootmenu.tar.gz --strip-components=1 --directory /usr/local/share/zfsbootmenu
+        tar xzf /usr/local/share/zfsbootmenu.tar.gz --no-same-owner --strip-components=1 --directory /usr/local/share/zfsbootmenu
         rm -f /usr/local/share/zfsbootmenu.tar.gz
     fi
 
@@ -2150,7 +2150,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         rm -rf /tmp/memtest86 && mkdir -p /tmp/memtest86/mnt
         mkdir -p /boot/efi/EFI/tools/memtest86
         download_with_retry "https://www.memtest86.com/downloads/memtest86-usb.zip" "/tmp/memtest86/memtest86-usb.zip"
-        download_with_retry "https://www.memtest86.com/downloads/memtest86-4.3.7-iso.zip" "/tmp/memtest86/memtest86-iso.zip"
+        download_with_retry "https://www.memtest86.com/downloads/memtest86-4.3.7-iso.tar.gz" "/tmp/memtest86/memtest86-iso.tar.gz"
         # For EFI
            unzip -d /tmp/memtest86 /tmp/memtest86/memtest86-usb.zip memtest86-usb.img
            losetup -P /dev/loop33 /tmp/memtest86/memtest86-usb.img
@@ -2159,7 +2159,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
            umount /tmp/memtest86/mnt
            losetup -d /dev/loop33
         # For Syslinux
-           unzip -d /tmp/memtest86 /tmp/memtest86/memtest86-iso.zip Memtest86-4.3.7.iso
+           tar xv -C /tmp/memtest86 -f /tmp/memtest86/memtest86-iso.tar.gz Memtest86-4.3.7.iso
            mount -o loop /tmp/memtest86/Memtest86-4.3.7.iso /tmp/memtest86/mnt
            cp /tmp/memtest86/mnt/isolinux/memtest /boot/efi/EFI/tools/memtest86/memtest86.syslinux
            umount /tmp/memtest86/mnt
@@ -2563,7 +2563,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         apt-get -qq --yes install dracut-network dropbear-bin
         rm -rf /tmp/dracut-crypt-ssh && mkdir -p /tmp/dracut-crypt-ssh
         download_with_retry "https://github.com/dracut-crypt-ssh/dracut-crypt-ssh/tarball/master" "/tmp/dracut-crypt-ssh.tar.gz"
-        tar xvzf /tmp/dracut-crypt-ssh.tar.gz --strip-components=1 --directory /tmp/dracut-crypt-ssh
+        tar xzf /tmp/dracut-crypt-ssh.tar.gz --no-same-owner --strip-components=1 --directory /tmp/dracut-crypt-ssh
         rm -f /tmp/dracut-crypt-ssh.tar.gz
 
         ##comment out references to /helper/ folder from module-setup.sh
