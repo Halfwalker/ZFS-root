@@ -2678,7 +2678,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     # For ZFS encryption point to the /etc/zfs/zroot.rootkey files in the initramfs
     # These keys should have been copied into place above outside the chroot
     if [ "${DISCENC}" = "ZFSENC" ] ; then
-        echo 'install_items+=" /etc/zfs/zroot.rootkey /etc/zfs/zroot.homekey"' > /etc/dracut.conf.d/zfskey.conf
+        echo 'install_items+=" /etc/zfs/zroot.rootkey /etc/zfs/zroot.homekey "' > /etc/dracut.conf.d/zfskey.conf
         if [ "${WIPE_FRESH}" == "y" ] ; then     # <<<<<------------------------------------------------ WIPE_FRESH ------ VVVVV
             # This allows using that zroot.rootkey to unlock the ${POOLNAME}/ROOT/${SUITE} root filesystem
             # without needing to enter the passphrase again
@@ -3504,26 +3504,22 @@ if [ "${WIPE_FRESH}" == "y" ] ; then
 else
     # Not wiping fresh - just use existing fstab which has /boot/efi mount in it
     # Also need the encryption keys from existing setup
-    mkdir -p ${ZFSBUILD}/etc
     mkdir -p ${ZFSBUILD}/boot/efi
-    cp /etc/fstab ${ZFSBUILD}/etc/fstab
-fi
-
-# Grab config files from exiting setup if NOT wipe_fresh
-if [ "${WIPE_FRESH}" == "n" ] ; then
     mkdir -p ${ZFSBUILD}/etc/zfs
-    [ -e /etc/zfs/zroot.lukskey ] && cp /etc/zfs/zroot.lukskey ${ZFSBUILD}/etc/zfs/zroot.lukskey
-    [ -e /etc/zfs/zroot.rootkey ] && cp /etc/zfs/zroot.rootkey ${ZFSBUILD}/etc/zfs/zroot.rootkey
-    [ -e /etc/zfs/zroot.homekey ] && cp /etc/zfs/zroot.homekey ${ZFSBUILD}/etc/zfs/zroot.homekey
-    if [ "${DISCENC}" == "LUKS" ] ; then
-        [ -e /etc/crypttab ] && cp /etc/crypttab ${ZFSBUILD}/etc/crypttab
-        [ -e /etc/zfsbootmenu/dracut.conf.d/luks_zbm.conf ] && cp /etc/zfsbootmenu/dracut.conf.d/luks_zbm.conf ${ZFSBUILD}/etc/zfsbootmenu/dracut.conf.d/
-        mkdir -p ${ZFSBUILD}/usr/local/bin
-        [ -e /usr/local/bin/zfsbootmenu_luks_unlock.sh ] && cp /usr/local/bin/zfsbootmenu_luks_unlock.sh ${ZFSBUILD}/usr/local/bin/
-        if [ "${HIBERNATE}" = "y" ] ; then
-            [ -e /etc/dracut.conf.d/resume-swap-uuid.conf ] && cp /etc/dracut.conf.d/resume-swap-uuid.conf ${ZFSBUILD}/etc/dracut.conf.d
-        fi
-    fi
+    mkdir -p ${ZFSBUILD}/etc/dracut.conf.d
+    mkdir -p ${ZFSBUILD}/usr/local/bin
+
+    # Grab config files from exiting setup if NOT wipe_fresh
+    cp -av /etc/fstab ${ZFSBUILD}/etc/fstab
+    cp -av /etc/zfs/zroot.* ${ZFSBUILD}/etc/zfs/
+    # Not sure if we should copy, since that would possibly copy systemd-cryptsetup to a distro that doesn't have it
+    # The contents of /etc/dracut.conf.d should all be built anyway
+    # cp -av /etc/dracut.conf.d ${ZFSBUILD}/etc/
+    cp -av /etc/zfsbootmenu ${ZFSBUILD}/etc/
+
+    [ -e /etc/crypttab ] && cp -av /etc/crypttab ${ZFSBUILD}/etc/
+    [ -e /usr/local/bin/zfsbootmenu_luks_unlock.sh ] && cp /usr/local/bin/zfsbootmenu_luks_unlock.sh ${ZFSBUILD}/usr/local/bin/
+
 fi
 
 # Set up network config and apt sources
@@ -3583,6 +3579,6 @@ else
     # For just a non-wipe new dataset, unmount and set mountpoint to / to make it bootable
     zfs umount ${POOLNAME}/ROOT/${SUITE}
     zfs set mountpoint=/ ${POOLNAME}/ROOT/${SUITE}
-    zfs set org.zfsbootmenu:commandline="rw quiet root=zfs:${POOLNAME}/ROOT/${SUITE}" ${POOLNAME}/ROOT/${SUITE}
+    zfs set devices=off  ${POOLNAME}/ROOT/${SUITE}
 fi
 
