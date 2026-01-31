@@ -1716,7 +1716,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     #       Do NOT install initramfs-tools next to dracut
     #       They wrestle and knock each other out
     #       Same with grub - fighting rEFInd
-    apt-mark hold cryptsetup-initramfs zfs-initramfs initramfs-tools initramfs-tools-bin initramfs-tools-core grub-efi-amd64 grub-efi-amd64-signed grub-efi-amd64-bin grub-common grub2-common lilo
+    apt-mark hold cryptsetup-initramfs zfs-initramfs initramfs-tools initramfs-tools-bin initramfs-tools-core grub-efi-amd64 grub-efi-amd64-signed grub-efi-amd64-bin grub-common grub2-common
 
     # Make sure the kernel is installed and configured before ZFS
     apt-get -qq --yes --no-install-recommends install linux-generic${HWE} linux-headers-generic${HWE} linux-image-generic${HWE}
@@ -1738,13 +1738,14 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
     # Ensure cachefile exists and zfs-import-cache is active
     # https://github.com/zfsonlinux/zfs/issues/8885
-    zpool set cachefile=/etc/zfs/zpool.cache ${POOLNAME}
-    systemctl enable zfs.target zfs-import-cache zfs-mount zfs-import.target
+#-#    zpool set cachefile=/etc/zfs/zpool.cache ${POOLNAME}
+#-#    systemctl enable zfs.target zfs-import-cache zfs-mount zfs-import.target
+    systemctl enable zfs.target zfs-import-scan zfs-mount zfs-import.target
 
 
     # Configure Dracut to load ZFS support
     # Need gcc to get libgcc_s.so for dracut_install to work
-    apt-get -qq --yes install dracut-core zfs-dracut ${SUITE_BSDUTILS} gcc
+    apt-get -qq --yes install dracut-core zfs-dracut ${SUITE_BSDUTILS} gcc cpio
 
     # NOTE: tabs as first char to handle indented heredoc
     cat <<- END > /etc/dracut.conf.d/100-zol.conf
@@ -1822,7 +1823,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 				# Try to enumerate filesystems by attempting to access fs0:
 				# This is just a basic check that the shell can access drives
 				fs0:
-				if %lasterror% != 0 then
+				if not %lasterror% == 0 then
 				    echo "ERROR: Cannot access filesystem mappings."
 				    goto end
 				endif
