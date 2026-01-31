@@ -1966,28 +1966,78 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     # Can only resume from ONE device though, so we default to the 1st disk swap partition
     # ZFS native encryption and non-encrypted can use SWAP partition directly
     # LUKS encryption uses the 1st swap_crypt0 device
+
+    # Hibernate or not, a LUKS install needs the crypt module
+    if [ "${DISCENC}" = "LUKS" ] ; then
+        # NOTE: be sure to use real TABS for this heredoc
+        cat <<- END > /etc/dracut.conf.d/luks_support.conf
+			# Needed for unlocking encrypted partitions
+			add_dracutmodules+=" crypt "
+		END
+
+        # For Ubuntu 25.04 and up we can use systemd-cryptsetup to handle unlocking
+        if compare_versions "$SUITE_NUM" "25.04" ; then
+            apt-get -qq --yes install systemd-cryptsetup
+            cat <<- END > /etc/dracut.conf.d/luks_systemd-cryptsetup.conf
+				# Needed for unlocking encrypted partitions
+				add_dracutmodules+=" systemd-cryptsetup "
+			END
+        else
+            # Below 25.04, so need our own custom dracut module
+            echo "TODO: Custom dracut module here"
+            cat <<- END > /etc/dracut.conf.d/luks_systemd.conf
+				# Needed for unlocking encrypted partitions
+				add_dracutmodules+=" systemd "
+			END
+        fi  # if >= 25.04
+    fi # if LUKS
+
     if [ "${HIBERNATE}" = "y" ] ; then
         # NOTE: be sure to use real TABS for this heredoc
         cat <<- END > /etc/dracut.conf.d/resume-from-hibernate.conf
+			# Needed for resuming from swap
 			add_dracutmodules+=" resume "
 		END
 
         # Although we have systemd-hibernate, also install pm-utils for pm-hibernate
         apt-get -qq --yes install pm-utils
 
+        # LUKS install already got the crypt module above so only need the swap_crypt0 device
         if [ "${DISCENC}" = "LUKS" ] ; then
-            zfs set org.zfsbootmenu:commandline="rw quiet ${USE_ZSWAP} resume=/dev/mapper/swap_crypt0" ${POOLNAME}/ROOT
-            zfs set org.zfsbootmenu:commandline="rw quiet ${USE_ZSWAP} resume=/dev/mapper/swap_crypt0" ${POOLNAME}/ROOT/${SUITE}
-
+            # Hibernate and encryption needs swap_crypt0
             # NOTE: be sure to use real TABS for this heredoc
-            cat <<- END > /etc/dracut.conf.d/resume-swap-crypt.conf
-				# Needed for resuming from encrypted swap
+            cat <<- END > /etc/dracut.conf.d/swap-crypt.conf
+				# Needed for unlocking encrypted swap
 				add_device+=" /dev/mapper/swap_crypt0 "
-				add_dracutmodules+=" crypt "
+				kernel_cmdline+=" resume=/dev/mapper/swap_crypt0 "
 			END
-        else
-            zfs set org.zfsbootmenu:commandline="rw quiet ${USE_ZSWAP} resume=UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP})" ${POOLNAME}/ROOT
-            zfs set org.zfsbootmenu:commandline="rw quiet ${USE_ZSWAP} resume=UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP})" ${POOLNAME}/ROOT/${SUITE}
+
+            # Just setting the resume option for dracut doesn't seem to work, zbm only
+            # looks at its own commandline. So add the resume option to it
+            ZBM_COMMANDLINE=$(zfs get -H -o value org.zfsbootmenu:commandline ${POOLNAME}/ROOT/${SUITE})
+            zfs set org.zfsbootmenu:commandline="${ZBM_COMMANDLINE} resume=/dev/mapper/swap_crypt0" ${POOLNAME}/ROOT/${SUITE}
+        fi
+
+        if [ "${DISCENC}" != "LUKS" ] ; then
+            # If this is an additional dataset, zfsdisks[] is not set (only during WIPE_FRESH=y
+            if [ "${WIPE_FRESH}" == "n" ] ; then     # <<<<<------------------------------------------------ WIPE_FRESH ------ VVVVV
+                # Then we need to grab the existing FIRST swap partition UUID from /etc/fstab
+                # UUID=32d96897-2d34-4dd1-991c-6eafd87bdd72 none swap discard,sw 0 0  # SWAP_0
+                SWAP_UUID=$(grep SWAP_0 /etc/fstab | head -1 | cut -d' ' -f1)
+            else
+                # Otherwise we just generate it from zfsdisks[0]
+                SWAP_UUID="UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP})"
+            fi # WIPE_FRESH                         # <<<<<------------------------------------------------ WIPE_FRESH ------ ^^^^^
+
+            cat <<- END > /etc/dracut.conf.d/swap-resume.conf
+				# Needed for unlocking encrypted swap
+				kernel_cmdline+=" resume=${SWAP_UUID} "
+			END
+
+            # Just setting the resume option for dracut doesn't seem to work, zbm only
+            # looks at its own commandline. So add the resume option to it
+            ZBM_COMMANDLINE=$(zfs get -H -o value org.zfsbootmenu:commandline ${POOLNAME}/ROOT/${SUITE})
+            zfs set org.zfsbootmenu:commandline="${ZBM_COMMANDLINE} resume=${SWAP_UUID}" ${POOLNAME}/ROOT/${SUITE}
         fi
 
         # Needed for any hibernation resume to work, encrypted or not
@@ -1997,10 +2047,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 			# add_device+=" UUID=$(blkid -s UUID -o value /dev/disk/by-id/${zfsdisks[0]}-part${PARTITION_SWAP}) "
 			install_items+=" /usr/lib/systemd/system/systemd-hibernate-resume.service "
 		END
-    else
-        zfs set org.zfsbootmenu:commandline="rw quiet" ${POOLNAME}/ROOT
-        zfs set org.zfsbootmenu:commandline="rw quiet" ${POOLNAME}/ROOT/${SUITE}
+        # Hibernate
     fi # Hibernate
+
     zfs set canmount=noauto ${POOLNAME}/ROOT
     zfs set canmount=noauto ${POOLNAME}/ROOT/${SUITE}
 
