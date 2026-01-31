@@ -628,11 +628,6 @@ query_ssh_auth() {
         (( RET )) && AUTHKEYS=none
     fi # Check for github user ssh keys in AUTHKEYS
 
-    # If it's NOT a ZFS encryption setup, then clear out the ZFSENC_ROOT_OPTIONS variable
-    if [ "${DISCENC}" != "ZFSENC" ] ; then
-        ZFSENC_ROOT_OPTIONS=""
-        ZFSENC_HOME_OPTIONS=""
-    fi
 } # query_ssh_auth()
 
 
