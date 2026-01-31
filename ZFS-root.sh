@@ -1298,6 +1298,8 @@ create_zfs_datasets() {
           -o logbias=throughput -o sync=always \
           -o primarycache=metadata -o secondarycache=none \
           -o com.sun:auto-snapshot=false ${POOLNAME}/ROOT/swap
+        # And create it as swap space
+        mkswap -f /dev/zvol/${POOLNAME}/ROOT/swap
     fi #HIBERNATE
 } # create_zfs_datasets()
 
