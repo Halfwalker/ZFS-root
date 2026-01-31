@@ -3442,10 +3442,10 @@ query_suite
 if [ "${WIPE_FRESH}" == "y" ] ; then
     query_secureboot    # NOTE: sbctl only available for noble/24.04
     select_disks "$@"
+    # Choose encryption
+    select_encryption
+    query_swap
 fi
-
-# Choose encryption
-select_encryption
 
 # Query for install options
 query_install_options
@@ -3455,7 +3455,6 @@ query_install_options
 query_nvidia
 query_google_auth
 query_ssh_auth
-query_swap
 
 if [[ -v PACKERCI ]] ; then
     show_options
@@ -3493,6 +3492,7 @@ else
     zfs mount ${POOLNAME}/ROOT/${SUITE}
     # For a plain root dataset need devices available for debootstrap
     zfs set devices=on ${POOLNAME}/ROOT/${SUITE}
+    zfs set org.zfsbootmenu:commandline="rw quiet ${USE_ZSWAP} root=zfs:${POOLNAME}/ROOT/${SUITE}" ${POOLNAME}/ROOT/${SUITE}
 fi
 
 # debootstrap the new root filesystem
