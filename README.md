@@ -369,12 +369,13 @@ The `.qcow2` format disk image (here in *packer-zfsroot-2024-10-17-1839.qcow2*) 
 * Ensure the local user owns the created files
     ```
     sudo chown -R ${USER}:${USER} packer-zfsroot-2024-10-17-1839
+    export PACKERZFS=packer-zfsroot-2024-10-17-1839
     ```
 
 * Boot with syslinux, no UEFI
     ```
     kvm -no-reboot -m 2048 \
-      -drive file=packer-zfsroot-2024-10-17-1839/packer-zfsroot-2024-10-17-1839.qcow2,format=qcow2,cache=writeback \
+      -drive file=${PACKERZFS}/${PACKERZFS}.qcow2,format=qcow2,cache=writeback \
       -device virtio-scsi-pci,id=scsi0
     ```
 
@@ -382,8 +383,8 @@ The `.qcow2` format disk image (here in *packer-zfsroot-2024-10-17-1839.qcow2*) 
     ``` 
     kvm -no-reboot -m 2048 \
       -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
-      -drive if=pflash,format=raw,file=packer-zfsroot-2024-10-17-1839/efivars.fd \
-      -drive file=packer-zfsroot-2024-10-17-1839/packer-zfsroot-2024-10-17-1839.qcow2,format=qcow2,cache=writeback \
+      -drive if=pflash,format=raw,file=${PACKERZFS}/efivars.fd \
+      -drive file=${PACKERZFS}/${PACKERZFS}.qcow2,format=qcow2,cache=writeback \
       -device virtio-scsi-pci,id=scsi0
     ```
 
@@ -392,9 +393,9 @@ For multiple-disk packer setups, specify each disk.  For example:
 * Boot with syslinux, no UEFI - 3 disks
     ```
     kvm -no-reboot -m 2048 \
-      -drive file=packer-zfsroot-2024-10-17-1839/packer-zfsroot-2024-10-17-1839.qcow2,format=qcow2,cache=writeback \
-      -drive file=packer-zfsroot-2024-10-17-1839/packer-zfsroot-2024-10-17-1839.qcow2-1,format=qcow2,cache=writeback \
-      -drive file=packer-zfsroot-2024-10-17-1839/packer-zfsroot-2024-10-17-1839.qcow2-2,format=qcow2,cache=writeback \
+      -drive file=${PACKERZFS}/${PACKERZFS}.qcow2,format=qcow2,cache=writeback \
+      -drive file=${PACKERZFS}/${PACKERZFS}.qcow2-1,format=qcow2,cache=writeback \
+      -drive file=${PACKERZFS}/${PACKERZFS}.qcow2-2,format=qcow2,cache=writeback \
       -device virtio-scsi-pci,id=scsi0
     ```
 
@@ -402,9 +403,9 @@ For multiple-disk packer setups, specify each disk.  For example:
     ```
     kvm -no-reboot -m 2048 \
       -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/OVMF_CODE_4M.fd \
-      -drive if=pflash,format=raw,file=packer-zfsroot-2024-10-17-1839/efivars.fd \
-      -drive file=packer-zfsroot-2024-10-17-1839/packer-zfsroot-2024-10-17-1839.qcow2,format=qcow2,cache=writeback \
-      -drive file=packer-zfsroot-2024-10-17-1839/packer-zfsroot-2024-10-17-1839.qcow2-1,format=qcow2,cache=writeback \
+      -drive if=pflash,format=raw,file=${PACKERZFS}/efivars.fd \
+      -drive file=${PACKERZFS}/${PACKERZFS}.qcow2,format=qcow2,cache=writeback \
+      -drive file=${PACKERZFS}/${PACKERZFS}.qcow2-1,format=qcow2,cache=writeback \
       -device virtio-scsi-pci,id=scsi0
     ```
 
