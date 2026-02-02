@@ -113,16 +113,7 @@ preflight() {
                 DEBUG=true
                 ;;
             p)
-                # Optional param for Packer config file - defaults to ZFS-root.conf.packerci below
-                eval NEXT_OPT=\${$OPTIND}
-                # Check if the next parameter exists and does not start with a dash (-)
-                if [[ -n $NEXT_OPT ]] && [[ $NEXT_OPT != -* ]]; then
-                    # If it's a valid argument, consume it and increment OPTIND
-                    PACKERCI=$NEXT_OPT
-                    OPTIND=$((OPTIND + 1))
-                else
-                    PACKERCI=false
-                fi
+                PACKERCI=true
                 ;;
             c)
                 CONFIG_FILE=$OPTARG
@@ -134,36 +125,40 @@ preflight() {
         esac
     done
 
-    # [[ -v PACKERCI ]] && echo "Packer $PACKERCI" || echo "Packer was NOT set"
-    # [[ -v CONFIG_FILE ]] && echo "Config file $CONFIG_FILE" || echo "No config file"
-    # [[ -v DEBUG ]] && echo "Debug mode set" || echo "Debug mode NOT set"
-
-    # Fugly logic ...
-    #   -p          : Default to ZFS-root.conf.packerci
-    #   -p <file>   : Use <file> for packer config
-    if [[ -v PACKERCI ]] ; then
-        if [[ -e ${PACKERCI} ]] ; then
-            echo "Packer sourcing ${PACKERCI}"
-            . ./${PACKERCI}
-        elif [[ "${PACKERCI}" == false ]] && [[ -e ZFS-root.conf.packerci ]] ; then
-            echo "Packer sourcing ZFS-root.conf.packerci"
-            . ZFS-root.conf.packerci
+    if [[ -v CONFIG_FILE ]] ; then
+        # CONFIG_FILE set      PACKERCI set
+        #   Attempt provided config, error if not available
+        # CONFIG_FILE set      PACKERCI not set
+        #   Attempt provided config, error if not available
+        if [[ -e ${CONFIG_FILE} ]] ; then
+            . ./${CONFIG_FILE}
+            echo "Loaded Main config ${CONFIG_FILE}"
         else
-            echo "No valid Packer config file found"
+            echo "No valid config file found: ${CONFIG_FILE}"
             exit 1
         fi
-    fi
-
-    # Grab any possible pre-config settings in ZFS-root.conf or passed-in config file
-    if [[ -v CONFIG_FILE ]] && [[ -e ${CONFIG_FILE} ]] ; then
-        echo "Main sourcing ${CONFIG_FILE}"
-        . ./${CONFIG_FILE}
-    elif [[ -e ZFS-root.conf ]] ; then
-        echo "Main sourcing ZFS-root.conf"
-        . ZFS-root.conf
     else
-        echo "No valid config file found"
-        exit 1
+        if [ "${PACKERCI}" = "true" ] ; then
+            # CONFIG_FILE not set  PACKER_CI set
+            #   Attempt default packer config, error if not available
+            if [[ -e ZFS-root.conf.packerci ]] ; then
+                . ZFS-root.conf.packerci
+                echo "Loaded Packer config ZFS-root.conf.packerci"
+            else
+                echo "No valid config file found: ZFS-root.conf.packerci"
+                exit 1
+            fi
+        else
+            # CONFIG_FILE not set  PACKER_CI not set
+            #   Attempt default main config, error if not available
+            if [[ -e ${CONFIG_FILE} ]] ; then
+                . ./${CONFIG_FILE}
+                echo "Loaded Main config ZFS-root.conf"
+            else
+                echo "No valid config file found: ZFS-root.conf"
+                exit 1
+            fi
+        fi
     fi
 
     # ZFSBOOTMENU_REPO_TYPE - use the tagged git release or latest git clone
@@ -213,7 +208,7 @@ preflight() {
 wipe_fresh() {
     echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
-    if [[ -v PACKERCI ]] ; then
+    if [ "${PACKERCI}" = "true" ] ; then
         export WIPE_FRESH=y
     else
         if [[ ! -v WIPE_FRESH ]] ; then
@@ -339,9 +334,13 @@ select_disks() {
     # and using packer to build an image via qemu. That means a single disk /dev/vda
     # We need to create the symlink in /dev/disk/by-id for it
     #
-    if [[ -v PACKERCI ]] ; then
-        echo "Setting single disk scsi-0QEMU_QEMU_HARDDISK_drive0"
-        readarray -t zfsdisks < <(echo "scsi-0QEMU_QEMU_HARDDISK_drive0")
+    if [ "${PACKERCI}" = "true" ] ; then
+        echo "Setting disk(s) for packer to all of scsi-0QEMU_QEMU_HARDDISK_drive*"
+        # readarray -t zfsdisks < <(echo "scsi-0QEMU_QEMU_HARDDISK_drive0")
+        readarray -t zfsdisks < <(find /dev/disk/by-id/ | grep 'scsi-0QEMU_QEMU_HARDDISK_drive' | cut -d'/' -f5 | sed '/^$/d' | sort)
+        for idx in $(seq 0 $((${#zfsdisks[@]}-1)) ) ; do
+            echo "  disk${idx} - ${zfsdisks[${idx}]}" 
+        done
     else
         # Set main disk here - be sure to include the FULL path
         # Get list of disks, ask user which one to install to
@@ -3456,7 +3455,7 @@ query_nvidia
 query_google_auth
 query_ssh_auth
 
-if [[ -v PACKERCI ]] ; then
+if [ "${PACKERCI}" != "true" ] ; then
     show_options
 fi
 
