@@ -54,14 +54,14 @@ RAIDLEVEL="mirror"
 #       For VirtualBox delete the VM .nvram file
 #       For other systems see the UEFI SecureBoot config section in the bios
 #
-SECUREBOOT=y
+SECUREBOOT=n
 
 #
 # Enable auto-signing of rEFInd and ZFSBootMenu .efi bundles when changes are made
 # NOTE: Without auto-signing, YOU must manage the signing of the .efi bundles and
 #       any other bootables in /boot/efi/EFI
 #       Forgetting to sign new bundles or mistakes may render the system unbootable
-AUTOSIGN=y
+AUTOSIGN=n
 
 #
 # Swap size in megabytes - if HIBERNATE or LUKS set then this

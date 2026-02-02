@@ -1,3 +1,4 @@
+
 packer {
   required_plugins {
     qemu = {
@@ -42,8 +43,18 @@ variable "ubuntu_live_iso_src" {
   default = "https://releases.ubuntu.com/24.04.2"
 }
 
+variable "disk_size" {
+  type    = string
+  default = "10G"
+}
+
+variable "additional_disks" {
+  type    = list(string)
+  default = []
+}
+
 locals {
-  output_dir = "packer_zfsroot_${local.timestamp}"
+  output_dir = "packer-zfsroot-${local.timestamp}"
   timestamp  = formatdate("YYYY-MM-DD-hhmm", timestamp())
   ubuntu_live_iso = "${var.ubuntu_live_iso_src}/ubuntu-${var.ubuntu_version}-live-server-amd64.iso"
 }
@@ -58,14 +69,16 @@ source "qemu" "ubuntu" {
   cpus              = 2
   memory            = 2048
   accelerator       = "kvm"
+  # Set machine type to q35 for secureboot
+  # See machine_type in https://developer.hashicorp.com/packer/integrations/hashicorp/qemu/latest/components/builder/qemu
   qemuargs = [
     ["-enable-kvm"], 
     ["-machine", "pc"],
     ["-cpu", "host,+nx,+pae"]
   ]
 
-  efi_firmware_code = "/usr/share/OVMF/OVMF_CODE.fd"
-  efi_firmware_vars = "/usr/share/OVMF/OVMF_VARS.fd"
+  efi_firmware_code = "/usr/share/OVMF/OVMF_CODE_4M.fd"
+  efi_firmware_vars = "/usr/share/OVMF/OVMF_VARS_4M.fd"
   efi_boot          = true
 
   # NOTE: output_prefix MUST have trailing slash in var definition
@@ -74,8 +87,11 @@ source "qemu" "ubuntu" {
   # virtio-scsi needed to populate /dev/disk/by-id
   # virtio alone does not populate that
   disk_interface    = "virtio-scsi"
-  disk_size         = 10000
+  disk_size         = var.disk_size
   format            = "qcow2"
+
+  # For additional disks, use disk_additional_size(s) - see ZFS-root_local.vars.hcl
+  disk_additional_size  = var.additional_disks
 
   http_directory    = "./"
   net_device        = "virtio-net"
@@ -112,6 +128,11 @@ build {
   provisioner "file" {
     source      = "ZFS-root.conf.packerci"
     destination = "/tmp/ZFS-root.conf.packerci"
+  }
+
+  provisioner "file" {
+    source      = "./95zfs-rootflags-fix"
+    destination = "/tmp/"
   }
 
   # Actually run the ZFS-root.sh script to build the system as root
