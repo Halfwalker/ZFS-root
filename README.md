@@ -295,17 +295,17 @@ PACKER_PLUGIN_PATH=.packer.d/plugins packer build -var 'additional_disks=["10G",
 The first `init` command only needs to be done once to download the packer qemu plugin.  Note: This makes use of a `vars` file to supply overrides to the packer config.  For example (replace `myuser` with your own username)
 
 ```
-# Where to dump the resuling files
+# Where to dump the resulting files
 # NOTE: If running under docker this location must be bind-mounted in the docker run cmd below
 #       The location is relative to INSIDE the container environment, so bind-mount like
-#           -v /home/myuser/qemu:/home/myuser/qemu
+#       -v /home/myuser/qemu:/home/myuser/qemu
 output_prefix       = "/home/myuser/qemu/"
 
 # false -> we can see the VM console gui
 # true  -> console is hidden (required for docker)
-headless            = false
+headless            = true
 
-ubuntu_version      = "24.04.1"
+ubuntu_version      = "24.04.2"
 
 # Where to find the boot ISO - can be a local dir or URL
 # The full name of the ISO is appended to this location
@@ -314,7 +314,7 @@ ubuntu_version      = "24.04.1"
 #           -v /home/myuser/ISOs:/home/myuser/ISOs
 ubuntu_live_iso_src = "file:///home/myuser/ISOs"
 # or
-# ubuntu_live_iso_src = "https://releases.ubuntu.com/24.04.1"
+# ubuntu_live_iso_src = "https://releases.ubuntu.com/24.04.2"
 ```
 
 It will create a directory `.packer.d` in the repo that contains the packer qemu plugins - ignored via `.gitignore`.
@@ -323,44 +323,48 @@ The destination directory specified by `output_prefix` will contain a subdirecto
 
 ### Running packer via docker
 
-A simple `Dockerfile` is provided to create a container based off the official Hashicorp packer image, with Qemu added.  That is in `packer/Dockerfile` and can be built locally with something like (replace *myname* with your user or other identifier)
+We can use the standard `hashicorp/packer:light` container image, adding the required packages to support kvm
 
-```
-docker build -t myname/packer-qemu packer
-```
-
-A sample run from the repo directory with docker would be (replace *myname* with your user or other identifier) like this
+A sample run from the repo directory with docker would be like as follows - first we need to init the packer plugins directory
 
 ```
 docker run --rm -it -v "$(pwd)":"${PWD}" -w "${PWD}" \
   --privileged --cap-add=ALL \
   -e PACKER_PLUGIN_PATH="${PWD}/.packer.d/plugins" \
-  myname/packer-qemu init ZFS-root_local.pkr.hcl
+  hashicorp/packer:light -c "apk add --no-cache qemu-system-x86_64 qemu-img >/dev/null 2>&1 && \
+  packer init ZFS-root_local.pkr.hcl"
 
 # NOTE: If setting the output_prefix and/or ubuntu_live_iso_src in the ZFS-root_local.vars.hcl
 #       file as above then must bind-mount that location in the docker container
-#           -v /home/myuser/qemu:/home/myuser/qemu
-#           -v /home/myuser/ISOs:/home/myuser/ISOs
+#
+#           -v /home/myuser/qemu:/home/myuser/qemu  # output_prefix from above
+#           -v /home/myuser/ISOs:/home/myuser/ISOs  # ubuntu_live_iso_src from above
+```
 
+This first `init` command only needs to be done once to download the packer qemu plugin.  Note: This example does not use a `vars` file for packer, so will use the defaults in the `ZFS-root_local.pkr.hcl` packer config file.  That downloads the ISO to `.packer.d` and places the output directory (eg. `packer-zfsroot-2024-10-17-1839)` right in the current (repo) directory.
+
+Of course you may pass in a `vars` file - if any directories are specified outside the repo directory they will have to be provided via `-v outside:inside` type volume mounts on the `docker run` command.
+
+For example, building an image with customizations in the `ZFS-root_local.vars.hcl` file example from above (note the bind-mount for `/home/myuser/qemu`)
+
+```
 docker run --rm -it -v "$(pwd)":"${PWD}" -w "${PWD}" \
   --privileged --cap-add=ALL \
   -v "${PWD}/.packer.d":/root/.cache/packer \
   -v "/home/myuser/qemu:/home/myuser/qemu" \
   -v /usr/share/OVMF:/usr/share/OVMF \
   -e PACKER_PLUGIN_PATH="${PWD}/.packer.d/plugins" \
-  -e PACKER_LOG=1 \
-  myname/packer-qemu build -var-file=ZFS-root_local.vars.hcl ZFS-root_local.pkr.hcl
+  -e PACKER_LOG=1 --entrypoint /bin/sh  \
+  hashicorp/packer:light -c "apk add --no-cache qemu-system-x86_64 qemu-img >/dev/null 2>&1 && \
+  packer build -var-file=ZFS-root_local.vars.hcl ZFS-root_local.pkr.hcl"
 ```
-
-The first `init` command only needs to be done once to download the packer qemu plugin.  Note: This example does not use a `vars` file for packer, so will use the defaults in the `ZFS-root_local.pkr.hcl` packer config file.  That downloads the ISO to `.packer.d` and places the output directory (eg. `packer-zfsroot-2024-10-17-1839)` right in the current (repo) directory.
 
 You may also pass in additional disks on the command-line, same as for running Packer locally, shown above.  The final line for the docker command would be
 
 ```
-  myname/packer-qemu build -var 'additional_disks=["10G", "10G"]' -var-file=ZFS-root_local.vars.hcl ZFS-root_local.pkr.hcl
+  .... \
+  packer build -var 'additional_disks=["10G", "10G"]' -var-file=ZFS-root_local.vars.hcl ZFS-root_local.pkr.hcl
 ```
-
-Of course you may pass in a `vars` file - if any directories are specified outside the repo directory they will have to be provided via `-v outside:inside` type volume mounts on the `docker run` command.
 
 ### Running the disk image
 
