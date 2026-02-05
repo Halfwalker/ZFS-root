@@ -561,11 +561,15 @@ query_nvidia() {
                 # Installing Nvidia PPA here just so we can search for versions
                 apt-add-repository --yes --update ppa:graphics-drivers/ppa
                 NVIDIA_LATEST=$(apt-cache search nvidia-driver- | cut -d ' ' -f1 | grep -e "nvidia-driver-...$" | cut -d'-' -f3 | sort | tail -1)
-                NVIDIA=$(whiptail --title "Nvidia Hardware detected - install latest driver ?" --radiolist "Gnome/KDE/NEON was selected, and Nvidia graphics HW was detected on this system.  The ppa:graphics-drivers/ppa repo could be installed in order to get the binary Nvidia driver\n\nNOTE: Be sure to select the correct driver - the latest (${NVIDIA_LATEST}) may not support older legacy HW.  See\n\nhttps://www.nvidia.com/en-us/drivers/unix/legacy-gpu/\n\nfor more information on legacy HW.  It is safe to select NONE if you are unsure.  You can always install the appropriate driver later via Additional Drivers" 22 70 4 \
-                    ${NVIDIA_LATEST} "Latest ${NVIDIA_LATEST}" OFF \
-                    470    "Legacy 470 driver" OFF \
-                    390    "Legacy 390 driver" OFF \
-                    none   "No Nvidia driver" ON \
+                NVIDIA=$(whiptail --title "Nvidia Hardware detected - install latest driver ?" --radiolist "Gnome/KDE/NEON was selected, and Nvidia graphics HW was detected on this system.  The ppa:graphics-drivers/ppa repo could be installed in order to get the binary Nvidia driver\n\nNOTE: Be sure to select the correct driver - the latest (${NVIDIA_LATEST}) may not support older legacy HW.  See\n\nhttps://www.nvidia.com/en-us/drivers/unix/legacy-gpu/\n\nfor more information on legacy HW.  It is safe to select NONE if you are unsure.  You can always install the appropriate driver later via Additional Drivers" 22 70 9 \
+                    driver-${NVIDIA_LATEST} "Latest ${NVIDIA_LATEST}" OFF \
+                    driver-580-open   "Open   580 driver" OFF \
+                    driver-580        "Closed 580 driver" OFF \
+                    headless-580-open "Open   580 driver (headless)" OFF \
+                    headless-580      "Closed 580 driver (headless)" OFF \
+                    driver-470        "Legacy 470 driver" OFF \
+                    driver-390        "Legacy 390 driver" OFF \
+                    none     "No Nvidia driver" ON \
                     3>&1 1>&2 2>&3)
                 RET=${?}
                 [[ ${RET} = 1 ]] && exit 1
@@ -3305,7 +3309,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         # The NVIDIA var should be set to the appropriate version from the menu query
         if [ "${NVIDIA}" != "none" ] ; then
             apt-add-repository --yes --update ppa:graphics-drivers/ppa
-            apt-get -qq --yes install nvidia-driver-${NVIDIA} libxnvctrl0
+            apt-get -qq --yes install nvidia-${NVIDIA} libxnvctrl0
         fi
 
         ####
