@@ -226,7 +226,7 @@ source "qemu" "ubuntu" {
   disk_additional_size  = var.additional_disks
 
   http_directory    = "./"
-  net_device        = "virtio-net"
+  net_device        = "virtio-net-pci"
 
   ssh_username      = "ubuntu-server"
   ssh_password      = "packer"
