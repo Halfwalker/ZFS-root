@@ -2796,6 +2796,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
             echo "Building ZFSBootMenu image via zbm-builder container (inside chroot)"
             if ! command -v podman &>/dev/null ; then
                 apt-get -qq --yes install podman
+                # Reclaim the .deb archives immediately — they're not needed
+                # again and eat ~50-80MB of the VM disk.
+                apt-get -qq clean
             fi
 
             ZBM_BUILDER_SH=/tmp/zbm-builder.sh
@@ -2807,10 +2810,21 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
             # Redirect podman storage to a tmpfs - keeps image layers off the VM disk.
             # Layers + xbps updates unpack to ~1.2GB; 2500m is safe with 4096MB RAM.
+            #
+            # NOTE: podman pulls in two stages -
+            #   1. decompress each blob into a *staging* directory (default /var/tmp)
+            #   2. commit the finished layer into graphRoot
+            # Without image_copy_tmp_dir below, stage 1 lands on the real VM disk
+            # even though graphRoot is on tmpfs, and can fill a small disk.
             PODMAN_TMPFS=/tmp/podman-store
             mkdir -p ${PODMAN_TMPFS}
-            mount -t tmpfs -o size=2500m tmpfs ${PODMAN_TMPFS}
-            mkdir -p ${PODMAN_TMPFS}/{storage,run}
+            if ! mount -t tmpfs -o size=2500m tmpfs ${PODMAN_TMPFS} ; then
+                echo "ERROR: could not mount tmpfs at ${PODMAN_TMPFS}"
+                exit 1
+            fi
+            # Release the tmpfs no matter how we leave this block (success or failure).
+            trap 'umount -f ${PODMAN_TMPFS} 2>/dev/null; rm -rf ${PODMAN_TMPFS}' EXIT
+            mkdir -p ${PODMAN_TMPFS}/{storage,run,tmp}
 
             PODMAN_STORAGE_CONF=${PODMAN_TMPFS}/storage.conf
             # NOTE: be sure to use real TABS for this heredoc
@@ -2819,6 +2833,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 				driver = "overlay"
 				graphRoot = "${PODMAN_TMPFS}/storage"
 				runRoot = "${PODMAN_TMPFS}/run"
+
+				[storage.options]
+				image_copy_tmp_dir = "${PODMAN_TMPFS}/tmp"
 			STEOF
 
             # Ensure podman uses cgroupfs rather than systemd (d-bus)
@@ -2834,9 +2851,29 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
             # copying from /etc/hostid (which is the live-CD's hostid).
             cp /etc/hostid /etc/zfsbootmenu/hostid
 
-            # rc.d and zbm-builder.conf are built conditionally on DROPBEAR
+            # zbm-builder.conf:
+            # - net=host for podman networking
+            # - RUNTIME_ARGS mounts the EFI output dir directly to /output inside container
+            # - BUILD_ARGS tells generate-zbm to write images to /output
             # NOTE: be sure to use real TABS for this heredoc
+            cat > /etc/zfsbootmenu/zbm-builder.conf <<- ZBMEOF
+				RUNTIME_ARGS+=( --net=host )
+				RUNTIME_ARGS+=( -v /boot/efi/EFI/zfsbootmenu:/output )
+				RUNTIME_ARGS+=( -v /etc/dropbear:/etc/dropbear:ro )
+				BUILD_ARGS+=( -o /output )
+			ZBMEOF
+
+            ZBM_EXTRA_ARGS=()
             if [ "${DROPBEAR}" = "y" ] ; then
+                # Build the zbm-builder.sh command - only add authorized_keys volume if DROPBEAR
+                ZBM_EXTRA_ARGS+=( -O --volume -O "/home/${USERNAME}/.ssh/authorized_keys:/home/${USERNAME}/.ssh/authorized_keys:ro" )
+                ZBM_EXTRA_ARGS+=( -O --volume -O "/etc/cmdline.d:/etc/cmdline.d:ro" )
+
+                # Only include dropbear/psmisc in the container build if DROPBEAR is enabled
+                echo 'BUILD_ARGS+=( -p dropbear -p psmisc )' >> /etc/zfsbootmenu/zbm-builder.conf
+
+                # rc.d and zbm-builder.conf are built conditionally on DROPBEAR
+                # NOTE: be sure to use real TABS for this heredoc
                 mkdir -p /etc/zfsbootmenu/rc.d
                 cat > /etc/zfsbootmenu/rc.d/10-install-crypt-ssh <<- 'RCEOF'
 					#!/bin/sh
@@ -2850,23 +2887,6 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
                 chmod 755 /etc/zfsbootmenu/rc.d/10-install-crypt-ssh
             fi
 
-            # zbm-builder.conf:
-            # - net=host for podman networking
-            # - RUNTIME_ARGS mounts the EFI output dir directly to /output inside container
-            # - BUILD_ARGS tells generate-zbm to write images to /output
-            # NOTE: be sure to use real TABS for this heredoc
-            cat > /etc/zfsbootmenu/zbm-builder.conf <<- ZBMEOF
-				RUNTIME_ARGS+=( --net=host )
-				RUNTIME_ARGS+=( -v /boot/efi/EFI/zfsbootmenu:/output )
-				BUILD_ARGS+=( -o /output )
-			ZBMEOF
-
-            # Build the zbm-builder.sh command - only add authorized_keys volume if DROPBEAR
-            ZBM_EXTRA_ARGS=()
-            if [ "${DROPBEAR}" = "y" ] ; then
-                ZBM_EXTRA_ARGS+=( -O --volume -O "/home/${USERNAME}/.ssh/authorized_keys:/home/${USERNAME}/.ssh/authorized_keys:ro" )
-            fi
-
             CONTAINERS_STORAGE_CONF=${PODMAN_STORAGE_CONF} \
             XDG_RUNTIME_DIR=${PODMAN_TMPFS}/run \
             ${ZBM_BUILDER_SH} \
@@ -2875,7 +2895,10 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
             ZBM_RC=${?}
 
-            umount -f ${PODMAN_TMPFS} && rm -rf ${PODMAN_TMPFS}
+            # tmpfs cleanup is handled by the EXIT trap set above.
+            trap - EXIT
+            umount -f ${PODMAN_TMPFS} 2>/dev/null
+            rm -rf ${PODMAN_TMPFS}
 
             if [ ${ZBM_RC} -ne 0 ] ; then
                 echo "ERROR: zbm-builder container failed with exit code ${ZBM_RC}"
