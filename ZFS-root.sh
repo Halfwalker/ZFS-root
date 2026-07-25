@@ -2698,23 +2698,46 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     # so those keys can be used in the initramfs
     # DROPBEAR can only be y if DISCENC is not NOENC (so encryption enabled)
     #
-    mkdir -p /etc/cmdline.d /etc/zfsbootmenu/dracut.conf.d
+    mkdir -p /etc/cmdline.d /etc/zfsbootmenu/dracut.conf.d /etc/zfsbootmenu/cmdline.d
     if [ "${DROPBEAR}" = "y" ] ; then
         echo "---------------------------------------------------"
         echo " Installing dropbear for remote unlocking"
         echo "---------------------------------------------------"
 
-        echo 'install_items+=" /etc/cmdline.d/dracut-network.conf "' >  /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
-        echo 'add_dracutmodules+=" crypt-ssh "'                      >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
-        # Have dracut use main user authorized_keys for access
-        echo "dropbear_acl=/home/${USERNAME}/.ssh/authorized_keys"   >> /etc/zfsbootmenu/dracut.conf.d/dropbear.conf
+        # Generate persistent dropbear host keys in PEM format.
+        # Keys must be PEM format for dropbearconvert to process them.
+        # Without persistent keys, SSH will complain about changed keys on every rebuild.
+        mkdir -p /etc/dropbear
+        for keytype in rsa ecdsa ed25519; do
+            keyfile="/etc/dropbear/ssh_host_${keytype}_key"
+            [ -e "${keyfile}" ] || ssh-keygen -q -N "" -m PEM -t "${keytype}" -f "${keyfile}"
+        done
 
+        # Write dracut-network.conf to both locations:
+        # /etc/cmdline.d for the main system initramfs (built by dracut -regenerate-all)
+        # /etc/zfsbootmenu/cmdline.d for the zbm-builder container (only sees /etc/zfsbootmenu)
         # With rd.neednet=1 it will fail to boot if no network available
         # This can be a problem with laptops and docking stations, if the dock
         # is not connected (no ethernet) it can fail to boot. Yay dracut.
         # Network really only needed for Dropbear/ssh access unlocking
         # Since we chose to use Dropbear, in this block set neednet=1
         echo 'ip=dhcp rd.neednet=1' > /etc/cmdline.d/dracut-network.conf
+
+        # dropbear.conf references the build-dir-relative path so the container finds it.
+        # NOTE: heredoc delimiter is UNQUOTED so ${USERNAME} is expanded at write time.
+        # If quoted ('DBEOF'), the literal string "${USERNAME}" would end up in the file,
+        # and dracut (which shell-sources this) would expand it to empty inside the
+        # zbm-builder container where USERNAME is unset -- leaving dropbear with a
+        # non-existent ACL file and rejecting every key.
+        cat > /etc/zfsbootmenu/dracut.conf.d/dropbear.conf <<- DBEOF
+			# Enable dropbear ssh server and pull in network configuration args
+			install_optional_items+=" /etc/cmdline.d/dracut-network.conf "
+			add_dracutmodules+=" crypt-ssh "
+			dropbear_acl=/home/${USERNAME}/.ssh/authorized_keys
+			# Use pre-generated keys for consistent access
+			dropbear_rsa_key=/etc/dropbear/ssh_host_rsa_key
+			dropbear_ecdsa_key=/etc/dropbear/ssh_host_ecdsa_key
+		DBEOF
     else
         # Not using Dropbear, so set neednet=0
         echo 'install_items+=" /etc/cmdline.d/dracut-network.conf "' > /etc/zfsbootmenu/dracut.conf.d/network.conf
