@@ -225,7 +225,7 @@ setup_cacher() {
 
     apt-get -qq --yes update
     # We need libnss-mdns to resolve names like bondi.local etc.
-    apt-get -qq --no-install-recommends --yes install libnss-mdns wget gpg
+    apt-get -qq --no-install-recommends --yes install libnss-mdns wget gpg gpgv ubuntu-keyring
 
     # Check for a local apt-cacher-ng system - looking for these hosts
     # aptcacher.local
@@ -694,7 +694,7 @@ query_suite() {
             # Specific zpool features available in jammy
             SUITE_ROOT_POOL="-O dnodesize=auto"
             # Ensure we have the questing/25.10 signing key in place
-            wget -qO - https://archive.ubuntu.com/ubuntu/dists/questing/InRelease | sudo gpg --dearmor -o /etc/apt/keyrings/questing_keyring.gpg
+            wget -qO - https://us.archive.ubuntu.com/ubuntu/dists/questing/InRelease | sudo gpg --dearmor -o /etc/apt/keyrings/questing_keyring.gpg
             ;;
         plucky)
             SUITE_NUM="25.04"
@@ -1328,7 +1328,7 @@ install_debootstrap() {
 
     # Install basic system - use main archive as source
     echo "debootstrap to build initial system"
-    debootstrap --include=${SUITE_BOOTSTRAP} ${SUITE} ${ZFSBUILD} http://archive.ubuntu.com/ubuntu
+    debootstrap --include=${SUITE_BOOTSTRAP} ${SUITE} ${ZFSBUILD} http://us.archive.ubuntu.com/ubuntu
 
     # Ensure device files cannot be created in main POOL
     if [ "${WIPE_FRESH}" == "y" ] ; then
@@ -1442,33 +1442,41 @@ setup_apt_config() {
             # Old sources setup before deb822
             # TABs for this
             cat > ${ZFSBUILD}/etc/apt/sources.list <<- EOF
-				deb http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse restricted
-				deb-src http://archive.ubuntu.com/ubuntu ${SUITE} main multiverse restricted
+				# List US mirrors first, THEN use auto-select for other mirrors
+				deb http://us.archive.ubuntu.com/ubuntu ${SUITE} main multiverse restricted
+				deb mirror://mirrors.ubuntu.com/mirrors.txt ${SUITE} main multiverse restricted
+				deb-src mirror://mirrors.ubuntu.com/mirrors.txt ${SUITE} main multiverse restricted
 
 				deb http://security.ubuntu.com/ubuntu ${SUITE}-security main multiverse restricted
 				deb-src http://security.ubuntu.com/ubuntu ${SUITE}-security main multiverse restricted
 
-				deb http://archive.ubuntu.com/ubuntu ${SUITE}-updates main multiverse restricted
-				deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-updates main multiverse restricted
+				deb http://us.archive.ubuntu.com/ubuntu ${SUITE}-updates main multiverse restricted
+				deb mirror://mirrors.ubuntu.com/mirrors.txt ${SUITE}-updates main multiverse restricted
+				deb-src mirror://mirrors.ubuntu.com/mirrors.txt ${SUITE}-updates main multiverse restricted
 
-				deb http://archive.ubuntu.com/ubuntu ${SUITE}-backports main multiverse restricted
-				deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-backports main multiverse restricted
+				deb http://us.archive.ubuntu.com/ubuntu ${SUITE}-backports main multiverse restricted
+				deb mirror://mirrors.ubuntu.com/mirrors.txt ${SUITE}-backports main multiverse restricted
+				deb-src mirror://mirrors.ubuntu.com/mirrors.txt ${SUITE}-backports main multiverse restricted
 			EOF
 
             # We put universe into its own .list file so ansible apt_repository will match
             # TABs for this
             cat > ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu_universe.list <<- EOF
-				deb http://archive.ubuntu.com/ubuntu ${SUITE} universe
-				deb-src http://archive.ubuntu.com/ubuntu ${SUITE} universe
+				# List US mirrors first, THEN use auto-select for other mirrors
+				deb http://us.archive.ubuntu.com/ubuntu ${SUITE} universe
+				deb mirror://mirrors.ubuntu.com/mirrors.txt ${SUITE} universe
+				deb-src mirror://mirrors.ubuntu.com/mirrors.txt ${SUITE} universe
 
 				deb http://security.ubuntu.com/ubuntu ${SUITE}-security universe
 				deb-src http://security.ubuntu.com/ubuntu ${SUITE}-security universe
 
-				deb http://archive.ubuntu.com/ubuntu ${SUITE}-updates universe
-				deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-updates universe
+				deb http://us.archive.ubuntu.com/ubuntu ${SUITE}-updates universe
+				deb mirror://mirrors.ubuntu.com/mirrors.txt ${SUITE}-updates universe
+				deb-src mirror://mirrors.ubuntu.com/mirrors.txt ${SUITE}-updates universe
 
-				deb http://archive.ubuntu.com/ubuntu ${SUITE}-backports universe
-				deb-src http://archive.ubuntu.com/ubuntu ${SUITE}-backports universe
+				deb http://us.archive.ubuntu.com/ubuntu ${SUITE}-backports universe
+				deb mirror://mirrors.ubuntu.com/mirrors.txt ${SUITE}-backports universe
+				deb-src mirror://mirrors.ubuntu.com/mirrors.txt ${SUITE}-backports universe
 			EOF
             ;;
         *)
@@ -1476,7 +1484,8 @@ setup_apt_config() {
             # TABs for this
             cat > ${ZFSBUILD}/etc/apt/sources.list.d/ubuntu.sources <<- EOF
 				Types: deb
-				URIs: http://us.archive.ubuntu.com/ubuntu/
+				# List US mirrors first, THEN use auto-select for other mirrors
+				URIs: http://us.archive.ubuntu.com/ubuntu/ mirror://mirrors.ubuntu.com/mirrors.txt
 				Suites: ${SUITE} ${SUITE}-updates ${SUITE}-backports
 				Components: main restricted universe multiverse
 				Signed-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg
