@@ -129,7 +129,7 @@ command:
   {{- end }}
 
   luks-header:
-    exec: "cryptsetup IsLuks /dev/disk/by-partlabel/ZFS_0"
+    exec: "cryptsetup isLuks /dev/disk/by-partlabel/ZFS_0"
     {{- if eq .Vars.discenc "LUKS" }}
     exit-status: 0
     {{- else }}
