@@ -52,8 +52,11 @@ install_goss() {
 
     log_info "Installing goss..."
     mkdir -p ~/.local/bin
-    export GOSS_DST=~/.local/bin
-    curl -fsSL https://goss.rocks/install | sh
+    curl -L https://github.com/goss-org/goss/releases/latest/download/goss-linux-amd64 -o ~/.local/bin/goss
+    chmod +x ~/.local/bin/goss
+
+    # export GOSS_DST=~/.local/bin
+    # curl -fsSL https://goss.rocks/install | sh
     
     if [[ -x "$GOSS_BIN" ]]; then
         log_info "Goss installed successfully: $($GOSS_BIN --version)"
