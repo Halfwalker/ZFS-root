@@ -2192,11 +2192,12 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 			  DracutConfDir: /etc/zfsbootmenu/dracut.conf.d
 			  PreHooksDir: /etc/zfsbootmenu/generate-zbm.pre.d
 			  PostHooksDir: /etc/zfsbootmenu/generate-zbm.post.d
+			  HookRoot: /etc/zfsbootmenu/hooks
 			  InitCPIO: false
 			  InitCPIOConfig: /etc/zfsbootmenu/mkinitcpio.conf
 			Components:
 			  ImageDir: /boot/efi/EFI/zfsbootmenu
-			  # Versions: false means generate-zbm creates vmlinuz-bootmenu and initramgs-bootmenu.img
+			  # Versions: false means generate-zbm creates vmlinuz-bootmenu and initramfs-bootmenu.img
 			  Versions: false
 			  Enabled: true
 			EFI:
@@ -2291,110 +2292,136 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
                 fi
             done
 
-            #
-            # Early-stage script for zfsbootmenu - scan for ZFS_ partitions which
-            # should be LUKS encrypted and try to open them all
-            # Only needed for 24.04 and below - compare_version is a >= check, so use 24.10 to compare against
-            #
-            if ! compare_versions "$SUITE_NUM" "24.10" ; then
-                # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-                cat > /usr/local/bin/zfsbootmenu_luks_unlock.sh <<- 'EOF'
-					#!/bin/bash
+            # Set up LUKS unlock hook for ZFSBootMenu using the modern hook_root mechanism.
+            # Uses zbm-luks-unlock approach compatible with zbm-builder container.
+            # Replaces the deprecated zfsbootmenu_early_setup dracut variable approach.
+            ZBM_HOOK_ROOT=/etc/zfsbootmenu/hooks
+            mkdir -p ${ZBM_HOOK_ROOT}/early-setup.d
+            mkdir -p ${ZBM_HOOK_ROOT}/boot-sel.d
 
-					sources=(
-					  /lib/profiling-lib.sh
-					  /etc/zfsbootmenu.conf
-					  /lib/zfsbootmenu-core.sh
-					  /lib/kmsg-log-lib.sh
-					  /etc/profile
-					)
+            # Download the luks-unlock early-setup hook
+            # Winds up in /libexec/hooks/early-setup.d/luks-unlock.sh
+            wget --quiet -O ${ZBM_HOOK_ROOT}/early-setup.d/luks-unlock.sh \
+                https://raw.githubusercontent.com/agorgl/zbm-luks-unlock/master/hooks/early-setup.d/luks-unlock.sh
+            chmod +x ${ZBM_HOOK_ROOT}/early-setup.d/luks-unlock.sh
 
-					for src in "${sources[@]}"; do
-					  # shellcheck disable=SC1090
-					  if ! source "${src}" > /dev/null 2>&1 ; then
-					    echo -e "\033[0;31mWARNING: ${src} was not sourced; unable to proceed\033[0m"
-					    exit 1
-					  fi
-					done
-					unset src sources
+            # Download the initramfs-inject boot-selection hook
+            wget --quiet -O ${ZBM_HOOK_ROOT}/boot-sel.d/initramfs-inject.sh \
+                https://raw.githubusercontent.com/agorgl/zbm-luks-unlock/master/hooks/boot-sel.d/initramfs-inject.sh
+            chmod +x ${ZBM_HOOK_ROOT}/boot-sel.d/initramfs-inject.sh
 
-					# Ensure glob expands to nothing for non-matches
-					shopt -s nullglob
-					# We only unlock the ZFS partition(s) since the SWAP ones can use the
-					# /etc/zfs/zroot.lukskey to unlock once main pool is open
-					# ZFS_PARTS=(/dev/disk/by-partlabel/{SWAP_*,ZFS_*})
-					ZFS_PARTS=(/dev/disk/by-partlabel/ZFS_*)
+            # Download the dracut crypt config - adds cryptsetup to the ZBM initramfs
+            wget --quiet -O /etc/zfsbootmenu/dracut.conf.d/99-crypt.conf \
+                https://raw.githubusercontent.com/agorgl/zbm-luks-unlock/master/dracut.conf.d/99-crypt.conf
 
-					echo "Found these partitions for LUKS encryption"
-					for idx in ${!ZFS_PARTS[@]} ; do echo "${ZFS_PARTS[$idx]}" ; done
-					echo ""
+            # Tell ZBM where to find the hooks - this goes in config.yaml not dracut.conf.d
+            # We set this via a dracut conf entry that zbm-builder will pick up
+            echo "zfsbootmenu_hook_root=/etc/zfsbootmenu/hooks" >> /etc/zfsbootmenu/dracut.conf.d/luks-hooks.conf
 
-					# Read passphrase for LUKS encryption into $REPLY
-					read -s -p "LUKS encryption passphrase : "
+            ##-# #
+            ##-# # Early-stage script for zfsbootmenu - scan for ZFS_ partitions which
+            ##-# # should be LUKS encrypted and try to open them all
+            ##-# # Only needed for 24.04 and below - compare_version is a >= check, so use 24.10 to compare against
+            ##-# #
+            ##-# if ! compare_versions "$SUITE_NUM" "24.10" ; then
+            ##-#     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+            ##-#     cat > /usr/local/bin/zfsbootmenu_luks_unlock.sh <<- 'EOF'
+			##-# 		#!/bin/bash
 
-					tput clear
-					colorize red "${header}\n\n"
-					for idx in ${!ZFS_PARTS[@]} ; do
-					    # Grab just ZFS_0 or SWAP_0
-					    test_luks=${ZFS_PARTS[$idx]#/dev/disk/by-partlabel/}
-					    # luks is the full path to the disk partition
-					    luks=${ZFS_PARTS[$idx]}
-					    # Set $dm to root_crypt0 or swap_crypt0 depending on basename
-					    [ "${test_luks%_*}" == "ZFS" ] && dm=root_crypt${idx}
-					    [ "${test_luks%_*}" == "SWAP" ] && dm=swap_crypt${idx}
+			##-# 		sources=(
+			##-# 		  /lib/profiling-lib.sh
+			##-# 		  /etc/zfsbootmenu.conf
+			##-# 		  /lib/zfsbootmenu-core.sh
+			##-# 		  /lib/kmsg-log-lib.sh
+			##-# 		  /etc/profile
+			##-# 		)
 
-					    if ! cryptsetup isLuks ${luks} >/dev/null 2>&1 ; then
-					        zwarn "LUKS device ${luks} missing LUKS partition header"
-					        exit
-					    fi
+			##-# 		for src in "${sources[@]}"; do
+			##-# 		  # shellcheck disable=SC1090
+			##-# 		  if ! source "${src}" > /dev/null 2>&1 ; then
+			##-# 		    echo -e "\033[0;31mWARNING: ${src} was not sourced; unable to proceed\033[0m"
+			##-# 		    exit 1
+			##-# 		  fi
+			##-# 		done
+			##-# 		unset src sources
 
-					    if cryptsetup status "${dm}" >/dev/null 2>&1 ; then
-					        zinfo "${dm} already active, continuing"
-					        continue
-					    fi
+			##-# 		# Ensure glob expands to nothing for non-matches
+			##-# 		shopt -s nullglob
+			##-# 		# We only unlock the ZFS partition(s) since the SWAP ones can use the
+			##-# 		# /etc/zfs/zroot.lukskey to unlock once main pool is open
+			##-# 		# ZFS_PARTS=(/dev/disk/by-partlabel/{SWAP_*,ZFS_*})
+			##-# 		ZFS_PARTS=(/dev/disk/by-partlabel/ZFS_*)
 
-					    header="$( center_string "[CTRL-C] cancel luksOpen attempts" )"
+			##-# 		echo "Found these partitions for LUKS encryption"
+			##-# 		for idx in ${!ZFS_PARTS[@]} ; do echo "${ZFS_PARTS[$idx]}" ; done
+			##-# 		echo ""
 
-					    # https://fossies.org/linux/cryptsetup/docs/Keyring.txt
-					    echo $REPLY | cryptsetup luksOpen ${luks} ${dm}
-					    ret=$?
+			##-# 		# Read passphrase for LUKS encryption into $REPLY
+			##-# 		read -s -p "LUKS encryption passphrase : "
 
-					    # successfully entered a passphrase
-					    if [ "${ret}" -eq 0 ] ; then
-					        echo "${luks} opened as ${dm}"
-					        zdebug "$(
-					            cryptsetup status "${dm}"
-					        )"
-					        continue
-					    fi
+			##-# 		tput clear
+			##-# 		colorize red "${header}\n\n"
+			##-# 		for idx in ${!ZFS_PARTS[@]} ; do
+			##-# 		    # Grab just ZFS_0 or SWAP_0
+			##-# 		    test_luks=${ZFS_PARTS[$idx]#/dev/disk/by-partlabel/}
+			##-# 		    # luks is the full path to the disk partition
+			##-# 		    luks=${ZFS_PARTS[$idx]}
+			##-# 		    # Set $dm to root_crypt0 or swap_crypt0 depending on basename
+			##-# 		    [ "${test_luks%_*}" == "ZFS" ] && dm=root_crypt${idx}
+			##-# 		    [ "${test_luks%_*}" == "SWAP" ] && dm=swap_crypt${idx}
 
-					    # ctrl-c'd the process
-					    if [ "${ret}" -eq 1 ] ; then
-					        zdebug "canceled luksOpen attempts via SIGINT"
-					        exit
-					    fi
+			##-# 		    if ! cryptsetup isLuks ${luks} >/dev/null 2>&1 ; then
+			##-# 		        zwarn "LUKS device ${luks} missing LUKS partition header"
+			##-# 		        exit
+			##-# 		    fi
 
-					    # failed all password attempts
-					    if [ "${ret}" -eq 2 ] ; then
-					        if timed_prompt -e "emergency shell" \
-					            -r "continue unlock attempts" \
-					            -p "Continuing in %0.2d seconds" ; then
-					            continue
-					        else
-					            emergency_shell "unable to unlock LUKS partition"
-					        fi
-					    fi
-					done
-				sleep 5  # Allow user to see unlocked partitions
-				EOF
-                chmod +x /usr/local/bin/zfsbootmenu_luks_unlock.sh
+			##-# 		    if cryptsetup status "${dm}" >/dev/null 2>&1 ; then
+			##-# 		        zinfo "${dm} already active, continuing"
+			##-# 		        continue
+			##-# 		    fi
 
-                cat <<- END > /etc/zfsbootmenu/dracut.conf.d/luks_zbm.conf
-					# For 24.04 and below we need our own LUKS unlock setup
-					install_items+=" /usr/local/bin/zfsbootmenu_luks_unlock.sh "
-					zfsbootmenu_early_setup+=" /usr/local/bin/zfsbootmenu_luks_unlock.sh "
-				END
-            fi # 24.04 and below
+			##-# 		    header="$( center_string "[CTRL-C] cancel luksOpen attempts" )"
+
+			##-# 		    # https://fossies.org/linux/cryptsetup/docs/Keyring.txt
+			##-# 		    echo $REPLY | cryptsetup luksOpen ${luks} ${dm}
+			##-# 		    ret=$?
+
+			##-# 		    # successfully entered a passphrase
+			##-# 		    if [ "${ret}" -eq 0 ] ; then
+			##-# 		        echo "${luks} opened as ${dm}"
+			##-# 		        zdebug "$(
+			##-# 		            cryptsetup status "${dm}"
+			##-# 		        )"
+			##-# 		        continue
+			##-# 		    fi
+
+			##-# 		    # ctrl-c'd the process
+			##-# 		    if [ "${ret}" -eq 1 ] ; then
+			##-# 		        zdebug "canceled luksOpen attempts via SIGINT"
+			##-# 		        exit
+			##-# 		    fi
+
+			##-# 		    # failed all password attempts
+			##-# 		    if [ "${ret}" -eq 2 ] ; then
+			##-# 		        if timed_prompt -e "emergency shell" \
+			##-# 		            -r "continue unlock attempts" \
+			##-# 		            -p "Continuing in %0.2d seconds" ; then
+			##-# 		            continue
+			##-# 		        else
+			##-# 		            emergency_shell "unable to unlock LUKS partition"
+			##-# 		        fi
+			##-# 		    fi
+			##-# 		done
+			##-# 	sleep 5  # Allow user to see unlocked partitions
+			##-# 	EOF
+            ##-#     chmod +x /usr/local/bin/zfsbootmenu_luks_unlock.sh
+
+            ##-#     cat <<- END > /etc/zfsbootmenu/dracut.conf.d/luks_zbm.conf
+			##-# 		# For 24.04 and below we need our own LUKS unlock setup
+			##-# 		install_items+=" /usr/local/bin/zfsbootmenu_luks_unlock.sh "
+			##-# 		zfsbootmenu_early_setup+=" /usr/local/bin/zfsbootmenu_luks_unlock.sh "
+			##-# 	END
+            ##-# fi # 24.04 and below
         fi #DISCENC
     fi # WIPE_FRESH                         # <<<<<------------------------------------------------ WIPE_FRESH ------ ^^^^^
 
