@@ -138,7 +138,7 @@ fi
 # run-kvm.sh can be found at ./run-kvm.sh regardless of the caller's working directory.
 SCRIPT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 SSH_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5 -o pubkeyauthentication=no"
-DROPBEAR_OPTS="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5"
+DROPBEAR_OPTS="-i packer-validation/CICD_ed25519 -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=5"
 MAIN_USER="packer"
 
 test_ssh() {
