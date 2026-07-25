@@ -230,7 +230,7 @@ else
     # Give system a moment to fully initialize after SSH starts
     sleep 5
 
-    # Unlock ZFS encryption via Dropbear SSH, then kexec into the main OS.
+    # Unlock disk encryption via Dropbear SSH, then kexec into the main OS.
     # The SSH command is run in the background; we kill it after the main OS comes up.
     #
     # IMPORTANT: Quoting rules for the remote command (do not alter without testing):
@@ -244,9 +244,45 @@ else
     # so the remote shell performs the subshell substitution.
     DATASET="${POOL_NAME}/ROOT/${SUITE_NAME}"
 
+    # Per-variant unlock differences. Everything else (find_be_kernels + kexec_kernel)
+    # is identical for both.
+    #
+    #   ZFSENC: load_key is a ZBM builtin that decrypts an already-imported pool. The
+    #           pool was imported readonly by ZBM's own init.d during startup, so no
+    #           separate import_pool call is needed. Fast — 2s is enough for
+    #           find_be_kernels to see the kernels file populate.
+    #
+    #   LUKS:   Two-step chicken-and-egg: the pool can't be imported until the LUKS
+    #           partition is unlocked, so ZBM's init.d cannot pre-import it.
+    #             1. luks-unlock.sh (agorgl/zbm-luks-unlock hook) does cryptsetup
+    #                luksOpen, reads password from stdin.
+    #             2. import_pool ${POOL} — ZBM's own wrapper: -N -o readonly=on.
+    #                Plain `zpool import` would auto-mount datasets (mountpoint=/ on
+    #                the root BE), which then collides with mount_zfs inside
+    #                kexec_kernel. Must use import_pool.
+    #           Both steps are synchronous, but keep a 10s buffer for slower storage.
+    #           luks-unlock.sh renames itself to .completed after success — safe to
+    #           call again idempotently on a fresh boot, but not after ZBM's early-
+    #           setup phase has already run it.
+    case "$VARIANT" in
+        ZFSENC)
+            UNLOCK_STEP="load_key ${DATASET}"
+            POST_UNLOCK_WAIT=2
+            ;;
+        LUKS)
+            UNLOCK_STEP="/libexec/hooks/early-setup.d/luks-unlock.sh ; import_pool ${POOL_NAME}"
+            POST_UNLOCK_WAIT=10
+            ;;
+        *)
+            echo "ERROR: unknown VARIANT: $VARIANT (expected NOENC, ZFSENC, or LUKS)"
+            kill $VM_PID 2>/dev/null || true
+            exit 1
+            ;;
+    esac
+
     # ssh -n keeps this backgrounded connection from ever touching the caller's
     # stdin (matters when this script is called from a `while read < file` loop).
-    (ssh -n $DROPBEAR_OPTS -p $DROPBEAR_PORT root@localhost 'bash -l -c "sleep 5 ; echo '"'password'"' | load_key '"$DATASET"' ; sleep 2 ; find_be_kernels '"$DATASET"' ; sleep 2 ; kexec_kernel \"\$(select_kernel '"$DATASET"')\"" ') &
+    (ssh -n $DROPBEAR_OPTS -p $DROPBEAR_PORT root@localhost 'bash -l -c "sleep 5 ; echo '"'password'"' | '"$UNLOCK_STEP"' ; sleep '"$POST_UNLOCK_WAIT"' ; find_be_kernels '"$DATASET"' ; sleep 2 ; kexec_kernel \"\$(select_kernel '"$DATASET"')\"" ') &
     UNLOCK_PID=$!
     echo "Unlock ssh is pid $UNLOCK_PID"
 
