@@ -128,15 +128,15 @@ jobs:
           if [ ! -s unvalidated.txt ] 2>/dev/null; then
             echo "✅ All builds already validated — nothing to do" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "| Build | Status | Results File |" >> "$GITHUB_STEP_SUMMARY"
-            echo "|-------|--------|--------------|" >> "$GITHUB_STEP_SUMMARY"
+            echo "| Build                                 | Status       | Results File " >> "$GITHUB_STEP_SUMMARY"
+            echo "|---------------------------------------|--------------|---------------------" >> "$GITHUB_STEP_SUMMARY"
             while IFS= read -r build_dir; do
               name=$(basename "$build_dir")
               results=$(ls "${build_dir}"goss-validation-*.txt 2>/dev/null | tail -1)
               if [ -n "$results" ]; then
-                echo "| $name | ✅ Validated | $(basename "$results") |" >> "$GITHUB_STEP_SUMMARY"
+                echo "| $name | ✅ Validated | $(basename "$results")" >> "$GITHUB_STEP_SUMMARY"
               else
-                echo "| $name | ❌ Not validated | — |" >> "$GITHUB_STEP_SUMMARY"
+                echo "| $name | ❌  Invalid  | — |" >> "$GITHUB_STEP_SUMMARY"
               fi
             done < unvalidated.txt
           fi
