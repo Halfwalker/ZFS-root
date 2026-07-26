@@ -128,13 +128,14 @@ command:
     timeout: 10000
   {{- end }}
 
+  # The ZFS_0 partition should ONLY be LUKS-encrypted if discenc is LUKS
+  # We may later have LUKS-encrypted SWAP partitions, but that will be a
+  # new test specifically for that
+  {{- if eq .Vars.discenc "LUKS" }}
   luks-header:
     exec: "cryptsetup isLuks /dev/disk/by-partlabel/ZFS_0"
-    {{- if eq .Vars.discenc "LUKS" }}
     exit-status: 0
-    {{- else }}
-    exit-status: 1
-    {{- end }}
+  {{- end }}
 
   # LUKS-specific: check crypttab exists
   {{- if eq .Vars.discenc "LUKS" }}
