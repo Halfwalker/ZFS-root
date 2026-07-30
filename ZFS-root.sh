@@ -1914,7 +1914,10 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 			#       on Supermicro X10DHR motherboards, so we disable that hook here.
 			#       See https://docs.zfsbootmenu.org/en/v3.0.x/man/zfsbootmenu.7.html
 			# NOTE: This will also need to be set in the syslinux-update.sh below
-			"Boot to ZFSbootMenu" "zbm.prefer=${POOLNAME} ro quiet loglevel=0 ${ZFSBOOTMENU_CMDLINE}"
+			# zfsbootmenu can sometimes fail to boot with multiple cpus
+			# so we restrict here to just 1. The boot env will use whatever
+			# cpus are available, so we're not limiting anything here.
+			"Boot to ZFSbootMenu" "zbm.prefer=${POOLNAME} ro quiet loglevel=0 ${ZFSBOOTMENU_CMDLINE} maxcpus=1"
 		END
 
         # Copy UEFI shell to EFI system
@@ -2116,6 +2119,10 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 				menuentry "ZFSBootMenu" {
 				  loader EFI/zfsbootmenu/zfsbootmenu.efi
 				  icon EFI/refind/icons/os_ubuntu.png
+				  # zfsbootmenu can sometimes fail to boot with multiple cpus
+				  # so we restrict here to just 1. The boot env will use whatever
+				  # cpus are available, so we're not limiting anything here.
+				  options "maxcpus=1"
 				}
 			EOF
         fi # ZFSBOOTMENU_BINARY_TYPE
@@ -2137,11 +2144,14 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         if [ "${ZFSBOOTMENU_BINARY_TYPE}" != "LOCAL" ] ; then
             download_with_retry "https://raw.githubusercontent.com/zbm-dev/zfsbootmenu/master/contrib/syslinux-update.sh" "/boot/efi/syslinux-update.sh"
             chmod +x /boot/efi/syslinux-update.sh
+            # zfsbootmenu can sometimes fail to boot with multiple cpus
+            # so we restrict here to just 1. The boot env will use whatever
+            # cpus are available, so we're not limiting anything here.
             sed -i '
               s/^SYSLINUX_ROOT.*/SYSLINUX_ROOT="\/boot\/efi"/
               s/^KERNEL_PATH.*/KERNEL_PATH="EFI\/zfsbootmenu"/
               s/^SYSLINUX_CONFD.*/SYSLINUX_CONFD="\/boot\/efi\/snippets"/
-              s/^ZBM_KCL_ARGS.*/ZBM_KCL_ARGS="zbm.prefer=${POOLNAME} ro quiet loglevel=0 ${ZFSBOOTMENU_CMDLINE}"/
+              s/^ZBM_KCL_ARGS.*/ZBM_KCL_ARGS="zbm.prefer=${POOLNAME} ro quiet loglevel=0 ${ZFSBOOTMENU_CMDLINE} maxcpus=1"/
               s/^cp .*/cp "\${SYSLINUX_CFG}" "\${SYSLINUX_ROOT}\/syslinux\/syslinux.cfg"/
              ' /boot/efi/syslinux-update.sh
         fi
