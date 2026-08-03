@@ -2811,6 +2811,47 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
                 apt-get -qq clean
             fi
 
+            # jammy's distro ancient crun 0.17 fails with "Operation not permitted"
+            # when xbps unpacks packages inside the zbm-builder container.
+            # Fix : upgrade crun to >= 1.x from the OBS libcontainers repo
+            # podman, conmon and the storage driver stay untouched.
+            if [ "${SUITE}" = "jammy" ] ; then
+                if ! dpkg --compare-versions "$(dpkg-query -W -f='${Version}' crun 2>/dev/null)" ge 1.0 ; then
+                    PODMAN_OBS_KEYRING=/usr/share/keyrings/libcontainers-stable.gpg
+                    PODMAN_OBS_SOURCE=/etc/apt/sources.list.d/libcontainers-stable.list
+
+                    apt-get -qq update
+                    apt-get -qq --yes --no-install-recommends install ca-certificates gnupg
+
+                    wget --quiet --output-document=${PODMAN_OBS_KEYRING}.asc \
+                        https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_22.04/Release.key
+                    gpg --dearmor --yes --output ${PODMAN_OBS_KEYRING} ${PODMAN_OBS_KEYRING}.asc
+                    rm -f ${PODMAN_OBS_KEYRING}.asc
+
+                    # NOTE: be sure to use real TABS for this heredoc
+                    cat > ${PODMAN_OBS_SOURCE} <<- EOF
+						deb [signed-by=${PODMAN_OBS_KEYRING}] https://download.opensuse.org/repositories/devel:/kubic:/libcontainers:/stable/xUbuntu_22.04/ /
+					EOF
+
+                    apt-get -qq update
+                    if ! apt-get -qq --yes --no-install-recommends install crun ; then
+                        rm -f ${PODMAN_OBS_SOURCE} ${PODMAN_OBS_KEYRING}
+                        exit 1
+                    fi
+
+                    # Make sure we actually DID get crun >= 1.x - kind of pointless if we don't
+                    if ! dpkg --compare-versions "$(dpkg-query -W -f='${Version}' crun)" ge 1.0 ; then
+                        echo "ERROR: jammy requires crun >= 1.0 for zbm-builder (got $(dpkg-query -W -f='${Version}' crun))"
+                        rm -f ${PODMAN_OBS_SOURCE} ${PODMAN_OBS_KEYRING}
+                        exit 1
+                    fi
+
+                    echo "Using jammy crun $(dpkg-query -W -f='${Version}' crun) for zbm-builder"
+                    rm -f ${PODMAN_OBS_SOURCE} ${PODMAN_OBS_KEYRING}
+                    apt-get -qq clean
+                fi
+            fi
+
             ZBM_BUILDER_SH=/tmp/zbm-builder.sh
             if [ ! -e ${ZBM_BUILDER_SH} ] ; then
                 wget --quiet -O ${ZBM_BUILDER_SH} \
