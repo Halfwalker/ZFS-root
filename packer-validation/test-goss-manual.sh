@@ -299,8 +299,8 @@ fi
 echo "[4/6] Installing goss on VM..."
 # All ssh/scp calls below use -n / </dev/null so this script is safe to invoke
 # from inside a `while read <file; do ...; done` loop without draining stdin.
-# sshpass -p 'packer' ssh -n $SSH_OPTS -p $SSH_PORT $MAIN_USER@localhost "mkdir -p /home/${MAIN_USER}/.local/bin && if [ ! -e /home/${MAIN_USER}/.local/bin/goss ] ; then curl -fsSL https://goss.rocks/install | GOSS_DST=/home/${MAIN_USER}/.local/bin sh ; fi"
-sshpass -p 'packer' ssh -n $SSH_OPTS -p $SSH_PORT $MAIN_USER@localhost "mkdir -p /home/${MAIN_USER}/.local/bin && if [ ! -e /home/${MAIN_USER}/.local/bin/goss ] ; then curl -L https://github.com/goss-org/goss/releases/latest/download/goss-linux-amd64 -o /home/${MAIN_USER}/.local/bin/goss ; chmod +x /home/${MAIN_USER}/.local/bin/goss ; fi"
+sshpass -p 'packer' ssh -n $SSH_OPTS -p $SSH_PORT $MAIN_USER@localhost "mkdir -p /home/${MAIN_USER}/.local/bin && if [ ! -e /home/${MAIN_USER}/.local/bin/goss ] ; then curl -fsSL https://goss.rocks/install | GOSS_DST=/home/${MAIN_USER}/.local/bin sh ; fi"
+# sshpass -p 'packer' ssh -n $SSH_OPTS -p $SSH_PORT $MAIN_USER@localhost "mkdir -p /home/${MAIN_USER}/.local/bin && if [ ! -e /home/${MAIN_USER}/.local/bin/goss ] ; then curl -L https://github.com/goss-org/goss/releases/latest/download/goss-linux-amd64 -o /home/${MAIN_USER}/.local/bin/goss ; chmod +x /home/${MAIN_USER}/.local/bin/goss ; fi"
 
 # Step 5: Copy test files to VM
 echo "[5/6] Copying test files..."
