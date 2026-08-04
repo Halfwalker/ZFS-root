@@ -62,6 +62,9 @@ USAGE
 # Set main qemu working dir
 QEMU_ROOT="${QEMU_ROOT:-/qemu}"
 
+# Used for serial logs when "-serial ..." is enabled in ZFS-root_local.pkr.hcl
+# mkdir -p "${QEMU_ROOT}/logs"
+
 DOCKER_RUN="${DOCKER_RUN:-}"                            # Run packer in container or not
 CONFIG_FILE="${CONFIG_FILE:-ZFS-root.conf.packerci}"    # Preseed config file for ZFS-root.sh
 DISCENC="${DISCENC:-NOENC}"                             # Disk encryption
@@ -250,6 +253,9 @@ packer_init_docker() {
 packer_docker() {
     # Run packer in a docker container
     docker_args=( -v /usr/share/OVMF:/usr/share/OVMF )
+
+    # Used for serial logs when "-serial ..." is enabled in ZFS-root_local.pkr.hcl
+    [ -d ${QEMU_ROOT}/logs ] && docker_args+=( -v /qemu/logs:/qemu/logs )
 
     # If ISO_SRC is not defined, then the packer config will default to pulling
     # the iso from https://releases.ubuntu.com

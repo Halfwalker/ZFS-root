@@ -201,6 +201,9 @@ source "qemu" "ubuntu" {
   accelerator       = "kvm"
   # Machine type: q35 required for SecureBoot, pc for standard boot
   # See machine_type in https://developer.hashicorp.com/packer/integrations/hashicorp/qemu/latest/components/builder/qemu
+  # Can add -serial for extra logging - ensure /qemu/logs dir exists first
+  # Also uncomment "mkdir /qemu/logs" in run-packer.sh
+  # ["-serial", "file:/qemu/logs/packer-${local.variant}-${local.timestamp}-serial.log"]
   qemuargs = [
     ["-enable-kvm"],
     ["-machine", local.machine_type],
