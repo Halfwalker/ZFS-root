@@ -17,6 +17,12 @@ variable "headless" {
   default = true
 }
 
+variable "display" {
+  description = "Display backend when headless=false: sdl (default), gtk, none, curses"
+  type    = string
+  default = "sdl"
+}
+
 # Output dir prefix
 # Set to "" for running in CI/CD pipelines
 # Set to some location for running locally
@@ -236,6 +242,7 @@ source "qemu" "ubuntu" {
   ssh_wait_timeout  = "30m"
   shutdown_command  = "sudo poweroff -f"  # force to avoid "remove installation media" msg
   headless          = "${var.headless}"   # NOTE: set this to true when using in CI Pipelines or docker
+  display           = "${var.display}"    # sdl is most compatible, gtk is faster but may have issues with older systems
 
   boot_wait         = "10s"
   # Trigger the "Try Ubuntu" right away, then wait 60secs to get to installer
