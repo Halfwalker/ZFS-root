@@ -13,8 +13,8 @@ Options:
   --bios          Run VM *without* UEFI (legacy BIOS mode)
   --secureboot    Force SecureBoot UEFI (overrides auto-detection)
   --ram SIZE      Set RAM size in MB (default: 2048)
-  --ssh PORT      Set SSH forwarding port (default: 2222)
-                  e.g. ssh -p 2222 packer@localhost -o pubkeyauthentication=no
+  --ssh PORT      Set SSH forwarding port (default: 3222)
+                  e.g. ssh -p 3222 packer@localhost -o pubkeyauthentication=no
                   Since packer builds default to packer:packer creds
   --dropbear PORT Set SSH forwarding port for Dropbear (default: 1222)
   --help          Show this help
@@ -31,7 +31,7 @@ USAGE
 
 # Default ram 2GB
 RAMSIZE="${RAMSIZE:-2048}"
-SSH_PORT="${SSH_PORT:-2222}"            # Main ssh port to booted system, NAT'd to ssh at 22
+SSH_PORT="${SSH_PORT:-3222}"            # Main ssh port to booted system, NAT'd to ssh at 22
 # Dropbear SSH port NAT'd to dropbear at 222
 # Connect with 'ssh -p 1222 root@localhost`
 DROPBEAR_PORT="${DROPBEAR_PORT:-1222}"  

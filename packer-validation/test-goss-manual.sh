@@ -8,7 +8,7 @@
 #   --variant VARIANT         Encryption variant: NOENC, ZFSENC, LUKS (auto-detected if not set)
 #   --pool-name NAME          ZFS pool name (auto-detected from build-metadata.txt or dir name)
 #   --suite NAME              Ubuntu suite name, e.g. noble (auto-detected)
-#   --ssh-port PORT           SSH port for main OS (default: 2222)
+#   --ssh-port PORT           SSH port for main OS (default: 3222)
 #   --dropbear-port PORT      SSH port for Dropbear unlock (default: 1222)
 #   --save-results true|false Save goss output to build dir (default: true)
 #   --help, -h                Show this help
@@ -27,7 +27,7 @@ Options:
   --variant VARIANT         Encryption variant: NOENC, ZFSENC, LUKS (auto-detected if not set)
   --pool-name NAME          ZFS pool name (auto-detected from build-metadata.txt or dir name)
   --suite NAME              Ubuntu suite name, e.g. noble (auto-detected)
-  --ssh-port PORT           SSH port for main OS (default: 2222)
+  --ssh-port PORT           SSH port for main OS (default: 3222)
   --dropbear-port PORT      SSH port for Dropbear unlock (default: 1222)
   --save-results true|false Save goss output to build dir (default: true)
   --help, -h                Show this help
@@ -40,7 +40,7 @@ EOF
 }
 
 # Defaults
-SSH_PORT=2222
+SSH_PORT=3222
 DROPBEAR_PORT=1222
 SAVE_RESULTS=true
 VARIANT=""

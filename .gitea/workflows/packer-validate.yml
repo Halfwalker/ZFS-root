@@ -104,7 +104,7 @@ jobs:
               FAILED=$((FAILED + 1))
             fi
             # test-goss-manual.sh deliberately leaves the VM running for
-            # interactive use. In CI we need the ports (2222/1222) free for
+            # interactive use. In CI we need the ports (3222/1222) free for
             # the next iteration, so kill it here.
             if [ -f /tmp/qemu-vm.pid ]; then
               kill "$(cat /tmp/qemu-vm.pid)" 2>/dev/null || true
