@@ -276,6 +276,18 @@ packer_docker() {
         packer_init_docker
     fi
 
+    # Check host kernel for QEMU compatibility
+    # QEMU >= 11 from Alpine edge has a SLiRP regression on kernel < 6.0
+    KERNEL_MAJOR=$(uname -r | cut -d. -f1)
+    if [ "$KERNEL_MAJOR" -lt 6 ]; then
+        QEMU_PKG="qemu-system-x86_64=8.1.5-r0"
+        QEMU_REPO="--repository http://dl-cdn.alpinelinux.org/alpine/v3.19/community"
+        echo "Kernel ${KERNEL_MAJOR}.x detected — using QEMU 8.1.5 for compatibility"
+    else
+        QEMU_PKG="qemu-system-x86_64"
+        QEMU_REPO=""
+    fi
+
     docker run --rm -it \
       --privileged --cap-add=ALL \
       -v "$(pwd)":"${PWD}" -w "${PWD}" \
@@ -287,7 +299,7 @@ packer_docker() {
       -e PKR_VAR_config_overrides \
       --entrypoint /bin/sh \
       hashicorp/packer:light -c " \
-        apk add --no-cache qemu-system-x86_64 qemu-img >/dev/null 2>&1 && \
+        apk add --no-cache ${QEMU_PKG} qemu-img ${QEMU_REPO} >/dev/null 2>&1 && \
         packer build ${packer_args[*]} ZFS-root_local.pkr.hcl"
 }
 
