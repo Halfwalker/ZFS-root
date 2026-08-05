@@ -244,15 +244,16 @@ source "qemu" "ubuntu" {
   headless          = "${var.headless}"   # NOTE: set this to true when using in CI Pipelines or docker
   display           = "${var.display}"    # sdl is most compatible, gtk is faster but may have issues with older systems
 
-  boot_wait         = "10s"
-  # Trigger the "Try Ubuntu" right away, then wait 60secs to get to installer
-  # ctrl-z the installer into background to get shell, then
-  # need to set a password so packer can ssh in to provision.
-  # Could also curl ZFS-root.sh/.conf then run script right here
+  boot_wait         = "150s"
+  # Wait for live CD to fully boot and reach the "Try Ubuntu" prompt,
+  # then trigger "Try Ubuntu" right away. Wait for the installer to
+  # appear, then ctrl-z it into background to get a shell so we can
+  # set a password for packer to ssh in and provision.
+  # The 2m+ pre-Ctrl-Z window handles slower hardware (e.g. Xeon E5).
   boot_command = [
-    "<wait><enter><wait10><wait10><wait10><wait10><wait10><wait10>",
+    "<wait><enter><wait10><wait10>",
     "<leftCtrlOn>z<leftCtrlOff>",
-    "<wait><enter><wait>",
+    "<wait10><enter><wait>",
     "ls -la /dev/vd* /dev/disk/by-id<enter><wait>",
     "echo ubuntu-server:packer | chpasswd<enter>"
   ]
