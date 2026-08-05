@@ -107,6 +107,21 @@ variable "config_overrides" {
   default = {}
 }
 
+# OVMF firmware paths — allow override for systems without the _4M variant
+# Ubuntu 24.04+: OVMF_CODE_4M.fd / OVMF_VARS_4M.fd
+# Ubuntu 18.04:  OVMF_CODE.fd / OVMF_VARS.fd
+variable "ovmf_code" {
+  type    = string
+  default = ""
+  description = "Path to OVMF_CODE firmware file (empty=auto, see locals)"
+}
+
+variable "ovmf_vars" {
+  type    = string
+  default = ""
+  description = "Path to OVMF_VARS firmware template (empty=auto, see locals)"
+}
+
 locals {
   # Auto-derive ubuntu_version_name from ubuntu_version if not explicitly set
   derived_version_name = (
@@ -123,11 +138,13 @@ locals {
     "UNKNOWN_VERSION_${var.ubuntu_version}"
   )
 
-  # SecureBoot-aware OVMF firmware paths and machine type
-  ovmf_code = var.secureboot ? "/usr/share/OVMF/OVMF_CODE_4M.secboot.fd" : "/usr/share/OVMF/OVMF_CODE_4M.fd"
-  ovmf_vars = "/usr/share/OVMF/OVMF_VARS_4M.fd"  # We're setting up our own keys and adding the Microsoft keys in ZFS-root.sh
-  # For pre-installed Microsoft keys use this
-  # ovmf_vars = var.secureboot ? "/usr/share/OVMF/OVMF_VARS_4M.ms.fd" : "/usr/share/OVMF/OVMF_VARS_4M.fd"
+  # OVMF firmware paths
+  # Default to 4M variant (Ubuntu 24.04+); override via -var ovmf_code / ovmf_vars
+  # for older systems (e.g. 18.04: OVMF_CODE.fd / OVMF_VARS.fd)
+  ovmf_code = var.ovmf_code != "" ? var.ovmf_code : (
+    var.secureboot ? "/usr/share/OVMF/OVMF_CODE_4M.secboot.fd" : "/usr/share/OVMF/OVMF_CODE_4M.fd"
+  )
+  ovmf_vars = var.ovmf_vars != "" ? var.ovmf_vars : "/usr/share/OVMF/OVMF_VARS_4M.fd"
   machine_type = var.secureboot ? "q35,smm=on" : "pc"
 
   # Include variant in output directory to allow parallel builds

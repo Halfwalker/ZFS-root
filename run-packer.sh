@@ -144,6 +144,32 @@ if [[ "${SECUREBOOT}" == "true" ]]; then
     CONFIG_OVERRIDES+=("SECUREBOOT=y")
 fi
 
+# Auto-detect OVMF firmware paths
+# Ubuntu 24.04+: OVMF_CODE_4M.fd / OVMF_VARS_4M.fd
+# Ubuntu 18.04:  OVMF_CODE.fd / OVMF_VARS.fd
+if [[ -f "/usr/share/OVMF/OVMF_CODE_4M.fd" ]]; then
+    OVMF_CODE="/usr/share/OVMF/OVMF_CODE_4M.fd"
+    OVMF_CODE_SECBOOT="/usr/share/OVMF/OVMF_CODE_4M.secboot.fd"
+    OVMF_VARS="/usr/share/OVMF/OVMF_VARS_4M.fd"
+    echo "Using 4M version of OVMF uefi code"
+elif [[ -f "/usr/share/OVMF/OVMF_CODE.fd" ]]; then
+    OVMF_CODE="/usr/share/OVMF/OVMF_CODE.fd"
+    OVMF_CODE_SECBOOT=""  # 18.04 has no .secboot.fd variant
+    OVMF_VARS="/usr/share/OVMF/OVMF_VARS.fd"
+    echo "Using old version of OVMF uefi code"
+else
+    echo "ERROR: No OVMF firmware found in /usr/share/OVMF/"
+    exit 1
+fi
+
+# For SecureBoot builds, use the .secboot firmware if available
+if [[ "${SECUREBOOT}" == "true" && -n "${OVMF_CODE_SECBOOT}" ]]; then
+    OVMF_CODE="${OVMF_CODE_SECBOOT}"
+    echo "Using SecureBoot OVMF firmware: ${OVMF_CODE}"
+fi
+
+echo "Detected OVMF firmware: ${OVMF_CODE}, ${OVMF_VARS}"
+
 packer_args=( -var-file=ZFS-root_local.vars.hcl )
 
 add_var() {
@@ -161,6 +187,8 @@ add_var "output_prefix"       "$OUT_PREFIX"
 add_var "disk_size"           "$DISK_SIZE"
 add_var "raidlevel"           "$RAIDLEVEL"
 add_var "secureboot"          "$SECUREBOOT"
+add_var "ovmf_code"           "$OVMF_CODE"
+add_var "ovmf_vars"           "$OVMF_VARS"
 add_var "ubuntu_live_iso_src" "$ISO_SRC"
 add_var "config_file"         "$CONFIG_FILE"
 

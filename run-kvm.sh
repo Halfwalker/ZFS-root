@@ -60,6 +60,42 @@ detect_secureboot() {
     return 1
 }
 
+# Auto-detect the correct OVMF_CODE firmware based on what's available
+# Ubuntu 24.04+: OVMF_CODE_4M.fd / OVMF_CODE_4M.secboot.fd
+# Ubuntu 18.04:  OVMF_CODE.fd (no SecureBoot variant available)
+detect_ovmf_code() {
+    local secureboot="${1:-false}"
+
+    if [[ "$secureboot" == "true" ]]; then
+        if [[ -f "/usr/share/OVMF/OVMF_CODE_4M.secboot.fd" ]]; then
+            echo "OVMF_CODE_4M.secboot.fd"
+        elif [[ -f "/usr/share/OVMF/OVMF_CODE.secboot.fd" ]]; then
+            echo "OVMF_CODE.secboot.fd"
+        else
+            # No SecureBoot firmware available — caller decides fallback
+            echo ""
+        fi
+    else
+        if [[ -f "/usr/share/OVMF/OVMF_CODE_4M.fd" ]]; then
+            echo "OVMF_CODE_4M.fd"
+        elif [[ -f "/usr/share/OVMF/OVMF_CODE.fd" ]]; then
+            echo "OVMF_CODE.fd"
+        else
+            echo ""
+        fi
+    fi
+}
+
+detect_ovmf_vars() {
+    if [[ -f "/usr/share/OVMF/OVMF_VARS_4M.fd" ]]; then
+        echo "OVMF_VARS_4M.fd"
+    elif [[ -f "/usr/share/OVMF/OVMF_VARS.fd" ]]; then
+        echo "OVMF_VARS.fd"
+    else
+        echo ""
+    fi
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --bios)         BIOS=true ; shift ;;
@@ -87,19 +123,63 @@ fi
 
 # Auto-detect SecureBoot if not explicitly set by --secureboot flag
 if [[ -z "$OVMF" ]] && [[ -z "$BIOS" ]]; then
+    # Step 1: detect whether the build has SecureBoot enabled
+    secureboot_detected=false
     if detect_secureboot "$ZFSROOT"; then
-        OVMF="OVMF_CODE_4M.secboot.fd"
+        secureboot_detected=true
+        echo "Auto-detected SecureBoot build"
+    else
+        echo "Auto-detected standard UEFI build"
+    fi
+
+    # Step 2: select matching OVMF firmware, falling back gracefully
+    OVMF=$(detect_ovmf_code "$secureboot_detected")
+
+    if [[ -z "$OVMF" ]]; then
+        if [[ "$secureboot_detected" == "true" ]]; then
+            # SecureBoot firmware not on this system — try standard
+            OVMF=$(detect_ovmf_code false)
+            if [[ -n "$OVMF" ]]; then
+                echo "WARNING: SecureBoot OVMF not available — booting with ${OVMF} (no SecureBoot)"
+                secureboot_detected=false
+            fi
+        fi
+    fi
+
+    if [[ -z "$OVMF" ]]; then
+        echo "ERROR: No OVMF firmware found in /usr/share/OVMF/"
+        ls /usr/share/OVMF/ 2>/dev/null || echo "  /usr/share/OVMF/ does not exist"
+        exit 1
+    fi
+
+    if [[ "$secureboot_detected" == "true" ]]; then
         MACHINE_TYPE="q35"
         SMM_ENABLED="on"
-        echo "Auto-detected SecureBoot build - using ${OVMF} with q35,smm=on"
+        echo "  Using ${OVMF} with q35,smm=on"
     else
-        OVMF="OVMF_CODE_4M.fd"
         MACHINE_TYPE="pc"
         SMM_ENABLED="off"
-        echo "Auto-detected standard UEFI build - using ${OVMF}"
+        echo "  Using ${OVMF}"
     fi
 elif [[ -n "$OVMF" ]]; then
-    # Manual --secureboot flag was used
+    # Manual --secureboot flag was used — verify the firmware exists
+    if [[ ! -f "/usr/share/OVMF/${OVMF}" ]]; then
+        detected=$(detect_ovmf_code true)
+        if [[ -n "$detected" ]]; then
+            OVMF="$detected"
+            echo "Auto-detected SecureBoot firmware: ${OVMF}"
+        else
+            detected=$(detect_ovmf_code false)
+            if [[ -n "$detected" ]]; then
+                OVMF="$detected"
+                echo "WARNING: SecureBoot OVMF not found, falling back to: ${OVMF}"
+            else
+                echo "ERROR: No OVMF firmware found in /usr/share/OVMF/"
+                ls /usr/share/OVMF/ 2>/dev/null || echo "  /usr/share/OVMF/ does not exist"
+                exit 1
+            fi
+        fi
+    fi
     MACHINE_TYPE="q35"
     SMM_ENABLED="on"
     echo "SecureBoot manually enabled - using q35,smm=on"
@@ -110,19 +190,49 @@ else
 fi
 
 # If booting with UEFI we need the UEFI bios and saved efivars
-# Set above in $OVMF variable
+# $OVMF is set above and verified to exist on the system
 if [[ -z "$BIOS" ]] ; then
+    # Verify that the build's efivars.fd matches the system OVMF firmware size.
+    # Builds created on a different OVMF version (e.g. 4M from 24.04 vs 2M from 18.04)
+    # will have mismatched efivars.fd sizes and silently fail with a black screen.
+    if [[ -f "${ZFSROOT}/efivars.fd" ]]; then
+        # Derive expected vars filename from the detected OVMF_CODE file
+        #   OVMF_CODE_4M.secboot.fd  → OVMF_VARS_4M.fd
+        #   OVMF_CODE_4M.fd          → OVMF_VARS_4M.fd
+        #   OVMF_CODE.fd             → OVMF_VARS.fd
+        expected_vars=$(echo "$OVMF" | sed 's/OVMF_CODE/OVMF_VARS/; s/\.secboot//')
+        expected_size=$(stat -c%s "/usr/share/OVMF/${expected_vars}" 2>/dev/null || echo 0)
+        build_size=$(stat -c%s "${ZFSROOT}/efivars.fd")
+
+        if [[ "$expected_size" -ne "$build_size" ]]; then
+            echo "ERROR: Build efivars.fd is incompatible with this system's OVMF firmware."
+            echo ""
+            echo "  System OVMF_CODE:   /usr/share/OVMF/${OVMF}"
+            echo "  Expected vars size:  ${expected_size} bytes (${expected_vars})"
+            echo "  Build efivars.fd:    ${build_size} bytes (${ZFSROOT}/efivars.fd)"
+            echo ""
+            echo "This build was created on a system with a different OVMF version."
+            echo "To boot it on this system you can either:"
+            echo "  1. Rebuild the image on this system (recommended)"
+            echo "  2. Install matching OVMF firmware on this system"
+            echo "  3. Regenerate efivars.fd from the system template:"
+            echo "     cp /usr/share/OVMF/${expected_vars} ${ZFSROOT}/efivars.fd"
+            echo "     (WARNING: this will lose any SecureBoot keys in efivars.fd)"
+            exit 1
+        fi
+    fi
+
     efivars=( -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/${OVMF} )
     efivars+=( -drive if=pflash,format=raw,file=${ZFSROOT}/efivars.fd )
 fi
 
 # Build machine type argument
 if [[ "$SMM_ENABLED" == "on" ]]; then
-    machine_args="-machine ${MACHINE_TYPE},smm=on,accel=kvm"
+    machine_args="-cpu host,+nx,+pae -machine ${MACHINE_TYPE},smm=on,accel=kvm"
     # Add global SMM options required for SecureBoot
     global_args="-global driver=cfi.pflash01,property=secure,value=on"
 else
-    machine_args="-machine ${MACHINE_TYPE},accel=kvm"
+    machine_args="-cpu host,+nx,+pae -machine ${MACHINE_TYPE},accel=kvm"
     global_args=""
 fi
 
