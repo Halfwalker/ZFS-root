@@ -194,9 +194,14 @@ fi
 
 
 # Running in docker requires headless, but running direct/local we can
-# view the install directly
+# view the install directly if a display is available
 if [[ ! -n "${DOCKER_RUN}" ]] ; then
-    add_var "headless" "false"
+    if [[ -n "${DISPLAY:-}" ]]; then
+        add_var "headless" "false"
+        echo "Display available — showing VM console"
+    else
+        echo "No display available — running headless automatically"
+    fi
 fi
 
 check_disks() {
