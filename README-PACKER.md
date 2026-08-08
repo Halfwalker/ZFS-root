@@ -1,18 +1,29 @@
-# Packer Builds
+# Packer builds
 
-The ZFS-root system can generate `.qcow2` KVM disk images via [Packer](https://developer.hashicorp.com/packer).  Two helper scripts handle the heavy lifting:
+`run-packer.sh` builds ZFS-root KVM images with [Packer](https://developer.hashicorp.com/packer); `run-kvm.sh` boots them. Normal builds remain QCOW2. `--ramdisk SIZE` is an explicit alternative for ephemeral, tmpfs-backed raw disks.
 
-* `run-packer.sh` — Build a system using packer (direct or via Docker)
-* `run-kvm.sh` — Boot a packer-built system with KVM
+Packer-built images use `packer/packer` creds by default.
 
-The default credentials for packer-built images are `packer/packer`.
+## Quick start
 
-## Quick Start
+Build a direct QCOW2 image:
 
-```
-# Single disk, no encryption
+```bash
 ./run-packer.sh --ubuntu-version 24.04.2 --discenc NOENC --disk-size 5G
 
+./run-kvm.sh /qemu/builds/packer-noble-NOENC-<timestamp>  # to directly boot a specific build
+./run-kvm.sh  # to choose which build to boot from a list
+```
+
+Build the same QCOW2 image through Docker:
+
+```bash
+./run-packer.sh --docker --ubuntu-version 24.04.2 --discenc NOENC --disk-size 5G
+./run-kvm.sh /qemu/builds/packer-noble-NOENC-<timestamp>
+```
+
+More examples
+```bash
 # Two-disk mirror with SecureBoot
 ./run-packer.sh --ubuntu-version 24.04.2 --discenc NOENC --disk-size 5G \
     --disks 2 --raidlevel mirror --secureboot
@@ -20,66 +31,78 @@ The default credentials for packer-built images are `packer/packer`.
 # Three-disk raidz1 with ZFS encryption and custom hostname
 ./run-packer.sh --ubuntu-version 24.04.2 --discenc ZFSENC --disk-size 10G \
     --disks 3 --raidlevel raidz1 --set MYHOSTNAME=securebox
-
-# Run the resulting image
-./run-kvm.sh /qemu/builds/packer-noble-NOENC-2026-02-08-1234
 ```
 
-## Build Options
+## Build modes and host prerequisites
+
+**Direct mode** uses the host Packer and QEMU/KVM. It can display the installer console when `DISPLAY` is available; otherwise it runs headless.
+
+**Docker mode** runs Packer in a privileged container and is always headless. It requires a running Docker daemon (and Docker group access when running as a non-root user), `/dev/kvm`, writable `/qemu/builds`, readable `/qemu/ISOs`, and OVMF firmware. The Packer plugin cache must be available to the selected mode. Docker mode also needs the container capability to use the mounted KVM device and paths.
+
+Both modes require KVM and compatible OVMF firmware. The scripts select the available 4 MiB OVMF files when present and fall back to the older 2 MiB names. On hosts with kernels older than 6, use the repository's QEMU 8.1.5 compatibility path where required.
+
+## Build options
 
 | Option | Description |
-|--------|-------------|
-| `--docker` | Run packer in a Docker container |
-| `--ubuntu-version` | Ubuntu version (e.g. 24.04.2, 26.04) |
-| `--discenc` | Encryption: NOENC, ZFSENC, or LUKS |
-| `--disk-size` | Disk size (e.g. 5G, 10G) |
-| `--disks N` | Total number of disks |
-| `--raidlevel` | mirror or raidz1 (for multi-disk) |
-| `--secureboot` | Enable UEFI SecureBoot (uses SecureBoot OVMF and configures signing) |
-| `--iso-src` | ISO location (e.g. file:///qemu/ISOs) |
-| `--config` | Config file (default: ZFS-root.conf.packerci) |
-| `--set KEY=VALUE` | Override config variables |
+| --- | --- |
+| `--docker` | Run Packer in Docker; always headless |
+| `--ubuntu-version VERSION` | Ubuntu version, for example `24.04.2` or `26.04` |
+| `--ubuntu-name NAME` | Release name; otherwise derived from the version |
+| `--discenc NOENC\|ZFSENC\|LUKS` | Disk-encryption mode |
+| `--disk-size SIZE` | Per-disk size, for example `5G` |
+| `--disks N` / `--raidlevel LEVEL` | Multi-disk count and `mirror` or `raidz1` layout |
+| `--secureboot` | Select SecureBoot OVMF where available and set `SECUREBOOT=y`; target firmware/key setup still needs validation |
+| `--iso-src URL` | ISO source, for example `file:///qemu/ISOs` |
+| `--config FILE` | ZFS-root preseed file; default is `ZFS-root.conf.packerci` |
+| `--set KEY=VALUE` | Override a preseed configuration value; repeat as needed |
+| `--ramdisk SIZE` | Opt in to host-tmpfs staging and raw disks. Requires sudo/tmpfs support and explicit cleanup after use. |
 
-The `--set SSHPUBKEY=...` option injects an SSH public key into the build for
-CI/CD access. A dedicated CI key pair is available at `packer-validation/CICD_ed25519{,.pub}`.
+## RAM-backed raw builds
 
-## Config Overrides
+Use RAM mode only when the raw disks can or should be temporary: (eg. for CI/CD build/validation)
 
-The `--set` option lets you override any `ZFS-root.conf` variable:
-
+```bash
+./run-packer.sh --ramdisk 16G --ubuntu-version 24.04.2 --discenc ZFSENC --disk-size 8G
 ```
+
+The wrapper mounts a host tmpfs at `/qemu/builds/.ramdisk-work/<build>.work`, then Packer stages its output there. After a successful build it creates the normal final directory, `/qemu/builds/packer-<release>-<encryption>-<timestamp>-<pid>/`, copies persistent metadata and logs into it, and file-bind-mounts each raw disk at its final parent path. The raw disk is therefore directly beside the other artifacts, for example:
+
+```text
+/qemu/builds/packer-jammy-ZFSENC-<timestamp>-<pid>/
+├── packer-jammy-ZFSENC-<timestamp>-<pid>.raw
+├── build-metadata.txt
+├── efivars.fd
+└── packer-output.log
+```
+
+The staging mount is removed after promotion (bind-mount ramdisk into final location), but its raw-file inodes remain available through those file bind mounts. Confirm a disk is tmpfs-backed with:
+
+```bash
+findmnt --target /qemu/builds/packer-jammy-ZFSENC-<timestamp>-<pid>/packer-jammy-ZFSENC-<timestamp>-<pid>.raw
+```
+
+Raw disks are ephemeral. `run-packer.sh` prints the exact cleanup commands. Stop QEMU first, then unmount each final raw-file bind mount and remove its final build directory as instructed. RAM-backed builds are not integrated into CI yet.
+
+## Configuration and ISO layout
+
+`--set KEY=VALUE` overrides the selected config file and Packer defaults:
+
+```bash
 ./run-packer.sh --ubuntu-version 24.04.2 --discenc NOENC --disk-size 5G \
-    --set MYHOSTNAME=testbox --set POOLNAME=testpool
+  --set MYHOSTNAME=testbox --set POOLNAME=testpool
 ```
 
-Multiple `--set` options can be combined.  These override values from both the base config file and packer's automatic defaults.
+For remote access, `--set SSHPUBKEY='...'` installs a public key; it is also used for Dropbear in encrypted builds.
 
-The `--set SSHPUBKEY=...` option is commonly used for CI/CD — an example CI key pair lives at `packer-validation/CICD_ed25519{,.pub}`.  This injects the pubkey into the build's `~/.ssh/authorized_keys` and into Dropbear's ACL for remote unlocking.
+ISOs are downloaded automatically from releases.ubuntu.com, or you can point to a local cache. Keep local ISOs in release-named directories and pass `--iso-src file:///qemu/ISOs`:
 
-## ISO Location
-
-ISOs are downloaded automatically from releases.ubuntu.com, or you can point to a local cache.  For local ISOs, place them in release-named subdirectories:
-
-```
-/qemu/ISOs/resolute/ubuntu-26.04-live-server-amd64.iso
-/qemu/ISOs/questing/ubuntu-25.10-live-server-amd64.iso
-/qemu/ISOs/plucky/ubuntu-25.04-live-server-amd64.iso
+```text
+/qemu/ISOs/jammy/ubuntu-22.04.5-live-server-amd64.iso
 /qemu/ISOs/noble/ubuntu-24.04.2-live-server-amd64.iso
+/qemu/ISOs/resolute/ubuntu-26.04-live-server-amd64.iso
 ```
 
-Then use `--iso-src file:///qemu/ISOs`.
-
-## Docker Builds
-
-For isolated builds without installing packer/qemu locally:
-
-```
-./run-packer.sh --docker --ubuntu-version 24.04.2 --discenc NOENC --disk-size 5G
-```
-
-The script handles plugin initialization, bind mounts, and container setup automatically.  Note that Docker builds always run headless.
-
-## Packer Configuration Files
+### Packer Configuration Files
 
 > <dl>
 >   <dt>ZFS-root_local.pkr.hcl
@@ -90,15 +113,15 @@ The script handles plugin initialization, bind mounts, and container setup autom
 >   <dd>Pre-seed config for ZFS-root.sh.  Sets up packer-friendly defaults (user, encryption, ZFSBootMenu options).
 > </dl>
 
-The `--set KEY=VALUE` option creates runtime overrides that take precedence over both the vars file and the packerci config.
+## Build output
 
-## Running Images
+Every build has a timestamped `packer-*` directory under `/qemu/builds`. Default builds contain QCOW2 disk files (additional disks have numbered suffixes). RAM builds instead expose tmpfs-backed `.raw` disk files at the same final directory level.
 
-The `run-kvm.sh` script auto-detects SecureBoot from the build metadata and/or the `efivars.fd` :
+Common artifacts include `efivars.fd`, `build-metadata.txt` (used by `run-kvm.sh`), `build.log`, `manifest.json`, `ZFS-root_final.conf`, and checksums. `packer-output.log` is the wrapper's captured Packer/Docker command output; in RAM mode it is copied out of staging during promotion.
 
-```
-./run-kvm.sh /qemu/builds/packer-noble-NOENC-2026-02-08-1234
-```
+## Running images
+
+`run-kvm.sh` accepts a build directory and reads its metadata. It launches RAM-mode raw disks when their metadata is present, and retains legacy QCOW2 discovery for ordinary builds.
 
 Options:
 
@@ -110,7 +133,14 @@ Options:
 | `--ssh PORT` | SSH forwarding port - default: 3222 (NAT'd to 22) |
 | `--dropbear PORT` | SSH forwarding port for Dropbear - default: 1222 (NAT'd to 222)<br>NOTE: **requires** an ssh key defined |
 
-SSH into an encrypted booting VM with:
+```bash
+./run-kvm.sh [--bios] [--secureboot] [--ram 4096] [--ssh 3222] [--dropbear 1222] \
+  /qemu/builds/packer-noble-NOENC-<timestamp>
+```
+
+SecureBoot is auto-detected from metadata or EFI variables unless overridden. SSH forwards to port `3222` by default; Dropbear uses `1222`. Docker-created artifacts can be root-owned; You may need a `sudo chown -R ${USER}:${USER} /qemu/builds/packer-<.....>`
+
+SSH into Dropbear on an encrypted booting VM with: (NOTE: Dropbear *requires* ssh key, no user/password)
 
 ```
 # Use your default ssh keys or specify which key to use
