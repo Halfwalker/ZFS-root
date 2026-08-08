@@ -97,10 +97,10 @@ if [[ -z "$BUILD_DIR" ]]; then
     echo "Must provide a path to a packer build dir"
     if command -v fzf >/dev/null 2>&1; then
         echo "Pick one to boot or ESC to exit"
-        BUILD_DIR=$(find /qemu/builds/* -type d | fzf --height 20% --border --reverse --margin=5%,40%,0%,5%)
+        BUILD_DIR=$(find /qemu/builds -mindepth 1 -maxdepth 1 -type d -name 'packer-*' -print | fzf --height 20% --border --reverse --margin=5%,40%,0%,5%)
     else
         echo "For example, from here"
-        find /qemu/builds/* -type d | xargs -I {} echo "$0 {}"
+        find /qemu/builds -mindepth 1 -maxdepth 1 -type d -name 'packer-*' -print | xargs -I {} echo "$0 {}"
     fi
 fi
 [[ -z "$BUILD_DIR" ]] && exit 1

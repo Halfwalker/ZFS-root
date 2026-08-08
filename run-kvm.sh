@@ -36,6 +36,41 @@ SSH_PORT="${SSH_PORT:-3222}"            # Main ssh port to booted system, NAT'd 
 # Connect with 'ssh -p 1222 root@localhost`
 DROPBEAR_PORT="${DROPBEAR_PORT:-1222}"  
 OVMF=""                                 # Will be auto-detected or set by --secureboot flag
+DISK_FORMAT="qcow2"                     # Default disk format
+DISK_PATHS=()
+efivars=()
+
+load_disk_metadata() {
+    # RAM builds publish the disk format and ordered basenames as a contract (fancy!) with
+    # this launcher. Returning failure deliberately selects legacy QCOW2 discovery.
+    local build_dir="$1" line key value disk_path
+
+    [[ -f "${build_dir}/build-metadata.txt" ]] || return 1
+    while IFS='=' read -r key value; do
+        case "${key}" in
+            RAMDISK) RAMDISK="${value}" ;;
+            DISK_FORMAT) DISK_FORMAT="${value}" ;;
+            DISK_PATHS) IFS=',' read -r -a DISK_PATHS <<< "${value}" ;;
+        esac
+    done < "${build_dir}/build-metadata.txt"
+
+    [[ "${RAMDISK:-false}" == "true" ]] || return 1
+    if [[ "${DISK_FORMAT}" != "raw" || ${#DISK_PATHS[@]} -eq 0 ]]; then
+        echo "ERROR: invalid RAM-disk metadata in ${build_dir}/build-metadata.txt" >&2
+        exit 1
+    fi
+    # Metadata is treated as untrusted: accept only expected raw basenames and
+    # require each resolved path to remain an existing file below build_dir.
+    for disk_path in "${DISK_PATHS[@]}"; do
+        # Accept timestamped RAM artifacts and the disk.raw names from the
+        # already-built proof of concept.
+        if [[ ! "${disk_path}" =~ ^(disk\.raw|packer-[A-Za-z0-9._-]+\.raw)(-[1-9][0-9]*)?$ || ! -f "${build_dir}/${disk_path}" ]]; then
+            echo "ERROR: unsafe or missing RAM-disk path: ${disk_path}" >&2
+            exit 1
+        fi
+    done
+    return 0
+}
 
 detect_secureboot() {
     local build_dir="$1"
@@ -113,12 +148,40 @@ if [[ -z "$ZFSROOT" ]] ; then
     echo "Must provide a path to a packer build dir"
     if command -v fzf >/dev/null 2>&1; then
         echo "Pick one to boot or ESC to exit"
-        ZFSROOT=$(find /qemu/builds/* -type d | fzf --height 20% --border --reverse --margin=5%,40%,0%,5%)
+        ZFSROOT=$(find /qemu/builds -mindepth 1 -maxdepth 1 -type d -name 'packer-*' -print | fzf --height 20% --border --reverse --margin=5%,40%,0%,5%)
     else
         echo "For example, from here"
-        find /qemu/builds/* -type d | xargs -I {} echo "$0 {}"
+        find /qemu/builds -mindepth 1 -maxdepth 1 -type d -name 'packer-*' -print | xargs -I {} echo "$0 {}"
     fi
     [[ -z "$ZFSROOT" ]] && exit 1
+fi
+
+RAMDISK=false
+if load_disk_metadata "${ZFSROOT}"; then
+    RAMDISK=true
+else
+    # Builds without RAM metadata retain the historical QCOW2 glob/discovery
+    # behavior instead of requiring newer metadata retroactively.
+    DISK_FORMAT="qcow2"
+    DISK_PATHS=()
+    for disk_path in "${ZFSROOT}"/*qcow*; do
+        [[ -f "${disk_path}" ]] && DISK_PATHS+=("${disk_path}")
+    done
+    if [[ ${#DISK_PATHS[@]} -eq 0 ]]; then
+        echo "ERROR: no QCOW2 disks found in ${ZFSROOT}" >&2
+        exit 1
+    fi
+fi
+
+if [[ "${RAMDISK}" == "true" && -f /tmp/qemu-vm.pid ]]; then
+    # RAM disks are ephemeral and should not be handed to a second VM. Keep this
+    # guard RAM-only so legacy launches preserve their existing PID behavior.
+    existing_pid=$(< /tmp/qemu-vm.pid)
+    if [[ "${existing_pid}" =~ ^[0-9]+$ ]] && kill -0 "${existing_pid}" 2>/dev/null; then
+        echo "ERROR: QEMU is already running with PID ${existing_pid}; refusing to overwrite /tmp/qemu-vm.pid" >&2
+        exit 1
+    fi
+    rm -f /tmp/qemu-vm.pid
 fi
 
 # Auto-detect SecureBoot if not explicitly set by --secureboot flag
@@ -155,10 +218,14 @@ if [[ -z "$OVMF" ]] && [[ -z "$BIOS" ]]; then
     if [[ "$secureboot_detected" == "true" ]]; then
         MACHINE_TYPE="q35"
         SMM_ENABLED="on"
+        machine_array=( -cpu host,+nx,+pae -machine "${MACHINE_TYPE},smm=on,accel=kvm" )
+        global_array=( -global driver=cfi.pflash01,property=secure,value=on )
         echo "  Using ${OVMF} with q35,smm=on"
     else
         MACHINE_TYPE="pc"
         SMM_ENABLED="off"
+        machine_array=( -cpu host,+nx,+pae -machine "${MACHINE_TYPE},accel=kvm" )
+        global_array=()
         echo "  Using ${OVMF}"
     fi
 elif [[ -n "$OVMF" ]]; then
@@ -182,11 +249,15 @@ elif [[ -n "$OVMF" ]]; then
     fi
     MACHINE_TYPE="q35"
     SMM_ENABLED="on"
+    machine_array=( -cpu host,+nx,+pae -machine "${MACHINE_TYPE},smm=on,accel=kvm" )
+    global_array=( -global driver=cfi.pflash01,property=secure,value=on )
     echo "SecureBoot manually enabled - using q35,smm=on"
 else
     # Legacy BIOS mode
     MACHINE_TYPE="pc"
     SMM_ENABLED="off"
+    machine_array=( -cpu host,+nx,+pae -machine "${MACHINE_TYPE},accel=kvm" )
+    global_array=()
 fi
 
 # If booting with UEFI we need the UEFI bios and saved efivars
@@ -222,30 +293,49 @@ if [[ -z "$BIOS" ]] ; then
         fi
     fi
 
-    efivars=( -drive if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/${OVMF} )
-    efivars+=( -drive if=pflash,format=raw,file=${ZFSROOT}/efivars.fd )
+    efivars=( -drive "if=pflash,format=raw,readonly=on,file=/usr/share/OVMF/${OVMF}" )
+    efivars+=( -drive "if=pflash,format=raw,file=${ZFSROOT}/efivars.fd" )
 fi
 
-# Build machine type argument
 if [[ "$SMM_ENABLED" == "on" ]]; then
     machine_args="-cpu host,+nx,+pae -machine ${MACHINE_TYPE},smm=on,accel=kvm"
-    # Add global SMM options required for SecureBoot
     global_args="-global driver=cfi.pflash01,property=secure,value=on"
 else
     machine_args="-cpu host,+nx,+pae -machine ${MACHINE_TYPE},accel=kvm"
     global_args=""
 fi
 
-# Add '-display none' for no gui interface when VM starts
-qemu-system-x86_64 -no-reboot -m ${RAMSIZE} \
-    ${machine_args} \
-    ${global_args} \
-    -daemonize -pidfile /tmp/qemu-vm.pid \
-    ${efivars[*]} \
-    $(for f in ${ZFSROOT}/*qcow* ; do echo "-drive file=${f},format=qcow2,cache=writeback " ; done) \
-    -device virtio-scsi-pci,id=scsi0 \
-    -device virtio-net-pci,netdev=net0 \
-    -netdev user,id=net0,hostfwd=tcp::${SSH_PORT}-:22,hostfwd=tcp::${DROPBEAR_PORT}-:222   # KVM-local network, need NAT to ssh in
+# RAM mode uses an argument array to preserve metadata disk order and safely pass
+# raw file paths. The legacy branch intentionally retains its established QCOW2
+# invocation. -drive entries precede controller/network arguments so QEMU sees
+# disks in the metadata order used during installation.
+# This is ugly and clunky, and can probably be cleaned/tightened up
+if [[ "${RAMDISK}" == "true" ]]; then
+    qemu_args=( -no-reboot -m "${RAMSIZE}" )
+    qemu_args+=( "${machine_array[@]}" )
+    qemu_args+=( "${global_array[@]}" )
+    qemu_args+=( -daemonize -pidfile /tmp/qemu-vm.pid )
+    qemu_args+=( "${efivars[@]}" )
+    for disk_path in "${DISK_PATHS[@]}"; do
+        qemu_args+=( -drive "file=${ZFSROOT}/${disk_path},format=raw,cache=writeback" )
+    done
+    qemu_args+=(
+        -device virtio-scsi-pci,id=scsi0
+        -device virtio-net-pci,netdev=net0
+        -netdev "user,id=net0,hostfwd=tcp::${SSH_PORT}-:22,hostfwd=tcp::${DROPBEAR_PORT}-:222"
+    )
+    qemu-system-x86_64 "${qemu_args[@]}"
+else
+    qemu-system-x86_64 -no-reboot -m ${RAMSIZE} \
+        ${machine_args} \
+        ${global_args} \
+        -daemonize -pidfile /tmp/qemu-vm.pid \
+        ${efivars[*]} \
+        $(for f in ${ZFSROOT}/*qcow* ; do echo "-drive file=${f},format=qcow2,cache=writeback " ; done) \
+        -device virtio-scsi-pci,id=scsi0 \
+        -device virtio-net-pci,netdev=net0 \
+        -netdev user,id=net0,hostfwd=tcp::${SSH_PORT}-:22,hostfwd=tcp::${DROPBEAR_PORT}-:222
+fi
     # -netdev bridge,id=net0,br=br0 &   # Attach to bridge br0 for local networking
 
 # Write the QEMU PID to a file for scripts that need to track it

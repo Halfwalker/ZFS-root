@@ -14,7 +14,8 @@ Options:
   --ubuntu-version VALUE    (e.g. 24.04.2)
   --ubuntu-name VALUE       (e.g. noble) [optional; auto-derived from version if not provided]
   --output-prefix VALUE     (e.g. /qemu/builds/)
-  --disk-size VALUE         (e.g. 5G)
+  --ramdisk SIZE            Use raw disk(s) on a host-mounted tmpfs (e.g. 16G); without it, the normal QCOW2 output path is unchanged
+  --disk-size VALUE         (e.g. 8G)
   --disks VALUE             (e.g. 3) [optional total; for multiple disks]
   --raidlevel VALUE         (e.g. raidz1 or mirror) only for multiple disks
   --secureboot              Enable SecureBoot (requires q35 machine and secboot OVMF firmware)
@@ -29,8 +30,6 @@ For local ISOs, each ISO should be in the appropriate release-named dir
   /qemu/ISOs/focal/ubuntu-20.04.5-live-server-amd64.iso
   /qemu/ISOs/jammy/ubuntu-22.04.5-live-server-amd64.iso
   /qemu/ISOs/noble/ubuntu-24.04.2-live-server-amd64.iso
-  /qemu/ISOs/plucky/ubuntu-25.04-live-server-amd64.iso
-  /qemu/ISOs/questing/ubuntu-25.10-live-server-amd64.iso
   /qemu/ISOs/resolute/ubuntu-26.04-live-server-amd64.iso
              ⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️
 
@@ -76,6 +75,22 @@ DISKS="${DISKS:-}"                                      # Total number of disks 
 RAIDLEVEL="${RAIDLEVEL:-}"                              # Raid type for multi-disk (mirror, raidz1)
 SECUREBOOT="${SECUREBOOT:-}"                            # Enable SecureBoot
 ISO_SRC="${ISO_SRC:-}"                                  # Location of bootable ISOs (eg. file///qemu/ISOs)
+# RAM mode is strictly opt-in. Empty preserves the established QCOW2 build and
+# launch paths, while a size enables the tmpfs staging/promotion lifecycle.
+RAMDISK_SIZE=""
+RAMDISK_MOUNTED=false
+# The build ID names the eventual artifact directory; the work directory is its
+# disposable tmpfs mount; stage output is Packer's required new directory; final
+# directory has promoted metadata and RAM-backed disk mounts.
+RAM_BUILD_ID=""
+RAM_WORK_DIR=""
+RAM_STAGE_OUTPUT=""
+RAM_FINAL_DIR=""
+# Final disk paths are individual bind mounts and must be unmounted before any
+# failure cleanup can remove the corresponding staging tmpfs.
+RAM_FINAL_MOUNTS=()
+RAMDISK_SUDO=()
+RAMDISK_OWNER="$(id -u):$(id -g)"
 CONFIG_OVERRIDES=()                                     # Array to collect --set KEY=VALUE pairs
 
 while [[ $# -gt 0 ]]; do
@@ -86,6 +101,7 @@ while [[ $# -gt 0 ]]; do
         --ubuntu-version)   VER="$2"; shift 2 ;;
         --ubuntu-name)      NAME="$2"; shift 2 ;;
         --output-prefix)    OUT_PREFIX="$2"; shift 2 ;;
+        --ramdisk)          RAMDISK_SIZE="$2"; shift 2 ;;
         --disk-size)        DISK_SIZE="$2"; shift 2 ;;
         --disks)            DISKS="$2"; shift 2 ;;
         --raidlevel)        RAIDLEVEL="$2"; shift 2 ;;
@@ -104,6 +120,35 @@ while [[ $# -gt 0 ]]; do
         *) echo "Unknown option: $1" >&2; usage; exit 1 ;;
     esac
 done
+
+if [[ -n "${RAMDISK_SIZE}" && "${OUT_PREFIX}" != "${QEMU_ROOT}/builds/" ]]; then
+    echo "Error: --ramdisk cannot be combined with --output-prefix" >&2
+    exit 1
+fi
+
+if [[ -n "${RAMDISK_SIZE}" && ! "${RAMDISK_SIZE}" =~ ^[1-9][0-9]*[KMGTP]?$ ]]; then
+    echo "Error: --ramdisk requires a positive size with an optional K, M, G, T, or P suffix" >&2
+    exit 1
+fi
+
+if [[ -n "${RAMDISK_SIZE}" ]]; then
+    for command_name in mount umount findmnt; do
+        if ! command -v "${command_name}" >/dev/null 2>&1; then
+            echo "Error: --ramdisk requires ${command_name}" >&2
+            exit 1
+        fi
+    done
+fi
+
+if [[ -n "${RAMDISK_SIZE}" && "${EUID}" -ne 0 ]]; then
+    # Mounting tmpfs and later bind mounts require host privilege. Keep sudo
+    # scoped to those filesystem operations rather than running Packer as root.
+    if ! command -v sudo >/dev/null 2>&1; then
+        echo "Error: --ramdisk requires sudo when not run as root" >&2
+        exit 1
+    fi
+    RAMDISK_SUDO=(sudo)
+fi
 
 if [[ ! -e "${CONFIG_FILE}" ]] ; then
     echo "Preseed config file ${CONFIG_FILE} does not exist"
@@ -192,6 +237,176 @@ add_var "ovmf_vars"           "$OVMF_VARS"
 add_var "ubuntu_live_iso_src" "$ISO_SRC"
 add_var "config_file"         "$CONFIG_FILE"
 
+ramdisk_failure_cleanup() {
+    local status="$?" mount_target
+    if [[ "${status}" -ne 0 ]]; then
+        # Include enough lifecycle state to diagnose failures after the tmpfs is
+        # gone, then reverse promotion: disk bind mounts first, staging last.
+        echo "RAM build failure diagnostics: status=${status} RAM_WORK_DIR=${RAM_WORK_DIR:-} RAM_STAGE_OUTPUT=${RAM_STAGE_OUTPUT:-} RAM_BUILD_ID=${RAM_BUILD_ID:-} RAM_FINAL_MOUNTS=${RAM_FINAL_MOUNTS[*]:-}" >&2
+    fi
+    if [[ "${status}" -ne 0 ]]; then
+        # RAM disk files are individual bind mounts. Unmount them before their
+        # staging tmpfs so mounted targets are never removed during cleanup.
+        for mount_target in "${RAM_FINAL_MOUNTS[@]}"; do
+            "${RAMDISK_SUDO[@]}" umount "${mount_target}" || true
+        done
+        if [[ "${RAM_FINAL_DIR:-}" == "${QEMU_ROOT}/builds/packer-"* ]]; then
+            rm -rf -- "${RAM_FINAL_DIR}" || true
+        fi
+    fi
+    if [[ "${status}" -ne 0 && "${RAMDISK_MOUNTED}" == "true" ]]; then
+        if [[ -f "${RAM_WORK_DIR}/packer-output.log" ]]; then
+            "${RAMDISK_SUDO[@]}" cp "${RAM_WORK_DIR}/packer-output.log" "${QEMU_ROOT}/builds/${RAM_BUILD_ID}.failed-packer-output.log" || true
+            "${RAMDISK_SUDO[@]}" chown "${RAMDISK_OWNER}" "${QEMU_ROOT}/builds/${RAM_BUILD_ID}.failed-packer-output.log" || true
+            echo "Preserved Packer output at ${QEMU_ROOT}/builds/${RAM_BUILD_ID}.failed-packer-output.log" >&2
+        fi
+        echo "Build failed; unmounting staging tmpfs ${RAM_WORK_DIR}" >&2
+        "${RAMDISK_SUDO[@]}" umount "${RAM_WORK_DIR}" || true
+        if [[ "${RAM_WORK_DIR}" == "${QEMU_ROOT}/builds/.ramdisk-work/"* ]]; then
+            rmdir "${RAM_WORK_DIR}" 2>/dev/null || true
+        fi
+    fi
+    exit "${status}"
+}
+
+prepare_ramdisk() {
+    local attempt
+
+    RAM_BUILD_ID="packer-${NAME}-${DISCENC}-$(date +%Y%m%d-%H%M%S)-$$"
+    attempt="${RAM_BUILD_ID}.work"
+    RAM_WORK_DIR="${QEMU_ROOT}/builds/.ramdisk-work/${attempt}"
+    RAM_STAGE_OUTPUT="${RAM_WORK_DIR}/${RAM_BUILD_ID}"
+
+    # The host needs writable builds/.ramdisk-work plus sudo-capable tmpfs mount
+    # tools. Create the mount point before either direct or Docker Packer starts
+    # so both execution modes see the same host-backed staging location.
+    mkdir -p "${QEMU_ROOT}/builds/.ramdisk-work"
+    if [[ -e "${RAM_WORK_DIR}" || -e "${QEMU_ROOT}/builds/${RAM_BUILD_ID}" ]]; then
+        echo "Error: RAM-disk work or final build directory already exists" >&2
+        exit 1
+    fi
+    mkdir "${RAM_WORK_DIR}"
+    if ! "${RAMDISK_SUDO[@]}" mount -t tmpfs -o "size=${RAMDISK_SIZE}" tmpfs "${RAM_WORK_DIR}"; then
+        rmdir "${RAM_WORK_DIR}" 2>/dev/null || true
+        echo "Error: failed to mount tmpfs at ${RAM_WORK_DIR}" >&2
+        exit 1
+    fi
+    RAMDISK_MOUNTED=true
+    if [[ "$(findmnt -n -o FSTYPE --target "${RAM_WORK_DIR}")" != "tmpfs" ]]; then
+        echo "Error: ${RAM_WORK_DIR} is not a tmpfs mount" >&2
+        exit 1
+    fi
+
+    # The QEMU plugin refuses an existing output_directory. Packer therefore
+    # creates RAM_STAGE_OUTPUT under this new tmpfs mount; promotion later gives
+    # the artifacts their normal builds/<build-id> location.
+    add_var "output_prefix" "${RAM_WORK_DIR}/"
+    add_var "build_id" "${RAM_BUILD_ID}"
+    add_var "ramdisk_mode" "true"
+    trap ramdisk_failure_cleanup EXIT
+    echo "Using staging tmpfs ${RAM_WORK_DIR} (${RAMDISK_SIZE})"
+}
+
+promote_ramdisk_build() {
+    local final_dir disk_name metadata_paths artifact mount_target
+    local -a disk_names artifacts
+
+    final_dir="${QEMU_ROOT}/builds/${RAM_BUILD_ID}"
+    [[ -f "${RAM_STAGE_OUTPUT}/build-metadata.txt" ]] || { echo "Error: missing RAM build metadata" >&2; return 1; }
+    metadata_paths=$("${RAMDISK_SUDO[@]}" awk -F= '$1 == "DISK_PATHS" { print $2; exit }' "${RAM_STAGE_OUTPUT}/build-metadata.txt")
+    IFS=',' read -r -a disk_names <<< "${metadata_paths}"
+    [[ ${#disk_names[@]} -eq ${DISKS:-1} ]] || { echo "Error: RAM disk metadata has an unexpected disk count" >&2; return 1; }
+
+    for disk_name in "${disk_names[@]}"; do
+        if [[ ! "${disk_name}" =~ ^(disk\.raw|packer-[A-Za-z0-9._-]+\.raw)(-[1-9][0-9]*)?$ || ! -f "${RAM_STAGE_OUTPUT}/${disk_name}" ]]; then
+            echo "Error: unsafe or missing RAM disk ${disk_name}" >&2
+            return 1
+        fi
+    done
+    [[ ! -e "${final_dir}" ]] || { echo "Error: refusing to overwrite existing final build directory ${final_dir}" >&2; return 1; }
+
+    artifacts=(efivars.fd build.log manifest.json build-metadata.txt ZFS-root_final.conf checksums.sha256)
+    mkdir "${final_dir}" || { echo "Error: failed to create final build directory ${final_dir}" >&2; return 1; }
+    RAM_FINAL_DIR="${final_dir}"
+    for artifact in "${artifacts[@]}"; do
+        if [[ -f "${RAM_STAGE_OUTPUT}/${artifact}" ]]; then
+            # Docker Packer can leave staging files root-owned. Use sudo only to
+            # copy/chown these known artifacts, then leave final files user-owned.
+            "${RAMDISK_SUDO[@]}" cp "${RAM_STAGE_OUTPUT}/${artifact}" "${final_dir}/${artifact}" || { echo "Error: failed to copy RAM artifact ${artifact}" >&2; return 1; }
+            "${RAMDISK_SUDO[@]}" chown "${RAMDISK_OWNER}" "${final_dir}/${artifact}" || { echo "Error: failed to set ownership on RAM artifact ${artifact}" >&2; return 1; }
+        fi
+    done
+
+    if [[ -f "${RAM_WORK_DIR}/packer-output.log" ]]; then
+        "${RAMDISK_SUDO[@]}" cp "${RAM_WORK_DIR}/packer-output.log" "${final_dir}/packer-output.log" || { echo "Error: failed to copy RAM Packer output" >&2; return 1; }
+        "${RAMDISK_SUDO[@]}" chown "${RAMDISK_OWNER}" "${final_dir}/packer-output.log" || { echo "Error: failed to set ownership on RAM Packer output" >&2; return 1; }
+    fi
+
+    # Disk names come from Packer's metadata rather than being reconstructed here.
+    # Packer must stage in a unique tmpfs directory because its output_directory
+    # cannot pre-exist dammit. Binding each raw file at its normal final artifact path
+    # retains the tmpfs inode after staging is unmounted, without a ramdisk/ path.
+    for disk_name in "${disk_names[@]}"; do
+        mount_target="${final_dir}/${disk_name}"
+        install -m 0600 /dev/null "${mount_target}" || { echo "Error: failed to create RAM disk mount target ${mount_target}" >&2; return 1; }
+        "${RAMDISK_SUDO[@]}" chown "${RAMDISK_OWNER}" "${RAM_STAGE_OUTPUT}/${disk_name}" || { echo "Error: failed to set ownership on RAM disk ${disk_name}" >&2; return 1; }
+        "${RAMDISK_SUDO[@]}" mount --bind "${RAM_STAGE_OUTPUT}/${disk_name}" "${mount_target}" || { echo "Error: failed to bind RAM disk ${disk_name}" >&2; return 1; }
+        RAM_FINAL_MOUNTS+=("${mount_target}")
+        if [[ "$(findmnt -n -o FSTYPE --target "${mount_target}")" != "tmpfs" ]]; then
+            echo "Error: RAM disk bind mount is not tmpfs-backed: ${mount_target}" >&2
+            return 1
+        fi
+    done
+
+    # Once every file bind mount is verified, remove the staging mount. Final
+    # mounts retain the RAM-backed inodes; failure cleanup reverses this order.
+    "${RAMDISK_SUDO[@]}" umount "${RAM_WORK_DIR}" || { echo "Error: failed to unmount RAM staging tmpfs ${RAM_WORK_DIR}" >&2; return 1; }
+    RAMDISK_MOUNTED=false
+    "${RAMDISK_SUDO[@]}" rmdir "${RAM_WORK_DIR}" || { echo "Error: failed to remove RAM staging directory ${RAM_WORK_DIR}" >&2; return 1; }
+}
+
+promote_ramdisk_build_with_diagnostics() {
+    local promotion_log="${QEMU_ROOT}/builds/${RAM_BUILD_ID}.promotion.log" status
+
+    # Keep tracing in this shell so RAM_FINAL_MOUNTS remains available to
+    # failure cleanup. Capture promotion diagnostics quietly unless it fails,
+    # when the retained log identifies the failed copy, ownership, or mount step.
+    exec 6>&1 7>&2
+    exec >"${promotion_log}" 2>&1
+    exec 5>&1
+    BASH_XTRACEFD=5
+    set -x
+    if promote_ramdisk_build; then
+        status=0
+    else
+        status=$?
+    fi
+    set +x
+    exec 1>&6 2>&7 5>&- 6>&- 7>&-
+    unset BASH_XTRACEFD
+    if [[ "${status}" -eq 0 ]]; then
+        rm -f "${promotion_log}"
+    else
+        echo "RAM promotion failed; diagnostics retained at ${promotion_log}" >&2
+        cat -- "${promotion_log}" >&2 || true
+    fi
+    return "${status}"
+}
+
+run_packer_with_ram_capture() {
+    local status
+
+    # RAM builds lose their staging tmpfs on failure, so retain a live copy of
+    # combined Packer/Docker output. With set -e and pipefail, explicitly return
+    # PIPESTATUS[0] so tee's result never masks the wrapped Packer/Docker status.
+    if "$@" 2>&1 | tee "${RAM_WORK_DIR}/packer-output.log"; then
+        status=${PIPESTATUS[0]}
+    else
+        status=${PIPESTATUS[0]}
+    fi
+    return "${status}"
+}
+
 # Build config_overrides map from --set parameters
 if [[ ${#CONFIG_OVERRIDES[@]} -gt 0 ]]; then
     # Build JSON-style map for PKR_VAR_config_overrides env var
@@ -236,7 +451,7 @@ check_disks() {
     # Check if DISKS is set and validate it
     if [[ -n "${DISKS}" ]]; then
         # Verify DISKS is a number
-        if ! [[ "${DISKS}" =~ ^[0-9]+$ ]]; then
+        if ! [[ "${DISKS}" =~ ^[1-9][0-9]*$ ]]; then
             echo "Error: DISKS must be a positive integer, got: ${DISKS}" >&2
             exit 1
         fi
@@ -321,7 +536,24 @@ packer_docker() {
         QEMU_REPO=""
     fi
 
-    docker run --rm -it \
+    if [[ -n "${RAMDISK_SIZE}" ]]; then
+      # RAM capture is separate so the normal Docker behavior and output remain
+      # unchanged when --ramdisk was not requested.
+      run_packer_with_ram_capture docker run --rm -it \
+        --privileged --cap-add=ALL \
+        -v "$(pwd)":"${PWD}" -w "${PWD}" \
+        "${docker_args[@]}" \
+        -v ${QEMU_ROOT}/packer.d:/root/.cache/packer.d \
+        -v ${QEMU_ROOT}/builds:/qemu/builds \
+        -e PACKER_PLUGIN_PATH="/root/.cache/packer.d/plugins" \
+        -e PACKER_LOG=1 \
+        -e PKR_VAR_config_overrides \
+        --entrypoint /bin/sh \
+        hashicorp/packer:light -c " \
+          apk add --no-cache ${QEMU_PKG} qemu-img ${QEMU_REPO} >/dev/null 2>&1 && \
+          packer build ${packer_args[*]} ZFS-root_local.pkr.hcl"
+    else
+      docker run --rm -it \
       --privileged --cap-add=ALL \
       -v "$(pwd)":"${PWD}" -w "${PWD}" \
       ${docker_args[*]} \
@@ -334,6 +566,7 @@ packer_docker() {
       hashicorp/packer:light -c " \
         apk add --no-cache ${QEMU_PKG} qemu-img ${QEMU_REPO} >/dev/null 2>&1 && \
         packer build ${packer_args[*]} ZFS-root_local.pkr.hcl"
+    fi
 }
 
 packer_init_direct() {
@@ -353,25 +586,32 @@ packer_direct() {
     export PACKER_PLUGIN_PATH=${QEMU_ROOT}/packer.d/plugins
     export PACKER_LOG=1
 
-    # Use fifo + tee for live output while capturing to file
-    trap 'rm -f /tmp/packer-pipe; kill $TEE_PID 2>/dev/null || true' EXIT
-    mkfifo /tmp/packer-pipe
-    tee /tmp/packer-output.log < /tmp/packer-pipe &
-    TEE_PID=$!
+    if [[ -n "${RAMDISK_SIZE}" ]]; then
+      run_packer_with_ram_capture packer build ${packer_args[*]} ZFS-root_local.pkr.hcl
+    else
+      # Keep the legacy direct path separate: its FIFO logging and QCOW2 output
+      # lifecycle predate and do not depend on RAM staging.
+      # Use fifo + tee for live output while capturing to file
+      trap 'rm -f /tmp/packer-pipe; kill $TEE_PID 2>/dev/null || true' EXIT
+      mkfifo /tmp/packer-pipe
+      tee /tmp/packer-output.log < /tmp/packer-pipe &
+      TEE_PID=$!
+      packer build ${packer_args[*]} ZFS-root_local.pkr.hcl > /tmp/packer-pipe
+      BUILD_EXIT=$?
+      wait $TEE_PID
 
-    packer build ${packer_args[*]} ZFS-root_local.pkr.hcl > /tmp/packer-pipe
-
-    BUILD_EXIT=$?
-    wait $TEE_PID
-
-    # Extract output directory from packer log
-    OUTPUT_DIR=$(grep -o '/qemu/builds/packer-[^/]*' /tmp/packer-output.log | head -1)
-    if [ -n "$OUTPUT_DIR" ] && [ -d "$OUTPUT_DIR" ]; then
-      cp /tmp/packer-output.log "$OUTPUT_DIR/packer-output.log"
+      # Extract output directory from packer log
+      OUTPUT_DIR=$(grep -o '/qemu/builds/packer-[^/]*' /tmp/packer-output.log | head -1)
+      if [ -n "$OUTPUT_DIR" ] && [ -d "$OUTPUT_DIR" ]; then
+        cp /tmp/packer-output.log "$OUTPUT_DIR/packer-output.log"
+      fi
     fi
 }
 
 check_disks
+if [[ -n "${RAMDISK_SIZE}" ]]; then
+    prepare_ramdisk
+fi
 
 echo "Starting build with ${packer_args[*]}"
 if [[ -n "${DOCKER_RUN}" ]] ; then
@@ -380,3 +620,18 @@ else
     packer_direct
 fi
 
+if [[ -n "${RAMDISK_SIZE}" ]]; then
+    promote_ramdisk_build_with_diagnostics
+    trap - EXIT
+    # Promotion is complete: tell the operator where the normal-looking build
+    # directory and its still-RAM-backed disks live, plus the required cleanup.
+    echo "RAM-backed build promoted: ${QEMU_ROOT}/builds/${RAM_BUILD_ID}" >&2
+    echo "RAM-backed raw disk files: ${RAM_FINAL_MOUNTS[*]}" >&2
+    for mount_target in "${RAM_FINAL_MOUNTS[@]}"; do
+        echo "Verified RAM backing: $(findmnt -n -o TARGET,SOURCE,FSTYPE --target "${mount_target}")" >&2
+        echo "Clean up after stopping QEMU: sudo umount ${mount_target}" >&2
+    done
+    # These mounts are intentionally left in place for run-kvm; removing them
+    # releases RAM, so QEMU must be stopped before the printed cleanup commands.
+    echo "These raw disk files consume RAM and are ephemeral; stop QEMU before unmounting them." >&2
+fi

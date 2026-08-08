@@ -34,6 +34,22 @@ variable "output_prefix" {
   default = ""
 }
 
+variable "build_id" {
+  # Empty by default so standard callers retain timestamped QCOW2 directories;
+  # run-packer supplies this only when it stages a RAM build.
+  description = "Unique build identifier used by RAM-disk builds"
+  type        = string
+  default     = ""
+}
+
+variable "ramdisk_mode" {
+  # Opt-in raw/tmpfs mode. The false default is the compatibility boundary for
+  # existing direct Packer and wrapper invocations.
+  description = "Build raw disks in a host-mounted tmpfs staging directory"
+  type        = bool
+  default     = false
+}
+
 variable "ubuntu_version" {
   description = "Which version of Ubuntu to boot for the build"
   type = string
@@ -147,8 +163,9 @@ locals {
   ovmf_vars = var.ovmf_vars != "" ? var.ovmf_vars : "/usr/share/OVMF/OVMF_VARS_4M.fd"
   machine_type = var.secureboot ? "q35,smm=on" : "pc"
 
-  # Include variant in output directory to allow parallel builds
-  output_dir = "packer-${local.variant}-${local.timestamp}"
+  # Standard builds keep timestamped variant directories. RAM builds use the
+  # wrapper-provided ID beneath its tmpfs output_prefix, then are promoted later.
+  output_dir = var.ramdisk_mode ? var.build_id : "packer-${local.variant}-${local.timestamp}"
   timestamp  = formatdate("YYYY-MM-DD-hhmm", timestamp())
   ubuntu_live_iso = "${var.ubuntu_live_iso_src}/${local.derived_version_name}/ubuntu-${var.ubuntu_version}-live-server-amd64.iso"
   variant = "${local.derived_version_name}-${var.discenc}"
@@ -167,19 +184,26 @@ locals {
     (var.raidlevel == "mirror" || var.raidlevel == "raidz1" ? var.raidlevel : "")
   )
 
-  # Generate the list of all disk files
+  # Generate the list of all disk files. Raw RAM names deliberately follow the
+  # standard artifact naming scheme so downstream tooling needs no new pattern.
   # Primary disk (index 0)
-  primary_disk = "${var.output_prefix}${local.output_dir}/packer-${local.variant}-${local.timestamp}.qcow2"
+  disk_extension = var.ramdisk_mode ? "raw" : "qcow2"
+  primary_disk_name = "packer-${local.variant}-${local.timestamp}.${local.disk_extension}"
+  primary_disk = "${var.output_prefix}${local.output_dir}/${local.primary_disk_name}"
 
   # Additional disks (indices 1, 2, 3, ...)
   # QEMU names them: base.qcow2-1, base.qcow2-2, etc.
-  additional_disk_files = [
+  additional_disk_names = [
     for idx in range(length(var.additional_disks)) :
-    "${var.output_prefix}${local.output_dir}/packer-${local.variant}-${local.timestamp}.qcow2-${idx + 1}"
+    "packer-${local.variant}-${local.timestamp}.${local.disk_extension}-${idx + 1}"
   ]
+  additional_disk_files = [for disk_name in local.additional_disk_names : "${var.output_prefix}${local.output_dir}/${disk_name}"]
 
-  # All disks combined
+  # These ordered basenames form the RAM metadata contract consumed by run-kvm
+  # and run-packer promotion; all_disk_files remains for post-processors.
   all_disk_files = concat([local.primary_disk], local.additional_disk_files)
+  disk_paths = concat([local.primary_disk_name], local.additional_disk_names)
+  checksum_output = var.ramdisk_mode ? "checksums.sha256" : "packer-${local.variant}-${local.timestamp}.{{.ChecksumType}}.checksum"
 
   # Build the default config overrides (these are set automatically)
   default_overrides = {
@@ -213,7 +237,7 @@ locals {
 }
 
 source "qemu" "ubuntu" {
-  vm_name           = "packer-${local.variant}-${local.timestamp}.qcow2"
+  vm_name           = local.primary_disk_name
 
   iso_url           = "${local.ubuntu_live_iso}"
   iso_checksum      = "file:https://releases.ubuntu.com/${var.ubuntu_version}/SHA256SUMS"
@@ -237,6 +261,9 @@ source "qemu" "ubuntu" {
   efi_firmware_vars = local.ovmf_vars
   efi_boot          = true
 
+  # Packer requires output_directory not to exist. run-packer therefore points
+  # RAM builds at a new directory beneath a pre-mounted tmpfs parent, never the
+  # final build directory where it will expose promoted artifacts.
   # NOTE: output_prefix MUST have trailing slash in var definition
   output_directory  = "${var.output_prefix}${local.output_dir}"
 
@@ -244,7 +271,10 @@ source "qemu" "ubuntu" {
   # virtio alone does not populate that
   disk_interface    = "virtio-scsi"
   disk_size         = var.disk_size
-  format            = "qcow2"
+  format            = var.ramdisk_mode ? "raw" : "qcow2"
+  # Compaction rewrites raw RAM artifacts after installation, adding I/O and
+  # defeating the short-lived tmpfs workflow; QCOW2 keeps Packer's default.
+  skip_compaction   = var.ramdisk_mode
 
   # For additional disks, use disk_additional_size(s) - see ZFS-root_local.vars.hcl
   # additional_disks  = ["5G"]  # for two total disks (one primary + one additional etc.)
@@ -341,7 +371,8 @@ build {
     direction   = "download"
   }
 
-  # Create a metadata file with build settings for easy detection
+  # This is the handoff contract for RAM promotion/boot: DISK_PATHS is ordered
+  # and relative to output_directory, while RAMDISK and DISK_FORMAT select raw.
   provisioner "shell-local" {
     # Be SURE to use hard-TABs as first chars for indented heredoc
     inline = [
@@ -353,11 +384,15 @@ build {
 				"SECUREBOOT=${var.secureboot}",
 				"RAIDLEVEL=${local.actual_raidlevel}",
 				"TOTAL_DISKS=${local.total_disks}",
+				"%{ if var.ramdisk_mode }RAMDISK=${var.ramdisk_mode}\nDISK_FORMAT=${local.disk_extension}\nDISK_PATHS=${join(",", local.disk_paths)}%{ endif }",
 			"METADATA_EOF"
     ]
   }
 
   post-processor "manifest" {
+    # Parent artifacts and post-processors own these build outputs. By contrast,
+    # run-packer creates packer-output.log outside Packer so failure logs survive
+    # the wrapper's tmpfs lifecycle.
     output     = "${var.output_prefix}${local.output_dir}/manifest.json"
     strip_path = true
   }
@@ -367,8 +402,7 @@ build {
       [
         "${var.output_prefix}${local.output_dir}/build.log",
         "${var.output_prefix}${local.output_dir}/manifest.json",
-        "${var.output_prefix}${local.output_dir}/ZFS-root_final.conf",
-        "${var.output_prefix}${local.output_dir}/packer-output.log"
+        "${var.output_prefix}${local.output_dir}/ZFS-root_final.conf"
       ],
       local.all_disk_files
     )
@@ -379,7 +413,7 @@ build {
   # and creates a checksum for each one
   post-processor "checksum" {
       checksum_types      = [ "sha256" ]
-      output              = "${var.output_prefix}${local.output_dir}/packer-${local.variant}-${local.timestamp}.{{.ChecksumType}}.checksum"
+      output              = "${var.output_prefix}${local.output_dir}/${local.checksum_output}"
       keep_input_artifact = true
   }
 }
