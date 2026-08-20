@@ -291,7 +291,7 @@ source "qemu" "ubuntu" {
   headless          = "${var.headless}"   # NOTE: set this to true when using in CI Pipelines or docker
   display           = "${var.display}"    # sdl is most compatible, gtk is faster but may have issues with older systems
 
-  boot_wait         = "150s"
+  boot_wait         = "180s"
   # Wait for live CD to fully boot and reach the "Try Ubuntu" prompt,
   # then trigger "Try Ubuntu" right away. Wait for the installer to
   # appear, then ctrl-z it into background to get a shell so we can
