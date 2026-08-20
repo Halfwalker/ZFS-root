@@ -132,9 +132,10 @@ Options:
 | `--ram SIZE` | RAM in MB (default: 2048) |
 | `--ssh PORT` | SSH forwarding port - default: 3222 (NAT'd to 22) |
 | `--dropbear PORT` | SSH forwarding port for Dropbear - default: 1222 (NAT'd to 222)<br>NOTE: **requires** an ssh key defined |
+| `--headless` | Run VM without graphical display |
 
 ```bash
-./run-kvm.sh [--bios] [--secureboot] [--ram 4096] [--ssh 3222] [--dropbear 1222] \
+./run-kvm.sh [--bios] [--secureboot] [--ram 4096] [--ssh 3222] [--dropbear 1222] [--headless] \
   /qemu/builds/packer-noble-NOENC-<timestamp>
 ```
 

@@ -17,6 +17,7 @@ Options:
                   e.g. ssh -p 3222 packer@localhost -o pubkeyauthentication=no
                   Since packer builds default to packer:packer creds
   --dropbear PORT Set SSH forwarding port for Dropbear (default: 1222)
+  --headless      Run VM without graphical display
   --help          Show this help
 
   path-to-packer-build should be a directory created by
@@ -39,6 +40,7 @@ OVMF=""                                 # Will be auto-detected or set by --secu
 DISK_FORMAT="qcow2"                     # Default disk format
 DISK_PATHS=()
 efivars=()
+display_args=()
 
 load_disk_metadata() {
     # RAM builds publish the disk format and ordered basenames as a contract (fancy!) with
@@ -138,6 +140,7 @@ while [[ $# -gt 0 ]]; do
     --ram)          RAMSIZE="$2" ; shift 2 ;;
     --ssh)          SSH_PORT="$2" ; shift 2 ;;
     --dropbear)     DROPBEAR_PORT="$2" ; shift 2 ;;
+    --headless)     display_args=( -display none ); shift ;;
     --help)         usage; exit 0 ;;
     *)              ZFSROOT="$1" ; shift ;;
   esac
@@ -316,6 +319,7 @@ if [[ "${RAMDISK}" == "true" ]]; then
     qemu_args+=( "${global_array[@]}" )
     qemu_args+=( -daemonize -pidfile /tmp/qemu-vm.pid )
     qemu_args+=( "${efivars[@]}" )
+    qemu_args+=( "${display_args[@]}" )
     for disk_path in "${DISK_PATHS[@]}"; do
         qemu_args+=( -drive "file=${ZFSROOT}/${disk_path},format=raw,cache=writeback" )
     done
@@ -330,6 +334,7 @@ else
         ${machine_args} \
         ${global_args} \
         -daemonize -pidfile /tmp/qemu-vm.pid \
+        "${display_args[@]}" \
         ${efivars[*]} \
         $(for f in ${ZFSROOT}/*qcow* ; do echo "-drive file=${f},format=qcow2,cache=writeback " ; done) \
         -device virtio-scsi-pci,id=scsi0 \
