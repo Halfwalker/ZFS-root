@@ -23,6 +23,7 @@ Options:
                             Must manually set "--set AUTOSIGN=y" if auto-signing of boot files required
   --iso-src VALUE           (e.g. file:///qemu/ISOs) defaults to download
   --set KEY=VALUE           Override config variables (can be used multiple times)
+  --display VALUE           packer display defaults to "sdl", can set to "gtk"
   --help                    Show this help
 
 For local ISOs, each ISO should be in the appropriate release-named dir
@@ -75,6 +76,7 @@ DISKS="${DISKS:-}"                                      # Total number of disks 
 RAIDLEVEL="${RAIDLEVEL:-}"                              # Raid type for multi-disk (mirror, raidz1)
 SECUREBOOT="${SECUREBOOT:-}"                            # Enable SecureBoot
 ISO_SRC="${ISO_SRC:-}"                                  # Location of bootable ISOs (eg. file///qemu/ISOs)
+PACKER_DISPLAY="${PACKER_DISPLAY:-}"                    # Override packer display var
 # RAM mode is strictly opt-in. Empty preserves the established QCOW2 build and
 # launch paths, while a size enables the tmpfs staging/promotion lifecycle.
 RAMDISK_SIZE=""
@@ -107,6 +109,7 @@ while [[ $# -gt 0 ]]; do
         --raidlevel)        RAIDLEVEL="$2"; shift 2 ;;
         --secureboot)       SECUREBOOT="true"; shift ;;
         --iso-src)          ISO_SRC="$2"; shift 2 ;;
+        --display)          PACKER_DISPLAY="$2"; shift 2 ;;
         --set)
             # Validate KEY=VALUE format
             if [[ ! "$2" =~ ^[A-Z_][A-Z0-9_]*=.+$ ]]; then
@@ -236,6 +239,7 @@ add_var "ovmf_code"           "$OVMF_CODE"
 add_var "ovmf_vars"           "$OVMF_VARS"
 add_var "ubuntu_live_iso_src" "$ISO_SRC"
 add_var "config_file"         "$CONFIG_FILE"
+add_var "display"             "$PACKER_DISPLAY"
 
 ramdisk_failure_cleanup() {
     local status="$?" mount_target

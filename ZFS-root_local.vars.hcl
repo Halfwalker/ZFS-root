@@ -7,6 +7,15 @@
 # true  -> console is hidden
 # headless              = true
 
+# Default for display is "sdl" - this is how one can set it to "gtk" or "none"
+#   gtk :  uses GTK to render the virtual machine window
+#   sdl :  Alternative backend; uses SDL2 to render the display. Useful if GTK
+#          fails or if hardware acceleration (like gl=on) behaves better with
+#          SDL on your graphics driver.
+#   none : Passes no -display flag to QEMU, letting QEMU fall back to system
+#          defaults or headless/VNC execution
+# display               = "gtk"
+
 # When running under docker this location is relative to the container environment
 # So the outside/host location must be bind-mounted into the container at this location
 # eg.  -v "/home/location/somewhere:/qemu/builds"
