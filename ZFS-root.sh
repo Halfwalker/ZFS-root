@@ -3278,6 +3278,15 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         systemctl stop zrepl
         mv /etc/zrepl/zrepl.yml /etc/zrepl/zrepl.yml.BAK
 
+        # NOTE: zrepl will fail sometimes with a "bad system call" error
+        #       See https://github.com/zrepl/zrepl/issues/735
+        #       So we disable the SystemCallFilter in the system unit file via override
+        mkdir -p /etc/systemd/system/zrepl.service.d
+        cat > /etc/systemd/system/zrepl.service.d/override.conf <<- EOF
+			[Service]
+			SystemCallFilter=
+			EOF
+
         # Set the main root dataset snapshot threshold to 120mb
         # TODO: Make this a parameter
         zfs set com.zrepl:snapshot-threshold=120000000 ${POOLNAME}/ROOT/${SUITE}

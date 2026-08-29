@@ -204,6 +204,10 @@ NOTE: It will _always_ prompt for the list of disks to install to, and will paus
 
 ### zrepl ZFS snapshot management and replication
 
+**NOTE:** *zrepl* will sometimes fail with a _"bad system call"_ error - see the [issue 735](https://github.com/zrepl/zrepl/issues/735)
+
+**ZFS-root.sh** will drop an override file into `/etc/systemd/system/zrepl.service.d/override.conf` to disable the **SystemCallFilter** entries.  In all testing this has resolved the problem.
+
 The simple *zrepl* config install sets up two snapshot/prune only jobs, no replication.  Both the main root dataset and the home user dataset are snap'd on a 15min cadence.  The root dataset prune policy is to keep 1 hour of 15min snaps, 24 hourly and 14 daily.  The home user dataset policy is similar, 1 hour of 15min snaps, 24 hourly and 30 daily snaps.
 
 In addition, the root dataset is only snap'd if there has been more that 120mb written to it - the idea being that we don't _really_ need mostly-empty snaps of an idle system.  Home data though, snap them all ...
