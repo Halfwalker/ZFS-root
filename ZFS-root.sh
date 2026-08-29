@@ -1321,9 +1321,13 @@ create_zfs_datasets() {
 install_debootstrap() {
     echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
+
+    # Ensure debootstrap has latest info
+    apt-get -qq --no-install-recommends --yes install distro-info-data debootstrap
+
     # Show what we got before installing
     echo "- $(tput setaf 1)About to debootstrap into ${ZFSBUILD}$(tput sgr0) -----------"
-    zfs list -t all
+    zfs list -r ${POOLNAME}
     df -h
     echo "- $(tput setaf 1)About to debootstrap into ${ZFSBUILD}$(tput sgr0) -----------"
     read -r -t 15 -p "Press <enter> to continue (auto-continue in 15secs)"
