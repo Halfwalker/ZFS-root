@@ -3285,7 +3285,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         cat > /etc/systemd/system/zrepl.service.d/override.conf <<- EOF
 			[Service]
 			SystemCallFilter=
-			EOF
+		EOF
 
         # Set the main root dataset snapshot threshold to 120mb
         # TODO: Make this a parameter
