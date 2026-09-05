@@ -318,6 +318,53 @@ query_user() {
 
 
 # -------------------------------------------------------------------------------------------------------
+# Build a list of any existing zfs pools and the member vdevs in each (if any)
+list_pools() {
+    declare -gA pools_and_vdevs=()   # global, associative: diskname -> poolname
+    local pool diskname
+
+    for pool in $(zpool list -H -o name 2>/dev/null); do
+        while read -r diskname; do
+            pools_and_vdevs["${diskname}"]="${pool}"
+        done < <(zpool status -L "${pool}" 2>/dev/null | awk -v poolname="${pool}" '
+            $1 == poolname { next }
+            $1 ~ /^(mirror|raidz[1-3]?|spare|log|cache|replacing|indirect)-?[0-9]*$/ { next }
+            $2 ~ /^(ONLINE|DEGRADED|FAULTED|OFFLINE|UNAVAIL|REMOVED)$/ { print $1 }
+        ')
+    done
+}
+
+
+# -------------------------------------------------------------------------------------------------------
+# Check a given disk (from /dev/disk/by-id/<disk name>)
+# If it's part of an active pool, return the poolname
+check_disk() {
+    # $1 = entry name under /dev/disk/by-id/, e.g. ata-ADATA_SP600_7D4020501003
+    local byid="$1"
+    local realdev diskname key
+
+    # Build the pool/vdev map once, on first call
+    if ! declare -p pools_and_vdevs &>/dev/null ; then
+        list_pools
+    fi
+
+    realdev=$(readlink -f "/dev/disk/by-id/${byid}") || return 1
+    diskname=$(basename "${realdev}")          # e.g. sdk
+
+    for key in "${!pools_and_vdevs[@]}"; do
+        # match bare disk (sdk) or any partition of it (sdk3)
+        if [[ "${key}" =~ ^${diskname}[0-9]*$ ]]; then
+            echo "${pools_and_vdevs[${key}]}"
+            return 0
+        fi
+    done
+
+    echo ""
+    return 1
+}
+
+
+# -------------------------------------------------------------------------------------------------------
 # Select which disk(s) to install to
 # Only called when WIPE_FRESH = y
 select_disks() {
@@ -348,10 +395,21 @@ select_disks() {
             exit 1
         fi
 
-        TMPFILE=$(mktemp)
+        # Build the checklist display list, annotating disks already in a pool
+        disklabels=()
+        for d in "${disks[@]}"; do
+            pool=$(check_disk "${d}")
+            if [[ -n "${pool}" ]]; then
+                disklabels+=("${d}[${pool}]")
+            else
+                disklabels+=("${d}")
+            fi
+        done
+
         # Find longest disk name
+        TMPFILE=$(mktemp)
         m=-1
-        for disk in "${disks[@]}"
+        for disk in "${disklabels[@]}"
         do
            if [ ${#disk} -gt $m ]
            then
@@ -361,18 +419,22 @@ select_disks() {
 
         # Set dialog box size to num disks
         list_height=$(( ${#disks[@]} + 1 ))
-        box_height=$(( ${#disks[@]} + 8 ))
+        box_height=$(( ${#disks[@]} + 9 ))
         box_width=$(( m + 26 ))
 
         DONE=false
         until ${DONE} ; do
+            args=()
+            for disk in "${!disklabels[@]}" ; do
+                args+=("${disklabels[${disk}]}" "OFF")
+            done
+        
             whiptail --title "List of disks" --separate-output --checklist --noitem \
-                "Choose disk(s) to install to" ${box_height} ${box_width} ${list_height} \
-                $(for disk in $(seq 0 $(( ${#disks[@]}-1)) ) ; do echo "${disks[${disk}]}" OFF ; done) 2> "${TMPFILE}"
+                "Choose disk(s) to install into\n[poolname] is existing active pool (if any)" ${box_height} ${box_width} ${list_height} \
+                "${args[@]}" 2> "${TMPFILE}"
             RET=${?}
             [[ ${RET} = 1 ]] && exit 1
-
-            readarray -t zfsdisks < <(cat "${TMPFILE}")
+            readarray -t zfsdisks < <(sed -E 's/ \[[^]]*\]$//' "${TMPFILE}")
             if [ ${#zfsdisks[@]} != 0 ] ; then
                 DONE=true
             fi
