@@ -1454,38 +1454,44 @@ setup_network_config() {
 		  # renderer: NetworkManager
 		  ethernets:
 		    alleths:
+		      # Set default mtu to 9000 jumbo frames
+		      # If not wanted, disable in bridges below as well
+		      mtu: 9000
 		      optional: true
 		      match:
 		        name: e*
-		      dhcp4: true
-		      dhcp6: true
+		      # Set dhcp false here if bridges dhcp is true
+		      dhcp4: false
+		      dhcp6: false
 		      # wakeonlan: true
 		      # === With the bridge config below, set dhcp to false
 		      # dhcp4: false
 		      # dhcp6: false
 
-		# bridges:
-		#   br0:
-		#     interfaces: [alleths]
-		#     # === Example static IP address
-		#     # addresses: [192.168.2.8/24]
-		#     # Set default mtu to 9000 jumbo frames
-		#     mtu: 9000
-		#     dhcp4: yes
-		#     dhcp6: yes
-		#     # wakeonlan: true
-		#     # === Only need routes: or gateway4: if NOT using DHCP
-		#     # === gateway4 is deprecated, use routes instead
-		#     # gateway4: 192.168.2.4
-		#     # === For focal/20.04 or jammy/22.04 and above
-		#     # routes:
-		#     #   - to: default
-		#     #     via: 192.168.2.4
-		#     #     metric: 100
-		#     #     mtu: 1472
-		#     #   - to: 192.168.0.0/16
-		#     #     scope: link
-		#     #     mtu: 9000
+		  bridges:
+		    br0:
+		      interfaces: [alleths]
+		      # === Example static IP address
+		      # addresses: [192.168.1.8/24]
+		      # Set default mtu to 9000 jumbo frames
+		      # If not wanted, disable in ethernets above as well
+		      mtu: 9000
+		      # If dhcp true here, set dhcp false above in ethernets block
+		      dhcp4: true
+		      dhcp6: true
+		      # wakeonlan: true
+		      # === Only need routes: or gateway4: if NOT using DHCP
+		      # === gateway4 is deprecated, use routes instead
+		      # gateway4: 192.168.1.1
+		      # === For focal/20.04 or jammy/22.04 and above
+		      # routes:
+		      #   - to: default
+		      #     via: 192.168.1.1
+		      #     metric: 100
+		      #     mtu: 1472
+		      #   - to: 192.168.0.0/16
+		      #     scope: link
+		      #     mtu: 9000
 		#     nameservers:
 		#       addresses: [127.0.0.53, 8.8.8.8, 8.8.4.4]
 		#     parameters:
@@ -3305,7 +3311,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 		# Exclude lo, virtual and docker interfaces - they're just messy
 
 		echo -e "$(lsb_release -d -s) \\\n \l\n" > /etc/issue
-		echo "$(ls -1 /sys/class/net | grep -E -v 'lo|vir|docker|tap|veth|br-|zt?' | xargs -I {} echo '   {} : \4{{}}')" >> /etc/issue
+		echo "$(ls -1 /sys/class/net | grep -E -v 'lo|vir|docker|tap|veth|zt?' | xargs -I {} echo '   {} : \4{{}}')" >> /etc/issue
 		echo "" >> /etc/issue
 	EOF
 
