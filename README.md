@@ -46,6 +46,24 @@ You can add a couple of parameters on the command-line
 
     Enable DEBUG mode - literally just `set -x` in the script to see everything it does
 
+
+## Features
+
+* Will accommodate any number of disks for ZFS, and offer options for the raid level to be used.
+* Uses [zfsbootmenu](https://github.com/zbm-dev/zfsbootmenu/) to handle the actual booting of the ZFS root dataset(s).
+* Creates a bridge network interface **br0** with all ethernet interfaces enslaved to it. Allows for plugging into any interface. 
+* Installs an apt hook in `/etc/apt/apt.conf.d/99-check-netplan-renderer` to automatically update the netplan `/etc/netplan/01_netcfg.yaml` to use the _networkd_ or _NetworkManager_ renderer for managing the **br0** interface depending on if _network-manager_ package is installed.
+* Can enable and configure UEFI SecureBoot using locally-generated keys.  The **rEFInd** binary and **zfsbootmenu** EFI bundle will be signed.
+* Can optionally clone the installed ROOT dataset as a rescue dataset. This will be selectable in the **zfsbootmenu** menu in the event the main ROOT dataset ever gets corrupted.
+* When using encryption it can also optionally install [dropbear](https://matt.ucc.asn.au/dropbear/dropbear.html) to allow remote unlocking of system. `ssh -p 222 root@<ip addr>`  **NOTE:** do not enable Dropbear for laptops - it wants to see the network in place, and if it's missing (usb-ethernet etc) then it will just sit and wait.
+* Can pre-populate the main user `~/.ssh/authorized_keys` with a pubkey pulled from named users from github.  This will also pre-populate the *dropbear* _authorized_keys_ if encryption is used.
+* Optionally can install google_authenticator for the main user.  This will prompt for a TOTP code on login via ssh if no ssh-key is used.  The code and a QR code are displayed during initial config setup.
+* If a local *apt-cacher* system is available you can point `apt` to that to speed up package downloads.
+* Memtest86+ included as a boot option.
+* Optionally can install [zrepl](https://zrepl.github.io/) with a basic snapshot-only config to auto-snapshot the main and home datasets (see _/etc/zrepl_)
+* [Packer](https://developer.hashicorp.com/packer) config to generate *QCOW2* KVM disk images for testing or CI/CD by default, with opt-in ephemeral RAM-backed raw disks. See [README-PACKER.md](README-PACKER.md) for operations.
+
+
 ## Partition layout
 
 The partition layout will look similar to this, depending on if a SWAP partition is needed for Hibernation and if encryption is selected.  The **_0** refers to the disk number.  **_0** for first disk, **_1** for second and so on.
@@ -121,21 +139,6 @@ If a subsequent run is made with **WIPE_FRESH=n** then a new root dataset will b
 To change the ZFSBootMenu default dataset to boot from the original Resolute/26.04 to the new Plucky/25.04
 
 > `zfs set bootfs=<poolname>/ROOT/plucky <poolname>`
-
-## Features
-
-* Will accommodate any number of disks for ZFS, and offer options for the raid level to be used.
-* Uses [zfsbootmenu](https://github.com/zbm-dev/zfsbootmenu/) to handle the actual booting of the ZFS root dataset(s).
-* Can enable and configure UEFI SecureBoot using locally-generated keys.  The **rEFInd** binary and **zfsbootmenu** EFI bundle will be signed.
-* Can optionally clone the installed ROOT dataset as a rescue dataset. This will be selectable in the **zfsbootmenu** menu in the event the main ROOT dataset ever gets corrupted.
-* When using encryption it can also optionally install [dropbear](https://matt.ucc.asn.au/dropbear/dropbear.html) to allow remote unlocking of system. `ssh -p 222 root@<ip addr>`  **NOTE:** do not enable Dropbear for laptops - it wants to see the network in place, and if it's missing (usb-ethernet etc) then it will just sit and wait.
-* Can pre-populate the main user `~/.ssh/authorized_keys` with a pubkey pulled from named users from github.  This will also pre-populate the *dropbear* _authorized_keys_ if encryption is used.
-* Optionally can install google_authenticator for the main user.  This will prompt for a TOTP code on login via ssh if no ssh-key is used.  The code and a QR code are displayed during initial config setup.
-* If a local *apt-cacher* system is available you can point `apt` to that to speed up package downloads.
-* Memtest86+ included as a boot option.
-* Optionally can install [zrepl](https://zrepl.github.io/) with a basic snapshot-only config to auto-snapshot the main and home datasets (see _/etc/zrepl_)
-* [Packer](https://developer.hashicorp.com/packer) config to generate *QCOW2* KVM disk images for testing or CI/CD by default, with opt-in ephemeral RAM-backed raw disks. See [README-PACKER.md](README-PACKER.md) for operations.
-
 
 *initramfs-tools* is NOT used, and is in fact disabled via `apt-mark hold initramfs-tools`.  Instead *dracut* is used for managing the initramfs.
 

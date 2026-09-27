@@ -1444,20 +1444,24 @@ setup_network_config() {
 
     # Set up networking for netplan
     # renderer: networkd is for text mode only, use NetworkManager for gnome
+    # Since this is early, we start with networkd, but after install we check
+    # if network-manager is installed which indicates a desktop. If so we set to
+    # to NetworkManager otherwise set to networkd
     # We create a bridge here with all found ethernet interfaces as slaves
     # Makes it easier to set up multipass or LXD later
     # NOTE: tabs as first char to handle indented heredoc
     cat > ${ZFSBUILD}/etc/netplan/01_netcfg.yaml <<- EOF
 		network:
 		  version: 2
+		  # renderer can be NetworkManager or networkd
 		  renderer: networkd
-		  # renderer: NetworkManager
 		  ethernets:
 		    alleths:
 		      # Set default mtu to 9000 jumbo frames
 		      # If not wanted, disable in bridges below as well
 		      mtu: 9000
 		      optional: true
+		      # Grab all ethernet interfaces for br0 bridge below
 		      match:
 		        name: e*
 		      # Set dhcp false here if bridges dhcp is true
@@ -1465,8 +1469,15 @@ setup_network_config() {
 		      dhcp6: false
 		      # wakeonlan: true
 		      # === With the bridge config below, set dhcp to false
-		      # dhcp4: false
-		      # dhcp6: false
+		      # dhcp4: true
+		      # dhcp6: true
+		      # ZFSROOT-NM-BEGIN
+		#      # Specific to NetworkManager to allow mutiple interfaces into br0 bridge
+		#      # /usr/local/bin/check-netplan-renderer.sh manages this block
+		#      networkmanager:
+		#        passthrough:
+		#          connection.multi-connect: "3"
+		      # ZFSROOT-NM-END
 
 		  bridges:
 		    br0:
@@ -1480,10 +1491,8 @@ setup_network_config() {
 		      dhcp4: true
 		      dhcp6: true
 		      # wakeonlan: true
-		      # === Only need routes: or gateway4: if NOT using DHCP
-		      # === gateway4 is deprecated, use routes instead
-		      # gateway4: 192.168.1.1
-		      # === For focal/20.04 or jammy/22.04 and above
+		      # === Only need routes: if NOT using DHCP
+		      # === For jammy/22.04 and above
 		      # routes:
 		      #   - to: default
 		      #     via: 192.168.1.1
@@ -1494,9 +1503,12 @@ setup_network_config() {
 		      #     mtu: 9000
 		#     nameservers:
 		#       addresses: [127.0.0.53, 8.8.8.8, 8.8.4.4]
-		#     parameters:
-		#       stp: false
-		#       forward-delay: 0
+		      parameters:
+		        # For multiple interfaces better to set this true, protection
+		        # against broadcast storms if >1 interface on same network
+		        # Allow 10 seconds for topology to settle down
+		        stp: true
+		        forward-delay: 10
 	EOF
 } # setup_network_config()
 
@@ -3508,6 +3520,135 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 		Dpkg::Pre-Invoke { "export DATE=\$(/usr/bin/date +%F-%H%M%S) ; ${ZFSLOCATION} snap \$(/usr/bin/df | /usr/bin/grep -E '/\$' | /usr/bin/cut -d' ' -f1)@apt_\${DATE}"; };
 	EOF
 
+    #-----------------------------------------------------------------------------
+
+    # Set apt/dpkg to automagically switch from networkd to NetworkManager in the
+    # netplan config /etc/netplan/01_netcfg.yaml if a desktop UI is installed
+    cat > /usr/local/bin/check-netplan-renderer.sh <<- 'EOFNETPLAN'
+		#!/bin/bash
+
+		# Check installed packages for network-manager. If found, set the renderer: in
+		# /etc/netplan/01_netcfg.yaml to NetworkManager otherwise set to networkd
+		# This usually triggered via apt hook
+
+		set -euo pipefail
+		NETCFG=/etc/netplan/01_netcfg.yaml
+		NM_BEGIN="# ZFSROOT-NM-BEGIN"
+		NM_END="# ZFSROOT-NM-END"
+		NM_OVERRIDE_CONF=/etc/NetworkManager/conf.d/10-globally-managed-devices.conf
+
+		# systemd-networkd.service is socket-activated; disabling/masking the service alone
+		# isn't enough — the .socket, -varlink.socket, and -resolve-hook.socket units all
+		# need the same treatment or the service respawns.
+		NETWORKD_UNITS=(systemd-networkd.service systemd-networkd.socket \
+		                systemd-networkd-varlink.socket systemd-networkd-resolve-hook.socket)
+
+		if dpkg-query -W -f='${Status}' network-manager 2>/dev/null | grep -q "^install ok installed$"; then
+		    WANT_RENDERER=NetworkManager
+		else
+		    WANT_RENDERER=networkd
+		fi
+
+		# --- Need to ensure bridge br0 is managed by NetworkManager ---
+		# Ubuntu's network-manager package ships a restrictive default
+		# (/usr/lib/NetworkManager/conf.d/10-globally-managed-devices.conf)
+		# that leaves ethernet devices unmanaged unless overridden
+		if [[ "$WANT_RENDERER" == "NetworkManager" ]]; then
+		    cat > "$NM_OVERRIDE_CONF" <<EOF
+				[keyfile]
+				# NOTE: br0 bridge is managed by netplan
+				unmanaged-devices=*,except:type:wifi,except:type:wwan,except:type:ethernet,except:interface-name:br0
+			EOF
+		else
+		    rm -f "$NM_OVERRIDE_CONF"
+		fi
+
+		# --- renderer line in /etc/netplan/01_netcfg.yaml ---
+		CURRENT_RENDERER=$(awk '/^  renderer:/{print $2; exit}' "$NETCFG")
+		if [[ "$CURRENT_RENDERER" != "$WANT_RENDERER" ]]; then
+		    sed -i "s/^  renderer: .*/  renderer: ${WANT_RENDERER}/" "$NETCFG"
+		fi
+
+		# --- networkmanager: passthrough stanza, bracketed by markers ---
+		# networkmanager: passthrough is only valid when renderer is NetworkManager
+		# So we have to comment/uncomment that block depending on renderer setting
+		# Determine current state by checking whether the content lines between the
+		# markers are commented out or not.
+		IS_COMMENTED=$(awk -v b="$NM_BEGIN" -v e="$NM_END" '
+		    $0 ~ b {inblock=1; next}
+		    $0 ~ e {inblock=0}
+		    inblock && NF {print ($0 ~ /^#/) ? "yes" : "no"; exit}
+		' "$NETCFG")
+
+		if [[ "$WANT_RENDERER" == "NetworkManager" && "$IS_COMMENTED" == "yes" ]]; then
+		    sed -i "/${NM_BEGIN}/,/${NM_END}/{ /${NM_BEGIN}/b; /${NM_END}/b; s/^#//; }" "$NETCFG"
+		elif [[ "$WANT_RENDERER" == "networkd" && "$IS_COMMENTED" == "no" ]]; then
+		    sed -i "/${NM_BEGIN}/,/${NM_END}/{ /${NM_BEGIN}/b; /${NM_END}/b; s/^/#/; }" "$NETCFG"
+		fi
+
+		# --- apply, only if something actually changed ---
+		if [[ "$CURRENT_RENDERER" != "$WANT_RENDERER" ]] || \
+		   { [[ "$WANT_RENDERER" == "NetworkManager" && "$IS_COMMENTED" == "yes" ]] || \
+		     [[ "$WANT_RENDERER" == "networkd" && "$IS_COMMENTED" == "no" ]]; }; then
+		    echo -n "Need to switch renderer: "
+		    chmod 600 "$NETCFG"
+
+		    # Netplan is stateless: switching renderers does not tear down
+		    # virtual devices (bridges) created under the old renderer. Clean
+		    # those up explicitly so the new backend creates them fresh.
+		    BRIDGES=$(netplan get bridges 2>/dev/null | awk -F: '/^[^[:space:]]/{print $1}')
+		    for br in $BRIDGES; do
+		        if ip link show "$br" &>/dev/null; then
+		            ip link delete "$br" 2>/dev/null || true
+		        fi
+		    done
+		    rm -f /run/systemd/network/*-netplan-*.network 2>/dev/null || true
+
+		    # Regenerate backend config only - do NOT call `netplan apply` here.
+		    # It also tries to poke the just-masked backend (harmless noise) and
+		    # performs an interface unbind/rebind pass that has been observed to
+		    # disrupt NetworkManager right after a renderer switch.
+		    netplan generate
+
+		    if [[ "$WANT_RENDERER" == "NetworkManager" ]]; then
+		        echo "Switching to NetworkManager"
+		        systemctl disable --now "${NETWORKD_UNITS[@]}" 2>/dev/null || true
+		        systemctl mask systemd-networkd.service
+		        systemctl unmask NetworkManager.service
+
+		        udevadm trigger --subsystem-match=net --action=change
+		        udevadm settle
+
+		        for i in 1 2 3 4 5; do
+		            systemctl restart NetworkManager && break
+		            sleep 2
+		        done
+		        if ! systemctl is-active --quiet NetworkManager; then
+		            echo "WARNING: NetworkManager did not come up cleanly" >&2
+		        fi
+		        nmcli connection reload
+		    else
+		        echo "Switching to networkd"
+		        systemctl disable --now NetworkManager 2>/dev/null || true
+		        systemctl mask NetworkManager.service
+		        systemctl unmask "${NETWORKD_UNITS[@]}"
+		        udevadm trigger --subsystem-match=net --action=change
+		        udevadm settle
+		        systemctl restart systemd-networkd.service
+		    fi
+		fi
+	EOFNETPLAN
+    chmod +x /usr/local/bin/check-netplan-renderer.sh
+
+    cat > /etc/apt/apt.conf.d/99-check-netplan-renderer <<- EOF
+		# Check installed packages for network-manager. If found, set the renderer: in
+		# /etc/netplan/01_netcfg.yaml to NetworkManager otherwise set to networkd
+
+		DPkg::Post-Invoke { "/usr/local/bin/check-netplan-renderer.sh || true"; };
+	EOF
+
+    #-----------------------------------------------------------------------------
+
     zfs snapshot ${POOLNAME}/ROOT/${SUITE}@base_install
 
     # Optionally create a clone of the new system as a rescue dataset.
@@ -3655,6 +3796,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         ####  ./displaylink-driver-5.6.1-59.184.run --accept --noprogress --nox11
 
     fi # GNOME KDE NEON XFCE
+
+    # Check if any desktop UI has been installed - if so switch from networkd to NetworkManager
+    /usr/local/bin/check-netplan-renderer.sh
 
     # Enable hibernate in upower and logind if desktop is installed
     if [ -d /etc/polkit-1/localauthority/50-local.d ] ; then
