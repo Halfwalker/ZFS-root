@@ -1874,6 +1874,10 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     # jammy/22.04 moved zfs from /sbin/zfs to /usr/sbin/zfs
     ZFSLOCATION=$(which zfs)
 
+    # Ensure floppy driver is disabled
+    mkdir -p /etc/modules-load.d
+    echo "blacklist floppy" > /etc/modules-load.d/blacklist-floppy.conf
+
     if [ "${DISCENC}" != "NOENC" ] ; then
         apt-get -qq --yes --no-install-recommends install cryptsetup keyutils
     fi
@@ -3944,7 +3948,7 @@ log_options
 # Assuming if wiping fresh we need to install ZFS in liveCD
 # If not wiping fresh then we should be running on an existing system with
 # ZFS and the pool and datasets
-apt-get -qq --no-install-recommends --yes install debootstrap gdisk dosfstools mdadm
+apt-get -qq --no-install-recommends --yes install debootstrap gdisk dosfstools mdadm parted
 if [ "${WIPE_FRESH}" == "y" ] ; then
     install_zfs
     partition_disks
