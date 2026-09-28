@@ -152,11 +152,12 @@ XFCE=n
 
 # If you have Nvidia video HW and you *know* which version of driver you want
 # it can be preset here. Leaving undefined will cause the script to prompt.
-# The package installed will be : nvidia-driver-${NVIDIA}
+# The package installed will be : nvidia-${NVIDIA}
 #
 # none for no driver
-# 390 or 470 for legacy driver
-# 550 for current latest, or whatever version you prefer
+# driver-390 or driver-470 for legacy driver
+# driver-580 for current latest, or whatever version you prefer
+# such as driver-580-open or headless-580-open
 NVIDIA=none
 
 # If installing Sound Open Firmware binaries (mostly for laptops) choose
