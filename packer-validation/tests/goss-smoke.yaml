@@ -1,3 +1,5 @@
+# vim: ft=yaml.gotexttmpl
+
 # ZFS-root Pre-Reboot Smoke Tests
 # Run inside packer VM after ZFS-root.sh completes, before reboot
 #
@@ -425,7 +427,7 @@ service:
   zfs-mount:
     enabled: true
 
-  zfs-import-cache:
+  zfs-import-scan:
     enabled: true
 
   {{- if eq .Vars.zrepl "y" }}
