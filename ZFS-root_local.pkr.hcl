@@ -206,14 +206,16 @@ locals {
   checksum_output = var.ramdisk_mode ? "checksums.sha256" : "packer-${local.variant}-${local.timestamp}.{{.ChecksumType}}.checksum"
 
   # Build the default config overrides (these are set automatically)
-  default_overrides = {
-    DISCENC      = var.discenc
-    MYHOSTNAME   = "${local.derived_version_name}-${var.discenc}"
-    POOLNAME     = local.derived_version_name
-    SUITE        = local.derived_version_name
-    RAIDLEVEL    = local.actual_raidlevel
-    SSHPUBKEY    = var.sshpubkey
-  }
+  default_overrides = merge(
+    {
+      DISCENC      = var.discenc
+      MYHOSTNAME   = "${local.derived_version_name}-${var.discenc}"
+      POOLNAME     = local.derived_version_name
+      SUITE        = local.derived_version_name
+      RAIDLEVEL    = local.actual_raidlevel
+    },
+    var.sshpubkey != "" ? { SSHPUBKEY = var.sshpubkey } : {}
+  )
 
   # Merge defaults with user overrides (user overrides win)
   final_overrides = merge(local.default_overrides, var.config_overrides)

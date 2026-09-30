@@ -170,9 +170,10 @@ SOF_VERSION=2025.05.1
 # conducive to entering via keyboard ...
 #
 
-# Any SSH pubkey to add to new system main user
-# This can be in addition to the Github user keys specified above
-##    SSHPUBKEY="ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC3uB7roSJ3EYs9hBAQiUZ9Of53Lm3+JZ6ZVokZnp3CRoRfuVT3zND7DAQYSCo+0MZaaydGB1JrWQfgLImWouiC4bsZEzNhnX6uYQ8qSL8zxsK7xOfeVocP+FHdkKcB85giQFp/onuNwHBWLXw9iC2Z/rrbjN2dPSaDKFWQT7ukE2vqt9TQ6mMpYFBCiHpJUfSxXjgjL7Y1MN58QCJ+PesQEY8hh1DzRBwgY0lY9LYAdrqWwj6AIPPawZTcJnNAwz9wO3a8hAS6i9dK+zHDtSIlArevmP8mpcqhpHEtKZ4TbAel7YRtbvY+w7pENbXQiiNMRkdZ28m6FJAFlIHv/wMpUhgZG3SyfFTDg33VhVFlS0qzvIYjTxMPjGLT4oBXK3+CSBuZKwE3xG39S/oTu++feTCtSu5VZZm9rkzrE77tIoWfGi0eGbfJURP9F9q96F0YuNUAS+gnCw5LzR48sMjqXcUpNHVRwi8XE7TDgl7Fk4JHfJelL3LBjFsZC7uaLmy8I1tk+87xTFd0VyG0cAaX/jMbWn1XGVo1V1uXFYRVmfyiPcJBhUaPQ6z1QDXQzsQLed9nQL9qFFPyjoL0zN7Fp+AVka0kPNhkEl0HIL8KqU7cuoypSeA7EO8Qxk7ay8nSP1PLlYzVUZEvEleBjPHTzO6YZxNMRLZSljp8BoY+lw== Johnny Bravo"
+## # Any SSH pubkey(s) to add to new system main user, one per line
+## # This can be in addition to the Github user keys specified above
+## # Be sure to use SINGLE quotes for ssh key(s)
+## SSHPUBKEY='ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQC3uB7roSJ3EYs9hBAQiUZ9Of53Lm3+JZ6ZVokZnp3CRoRfuVT3zND7DAQYSCo+0MZaaydGB1JrWQfgLImWouiC4bsZEzNhnX6uYQ8qSL8zxsK7xOfeVocP+FHdkKcB85giQFp/onuNwHBWLXw9iC2Z/rrbjN2dPSaDKFWQT7ukE2vqt9TQ6mMpYFBCiHpJUfSxXjgjL7Y1MN58QCJ+PesQEY8hh1DzRBwgY0lY9LYAdrqWwj6AIPPawZTcJnNAwz9wO3a8hAS6i9dK+zHDtSIlArevmP8mpcqhpHEtKZ4TbAel7YRtbvY+w7pENbXQiiNMRkdZ28m6FJAFlIHv/wMpUhgZG3SyfFTDg33VhVFlS0qzvIYjTxMPjGLT4oBXK3+CSBuZKwE3xG39S/oTu++feTCtSu5VZZm9rkzrE77tIoWfGi0eGbfJURP9F9q96F0YuNUAS+gnCw5LzR48sMjqXcUpNHVRwi8XE7TDgl7Fk4JHfJelL3LBjFsZC7uaLmy8I1tk+87xTFd0VyG0cAaX/jMbWn1XGVo1V1uXFYRVmfyiPcJBhUaPQ6z1QDXQzsQLed9nQL9qFFPyjoL0zN7Fp+AVka0kPNhkEl0HIL8KqU7cuoypSeA7EO8Qxk7ay8nSP1PLlYzVUZEvEleBjPHTzO6YZxNMRLZSljp8BoY+lw== Johnny Bravo'
 
 ##    ####################################################################
 ##    # Specify the host key for the new root-on-zfs system ?

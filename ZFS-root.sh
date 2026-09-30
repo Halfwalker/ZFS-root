@@ -1677,7 +1677,7 @@ prep_setup() {
     fi
 
     # Add SSHPUBKEY and Host keys from ZFS-root.conf if defined
-    [[ -v SSHPUBKEY ]] && echo "export SSHPUBKEY=\"${SSHPUBKEY}\"" >> ${ZFSBUILD}/root/Setup.sh
+    [[ -n "${SSHPUBKEY:-}" ]] && echo "export SSHPUBKEY=\"${SSHPUBKEY}\"" >> ${ZFSBUILD}/root/Setup.sh
     # Ugly hack to get multiline variable into Setup.sh
     # Note using single quotes like this  HOST_RSA_KEY='blahblah' surrounded by double quotes
     [[ -v HOST_ECDSA_KEY_PUB ]] && echo "export HOST_ECDSA_KEY_PUB=\"${HOST_ECDSA_KEY_PUB}\"" >> ${ZFSBUILD}/root/Setup.sh
@@ -2782,9 +2782,12 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
           done
         fi
 
-        if [[ -v SSHPUBKEY ]] ; then
-            echo "####### ZFS-root.conf configured key #######" >> /home/${USERNAME}/.ssh/authorized_keys
-            echo "${SSHPUBKEY}" >> /home/${USERNAME}/.ssh/authorized_keys
+        if [[ -n "${SSHPUBKEY:-}" ]]; then
+            echo "####### ZFS-root.conf configured key(s) #######" >> /home/${USERNAME}/.ssh/authorized_keys
+            while IFS= read -r key; do
+                [[ -z "${key//[[:space:]]/}" ]] && continue
+                echo "${key}" >> /home/${USERNAME}/.ssh/authorized_keys
+            done <<< "${SSHPUBKEY}"
         fi
 
         chown -R ${USERNAME}:${USERNAME} /home/${USERNAME}
