@@ -3105,11 +3105,6 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 				landlock: true
 				db_additions:
 				- microsoft
-				files:
-				- path: /boot/vmlinuz-linux
-				  output: /boot/vmlinuz-linux
-				- path: /efi/EFI/Linux/arch-linux.efi
-				  output: /efi/EFI/Linux/arch-linux.efi
 				keys:
 				  pk:
 				    privkey: /boot/efi/sbctl/keys/PK/PK.key
@@ -3123,6 +3118,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 				    privkey: /boot/efi/sbctl/keys/db/db.key
 				    pubkey: /boot/efi/sbctl/keys/db/db.pem
 				    type: file
+				files:
+				- path: /boot/vmlinuz-linux
+				  output: /boot/vmlinuz-linux
 				- path: /boot/efi/EFI/refind/refind_x64.efi
 				  output: /boot/efi/EFI/refind/refind_x64.efi
 				- path: /boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu
