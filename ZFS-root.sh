@@ -1121,14 +1121,29 @@ find_zfs_config() {
 
 
 # -------------------------------------------------------------------------------------------------------
+# Unmount and stop any assembled mdadm arrays built on the selected disks.
+# Arrays on other disks are left alone.  lsblk shows assembled arrays as
+# children of their member partitions, with a TYPE of raid1/raid5/linear/etc.
+stop_md_arrays() {
+    echo "--------------------------------------------------------------------------------"
+    echo "${FUNCNAME[0]}"
+    for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
+        lsblk -nrpo NAME,TYPE /dev/disk/by-id/${zfsdisks[${disk}]} | awk '$2 ~ /^(raid|linear)/ {print $1}'
+    done | sort -u | while read -r md ; do
+        echo "Stopping mdadm array ${md}"
+        umount "${md}" > /dev/null 2>&1
+        mdadm --stop --force "${md}" > /dev/null 2>&1
+    done
+} # stop_md_arrays()
+
+
+# -------------------------------------------------------------------------------------------------------
 # Only called when wiping fresh
 partition_disks() {
     echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
-    # Unmount any mdadm disks that might have been automounted
-    # Stop all found mdadm arrays - again, just in case.  Sheesh.
-    # shellcheck disable=SC2156  # Not "injecting" filenames - this is standard find -exec
-    find /dev -iname md* -type b -exec bash -c "umount {} > /dev/null 2>&1 ; mdadm --stop --force {} > /dev/null 2>&1 ; mdadm --remove {} > /dev/null 2>&1" \;
+    # Unmount and stop any mdadm arrays on the selected disks that might have been automounted
+    stop_md_arrays
 
     ### Partition layout
     for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
@@ -1414,10 +1429,9 @@ setup_boot_partition() {
     if [ ${#zfsdisks[@]} -eq 1 ] ; then
         BOOTDEVRAW=${PARTSBOOT}
     else
-        # Unmount any mdadm disks that might have been automounted
-        # Stop all found mdadm arrays - again, just in case.  Sheesh.
-        # shellcheck disable=SC2156  # Not "injecting" filenames - this is standard find -exec
-        find /dev -iname md* -type b -exec bash -c "umount {} > /dev/null 2>&1 ; mdadm --stop --force {} > /dev/null 2>&1 ; mdadm --remove {} > /dev/null 2>&1" \;
+        # udev may have re-assembled arrays from stale superblocks on the new partitions
+        # Stop any found on the selected disks - again, just in case.  Sheesh.
+        stop_md_arrays
 
         for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
             # Wipe mdadm superblock from all partitions found, even if not md raid partition
