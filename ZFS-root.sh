@@ -3545,12 +3545,13 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
     # Set apt/dpkg to automagically switch from networkd to NetworkManager in the
     # netplan config /etc/netplan/01_netcfg.yaml if a desktop UI is installed
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
     cat > /usr/local/bin/check-netplan-renderer.sh <<- 'EOFNETPLAN'
 		#!/bin/bash
 
 		# Check installed packages for network-manager. If found, set the renderer: in
 		# /etc/netplan/01_netcfg.yaml to NetworkManager otherwise set to networkd
-		# This usually triggered via apt hook
+		# This is usually triggered via apt hook
 
 		set -euo pipefail
 		NETCFG=/etc/netplan/01_netcfg.yaml
@@ -3782,16 +3783,6 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     fi # NEON
 
     if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] || [ "${NEON}" = "y" ] || [ "${XFCE}" = "y" ] ; then
-        # Ensure networking is handled by NetworkManager
-        sed -i 's/networkd/NetworkManager/' /etc/netplan/01_netcfg.yaml
-
-        # NOTE: Using <<- EOF so it wills strip leading TAB chars
-        #       MUST be TAB chars, not spaces
-        cat > /etc/NetworkManager/conf.d/10-globally-managed-devices.conf <<- EOF
-			[keyfile]
-			unmanaged-devices=*,except:type:wifi,except:type:wwan,except:type:ethernet
-		EOF
-
         # Check for Nvidia graphics - if so, install from the ppa:graphics-drivers/ppa
         # The NVIDIA var should be set to the appropriate version from the menu query
         if [ "${NVIDIA}" != "none" ] ; then
