@@ -3085,16 +3085,17 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     # If UEFI SecureBoot should be enabled - NOTE: only available for noble/24.04
     # Local building requires golang asciidoc-base pkgconf pkgconf-bin libpcsclite-dev
     # To build locally need libpcsclite-dev libpcsclite1 golang-go sbsigntool
+    # If UEFI SecureBoot should be enabled - NOTE: only available for noble/24.04
     if [[ ! -v SECUREBOOT ]] || [[ "$SECUREBOOT" != "n" ]]; then
         if [[ -d /sys/firmware/efi ]] && ( [[ "${SUITE}" == "noble" ]] || [[ "${SUITE}" == "resolute" ]] ) ; then
             # Create apt sources for sbctl
-            curl -fsSL https://download.opensuse.org/repositories/home:jloeser:secureboot/xUbuntu_${SUITE_NUM}/Release.key | gpg --dearmor | sudo tee /usr/share/keyrings/secureboot.gpg > /dev/null
+            curl -fsSL https://download.opensuse.org/repositories/home:jloeser:secureboot/xUbuntu_24.04/Release.key | gpg --dearmor | sudo tee /usr/share/keyrings/secureboot.gpg > /dev/null
 
             # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
             cat > /etc/apt/sources.list.d/secureboot.sources <<- EOF
 				X-Repolib-Name: SecureBoot
 				Types: deb
-				URIs: http://download.opensuse.org/repositories/home:/jloeser:/secureboot/xUbuntu_${SUITE_NUM}
+				URIs: http://download.opensuse.org/repositories/home:/jloeser:/secureboot/xUbuntu_24.04
 				Signed-By: /usr/share/keyrings/secureboot.gpg
 				Suites: /
 				Enabled: yes
@@ -3102,27 +3103,27 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 			EOF
 
             # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-            # We put /var/lib/sbctl into /boot/efi/sbctl, so need a config file to reflect that
-            cat > /etc/sbctl <<- EOF
-				keydir: /boot/efi/sbctl/keys
-				guid: /boot/efi/sbctl/GUID
-				files_db: /boot/efi/sbctl/files.json
-				bundles_db: /boot/efi/sbctl/bundles.json
+            mkdir -p /etc/sbctl
+            cat > /etc/sbctl/sbctl.conf <<- EOF
+				keydir: /var/lib/sbctl/keys
+				guid: /var/lib/sbctl/GUID
+				files_db: /var/lib/sbctl/files.json
+				bundles_db: /var/lib/sbctl/bundles.json
 				landlock: true
 				db_additions:
 				- microsoft
 				keys:
 				  pk:
-				    privkey: /boot/efi/sbctl/keys/PK/PK.key
-				    pubkey: /boot/efi/sbctl/keys/PK/PK.pem
+				    privkey: /var/lib/sbctl/keys/PK/PK.key
+				    pubkey: /var/lib/sbctl/keys/PK/PK.pem
 				    type: file
 				  kek:
-				    privkey: /boot/efi/sbctl/keys/KEK/KEK.key
-				    pubkey: /boot/efi/sbctl/keys/KEK/KEK.pem
+				    privkey: /var/lib/sbctl/keys/KEK/KEK.key
+				    pubkey: /var/lib/sbctl/keys/KEK/KEK.pem
 				    type: file
 				  db:
-				    privkey: /boot/efi/sbctl/keys/db/db.key
-				    pubkey: /boot/efi/sbctl/keys/db/db.pem
+				    privkey: /var/lib/sbctl/keys/db/db.key
+				    pubkey: /var/lib/sbctl/keys/db/db.pem
 				    type: file
 				files:
 				- path: /boot/vmlinuz-linux
@@ -3172,8 +3173,8 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
                 /usr/sbin/sbctl enroll-keys --microsoft
                 /usr/sbin/sbctl sign -s /boot/efi/EFI/refind/refind_x64.efi
                 [ -e /boot/efi/EFI/tools/memtest86/memtest86.efi ] && /usr/sbin/sbctl sign -s /boot/efi/EFI/tools/memtest86/memtest86.efi
-                [ -e /boot/efi/EFI/tools/shellx64.efi ] && /usr/sbin/sbctl sign -s /boot/efi/EFI/tools/shellx64.efi
-                /usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
+                [ -e /boot/efi/EFI/tools/shellx64.efi ]            && /usr/sbin/sbctl sign -s /boot/efi/EFI/tools/shellx64.efi
+                [ -e /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi ]   && /usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/zfsbootmenu.efi
                 if [ "${ZFSBOOTMENU_BINARY_TYPE}" != "EFI" ] ; then
                     /usr/sbin/sbctl sign -s /boot/efi/EFI/zfsbootmenu/vmlinuz-bootmenu
                 fi
@@ -4062,6 +4063,15 @@ unshare --mount --fork chroot ${ZFSBUILD} /bin/bash --login -c /root/Setup.sh $1
 
 # Remove any lingering crash reports
 rm -f ${ZFSBUILD}/var/crash/*
+
+# If this is a SecureBoot system and NOT a WIPE_FRESH install (new root dataset)
+# then we need to copy the existing /var/lib/sbctl to the new build
+if [ "${WIPE_FRESH}" == "n" ] ; then
+    if [ -d /var/lib/sbctl ] ; then
+        echo "SecureBoot system detected, WIPE_FRESH = n, copying /var/lib/sbctl"
+        cp -av /var/lib/sbctl ${ZFSBUILD}/var/lib
+    fi
+fi
 
 umount -n ${ZFSBUILD}/{dev/pts,dev/fuse,dev,sys/fs/cgroup,sys,proc}
 
