@@ -3316,6 +3316,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     fi # GOOGLE_AUTH
 
 
+    #-----------------------------------------------------------------------------
     # Add IP address(es) to main tty issue
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
     cat > /etc/systemd/system/showip.service <<- EOF
@@ -3346,7 +3347,16 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 		echo "" >> /etc/issue
 	EOF
 
+    # Create networkd trigger to run showip.service any time networking changes
+    cat > /etc/networkd-dispatcher/routable.d/trigger-showip-service <<- 'EOF'
+		#!/bin/bash
+
+		# Detected a network change - update showip.service
+		systemctl restart showip.service
+	EOF
+
     chmod +x /usr/local/bin/showip.sh
+    chmod +x /etc/networkd-dispatcher/routable.d/trigger-showip-service
     systemctl enable showip.service
 
     #-----------------------------------------------------------------------------
@@ -3556,6 +3566,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 		NM_BEGIN="# ZFSROOT-NM-BEGIN"
 		NM_END="# ZFSROOT-NM-END"
 		NM_OVERRIDE_CONF=/etc/NetworkManager/conf.d/10-globally-managed-devices.conf
+		NM_SHOWIP_CONF=/etc/NetworkManager/dispatcher.d/99-trigger-showip-service
 
 		# systemd-networkd.service is socket-activated; disabling/masking the service alone
 		# isn't enough — the .socket, -varlink.socket, and -resolve-hook.socket units all
@@ -3573,6 +3584,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 		# Ubuntu's network-manager package ships a restrictive default
 		# (/usr/lib/NetworkManager/conf.d/10-globally-managed-devices.conf)
 		# that leaves ethernet devices unmanaged unless overridden
+		# Also ensure network changes trigger the showip.service
 		if [[ "$WANT_RENDERER" == "NetworkManager" ]]; then
 		    cat > "$NM_OVERRIDE_CONF" <<EOF
 				[keyfile]
@@ -3581,6 +3593,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 			EOF
 		else
 		    rm -f "$NM_OVERRIDE_CONF"
+		    rm -f "$NM_SHOWIP_CONF"
 		fi
 
 		# --- renderer line in /etc/netplan/01_netcfg.yaml ---
