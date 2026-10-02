@@ -835,6 +835,7 @@ query_suite() {
 # Determine if SecureBoot may be set up.  Uses sbctl which is only (currently) available for noble 24.04
 # Later may clone the repo and build sbctl locally
 # Only called when WIPE_FRESH = y
+# NOTE: jloeser PPA only has package for noble/24.04, so we force that version
 # Local building requires golang asciidoc-base pkgconf pkgconf-bin libpcsclite-dev
 # NOTE: 'sbctl verify' does not work - fails with 'failed to find EFI system partition' due to ESP
 #       being on a mdadm device for multiple boot devices
@@ -850,13 +851,13 @@ query_secureboot() {
     if [[ ! -v SECUREBOOT ]] || [[ "$SECUREBOOT" != "n" ]]; then
         if [[ -d /sys/firmware/efi ]] && ( [[ "${SUITE}" == "noble" ]] || [[ "${SUITE}" == "resolute" ]] ) ; then
             # Create apt sources for sbctl
-            curl -fsSL https://download.opensuse.org/repositories/home:jloeser:secureboot/xUbuntu_${SUITE_NUM}/Release.key | gpg --dearmor | sudo tee /usr/share/keyrings/secureboot.gpg > /dev/null
+            [ ! -e /usr/share/keyrings/secureboot.gpg ] && curl -fsSL https://download.opensuse.org/repositories/home:jloeser:secureboot/xUbuntu_24.04/Release.key | gpg --dearmor | sudo tee /usr/share/keyrings/secureboot.gpg > /dev/null
 
             # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
-            cat > /etc/apt/sources.list.d/secureboot.sources <<- EOF
+            [ ! -e /etc/apt/sources.list.d/secureboot.sources ] && cat > /etc/apt/sources.list.d/secureboot.sources <<- EOF
 			X-Repolib-Name: SecureBoot
 			Types: deb
-			URIs: http://download.opensuse.org/repositories/home:/jloeser:/secureboot/xUbuntu_${SUITE_NUM}
+			URIs: http://download.opensuse.org/repositories/home:/jloeser:/secureboot/xUbuntu_24.04
 			Signed-By: /usr/share/keyrings/secureboot.gpg
 			Suites: /
 			Enabled: yes
@@ -868,26 +869,29 @@ query_secureboot() {
             apt-get -qq --yes --no-install-recommends install sbctl jq
 
             # Are we in setup mode for SecureBoot ?
-            SETUPMODE=$(sbctl status --json | jq '.setup_mode')
-            echo "SETUPMODE is $SETUPMODE"
-            sbctl setup --migrate   # Sometimes need to update
-            if [ "${SETUPMODE}" == "true" ] ; then
-                if [[ ! -v SECUREBOOT ]] ; then
-                    SECUREBOOT=$(whiptail --title "UEFI SecureBoot is available" --yesno "Should UEFI SecureBoot be enabled ?" 8 60 \
-                    3>&1 1>&2 2>&3)
-                    RET=${?}
-                    [[ ${RET} = 0 ]] && SECUREBOOT=y
-                    [[ ${RET} = 1 ]] && SECUREBOOT=n
-                fi
-            else
-                # Show current SecureBoot config, set SECUREBOOT var to n so we don't try to install in the chroot
-                if [ "${PACKERCI}" != "true" ] ; then
-                    SBCTL_STATUS=$(sbctl status)
-                    whiptail --title "System UEFI not in setup mode" --msgbox "SecureBoot config in bios must be in setup mode\n\nFor VirtualBox delete the .nvram file\nFor other systems see the bios config\n\n${SBCTL_STATUS}" 17 56
-                fi
-                echo "Not in Setup mode, Setting SECUREBOOT to n"
-                SECUREBOOT=n
-            fi
+            # Only need to check if this is a brand new build
+            if [ "${WIPE_FRESH}" == "y" ] ; then     # <<<<<------------------------------------------------ WIPE_FRESH ------ VVVVV
+                SETUPMODE=$(sbctl status --json | jq '.setup_mode')
+                echo "SETUPMODE is $SETUPMODE"
+                sbctl setup --migrate   # Sometimes need to update
+                if [ "${SETUPMODE}" == "true" ] ; then
+                    if [[ ! -v SECUREBOOT ]] ; then
+                        SECUREBOOT=$(whiptail --title "UEFI SecureBoot is available" --yesno "Should UEFI SecureBoot be enabled ?" 8 60 \
+                        3>&1 1>&2 2>&3)
+                        RET=${?}
+                        [[ ${RET} = 0 ]] && SECUREBOOT=y
+                        [[ ${RET} = 1 ]] && SECUREBOOT=n
+                    fi
+                else
+                    # Show current SecureBoot config, set SECUREBOOT var to n so we don't try to install in the chroot
+                    if [ "${PACKERCI}" != "true" ] ; then
+                        SBCTL_STATUS=$(sbctl status)
+                        whiptail --title "System UEFI not in setup mode" --msgbox "SecureBoot config in bios must be in setup mode\n\nFor VirtualBox delete the .nvram file\nFor other systems see the bios config\n\n${SBCTL_STATUS}" 17 56
+                    fi
+                    echo "Not in Setup mode, Setting SECUREBOOT to n"
+                    SECUREBOOT=n
+                fi # In Secureboot Setup mode ?
+            fi # WIPE_FRESH                         # <<<<<------------------------------------------------ WIPE_FRESH ------ ^^^^^
         else
             # No /sys/firmware/efi means no UEFI means no SecureBoot
             echo "/sys/firmware/efi doesn't exist - Setting SECUREBOOT to n"
@@ -955,7 +959,7 @@ show_options() {
         [[ ${RET} = 1 ]] && exit 1
     else
         # Not wiping fresh, so no need for Disk, Raid, Secureboot, Autosign, Hibernate
-        box_height=$(( ${#zfsdisks[@]} + 26 ))
+        box_height=$(( ${#zfsdisks[@]} + 28 ))
         # shellcheck disable=SC2086,SC2116
         whiptail --title "New dataset - Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
         Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
@@ -964,6 +968,8 @@ show_options() {
         Host keys  = $([[ -v HOST_RSA_KEY || -v HOST_ECDSA_KEY || -v HOST_ED25519_KEY ]] && echo Pre-defined || echo Generate new)\n \
         Poolname   = $(echo $POOLNAME)\n \
         User       = $(echo $USERNAME $UCOMMENT)\n\n \
+        SECUREBOOT = $SECUREBOOT  : Enable UEFI SecureBoot\n \
+        AUTOSIGN   = ${AUTOSIGN}  : Enable auto-signing of bootable .efi bundles\n \
         RESCUE     = $(echo $RESCUE)  : Create rescue dataset by cloning install\n \
         DELAY      = $(echo $DELAY)  : Enable delay before importing zpool\n \
         ZREPL      = $(echo $ZREPL)  : Install Zrepl zfs snapshot manager\n \
