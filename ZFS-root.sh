@@ -163,8 +163,8 @@ preflight() {
     [[ ! -v ZFSBOOTMENU_CMDLINE ]] && ZFSBOOTMENU_CMDLINE=""
 
     # For SOF binaries, default to 2025.05.1
-    if [[ ! -v $SOF_VERSION ]] ; then
-        SOF_VERSION=2025.05.1
+    if [[ ! -v SOF_VERSION ]] ; then
+        SOF_VERSION=2026.09.2
     fi
 
     # No magenta overrides for whiptail dialogs please
@@ -1510,7 +1510,6 @@ setup_network_config() {
 		      # If dhcp true here, set dhcp false above in ethernets block
 		      dhcp4: true
 		      dhcp6: true
-		      # wakeonlan: true
 		      # === Only need routes: if NOT using DHCP
 		      # === For jammy/22.04 and above
 		      # routes:
