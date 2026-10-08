@@ -3973,6 +3973,7 @@ log_options
 # Assuming if wiping fresh we need to install ZFS in liveCD
 # If not wiping fresh then we should be running on an existing system with
 # ZFS and the pool and datasets
+apt-get -qq --yes update
 apt-get -qq --no-install-recommends --yes install debootstrap gdisk dosfstools mdadm parted
 if [ "${WIPE_FRESH}" == "y" ] ; then
     install_zfs
@@ -4042,9 +4043,6 @@ chmod +x ${ZFSBUILD}/root/Setup.sh
 # copied to /usr/lib/dracut/modules.d/ in Setup.sh
 cp -av 95zfs-rootflags-fix ${ZFSBUILD}/root
 
-# Copy the Validation suite to the main user home dir
-cp -av packer-validation ${ZFSBUILD}/home/${USERNAME}
-
 # Bind mount virtual filesystem, create Setup.sh, then chroot
 mount -t proc /proc ${ZFSBUILD}/proc
 mount -t sysfs sys  ${ZFSBUILD}/sys
@@ -4084,6 +4082,8 @@ if [ "${WIPE_FRESH}" == "y" ] ; then
     # Copy setup log and chroot Setup.sh to built system
     cp /root/ZFS-setup.log       ${ZFSBUILD}/home/${USERNAME}/ZFS-${MYHOSTNAME}-${SUITE}-wipe_${WIPE_FRESH}-${DATETIME}.log
     cp ${ZFSBUILD}/root/Setup.sh ${ZFSBUILD}/home/${USERNAME}/ZFS-${MYHOSTNAME}-${SUITE}-wipe_${WIPE_FRESH}-${DATETIME}.chroot.sh
+    # Copy the Validation suite to the main user home dir
+    cp -av packer-validation ${ZFSBUILD}/home/${USERNAME}
 
     # umount to be ready for export
     zfs umount -a
