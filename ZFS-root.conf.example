@@ -156,13 +156,13 @@ XFCE=n
 #
 # none for no driver
 # 390 or 470 for legacy driver
-# 550 for current latest, or whatever version you prefer
+# 595 for current latest, or whatever version you prefer
 NVIDIA=none
 
 # If installing Sound Open Firmware binaries (mostly for laptops) choose
 # the version here.  Defaults to 2025.05.1
 # SOF_VERSION=2024.06
-SOF_VERSION=2025.05.1
+SOF_VERSION=2026.09.2
 
 #
 # Below are additional options that can be set that do NOT have a menu process
