@@ -544,6 +544,10 @@ select_encryption() {
 
 
 # -------------------------------------------------------------------------------------------------------
+# Checks a variable - if set to 'y' return ON otherwise (for 'n' or not defined) return OFF
+checklist_status() { [[ ${!1} == y ]] && echo ON || echo OFF; }
+
+# -------------------------------------------------------------------------------------------------------
 # Select install options
 query_install_options() {
     echo "--------------------------------------------------------------------------------"
@@ -559,33 +563,34 @@ query_install_options() {
     #
     if [[ ! -v ZREPL ]] || [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v HIBERNATE ]] || [[ ! -v DELAY ]] || [[ ! -v SOF ]] || [[ ! -v GNOME ]] || [[ ! -v KDE ]] || [[ ! -v NEON ]] || [[ ! -v XFCE ]] ; then
         # Hibernate can only resume from a single disk, and currently not available for ZFS encryption
-        if [ "${DISCENC}" == "ZFSENC" ] || [ ${#zfsdisks[@]} -gt 1 ] || [ ${HIBERNATE_AVAIL} -ne 0 ] ; then
+        # if [ "${DISCENC}" == "ZFSENC" ] || [ ${#zfsdisks[@]} -gt 1 ] || [ ${HIBERNATE_AVAIL} -ne 0 ] ; then
+        if [ ${HIBERNATE_AVAIL} -ne 0 ] ; then
             # Set basic options for install - ZFSENC so no Hibernate available (yet)
             whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 22 89 11 \
-                RESCUE "Create rescue dataset by cloning initial install" OFF \
-                GOOGLE "Add google authenticator via pam for ssh logins" OFF \
-                HWE "Install Hardware Enablement kernel" OFF \
-                ZREPL "Install Zrepl zfs snapshot manager" OFF \
-                DELAY "Add delay before importing root pool - for many-disk systems" OFF \
-                SOF "Install Sound Open Firmware binaries ${SOF_VERSION} (for some laptops)" OFF \
-                GNOME "Install Ubuntu Gnome desktop" OFF \
-                XFCE "Install Ubuntu xfce4 desktop with goodies" OFF \
-                KDE "Install Ubuntu KDE Plasma desktop" OFF \
-                NEON "Install Neon KDE Plasma desktop" OFF 2>"${TMPFILE}"
+                RESCUE "Create rescue dataset by cloning initial install" "$(checklist_status RESCUE)" \
+                GOOGLE "Add google authenticator via pam for ssh logins" "$(checklist_status GOOGLE)" \
+                HWE "Install Hardware Enablement kernel" "$(checklist_status HWE)" \
+                ZREPL "Install Zrepl zfs snapshot manager" "$(checklist_status ZREPL)" \
+                DELAY "Add delay before importing root pool - for many-disk systems" "$(checklist_status DELAY)" \
+                SOF "Install Sound Open Firmware binaries ${SOF_VERSION} (for some laptops)" "$(checklist_status SOF)" \
+                GNOME "Install Ubuntu Gnome desktop" "$(checklist_status GNOME)" \
+                XFCE "Install Ubuntu xfce4 desktop with goodies" "$(checklist_status XFCE)" \
+                KDE "Install Ubuntu KDE Plasma desktop" "$(checklist_status KDE)" \
+                NEON "Install Neon KDE Plasma desktop" "$(checklist_status NEON)" 2>"${TMPFILE}"
         else
             # Set basic options for install - ZFSENC so no Hibernate available (yet)
             whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 23 89 12 \
-                RESCUE "Create rescue dataset by cloning initial install" OFF \
-                GOOGLE "Add google authenticator via pam for ssh logins" OFF \
-                HWE "Install Hardware Enablement kernel" OFF \
-                ZREPL "Install Zrepl zfs snapshot manager" OFF \
-                HIBERNATE "Enable swap partition for hibernation" OFF \
-                DELAY "Add delay before importing root pool - for many-disk systems" OFF \
-                SOF "Install Sound Open Firmware binaries ${SOF_VERSION} (for some laptops)" OFF \
-                GNOME "Install Ubuntu Gnome desktop" OFF \
-                XFCE "Install Ubuntu xfce4 desktop with goodies" OFF \
-                KDE "Install Ubuntu KDE Plasma desktop" OFF \
-                NEON "Install Neon KDE Plasma desktop" OFF 2>"${TMPFILE}"
+                RESCUE "Create rescue dataset by cloning initial install" "$(checklist_status RESCUE)" \
+                GOOGLE "Add google authenticator via pam for ssh logins" "$(checklist_status GOOGLE)" \
+                HWE "Install Hardware Enablement kernel" "$(checklist_status HWE)" \
+                ZREPL "Install Zrepl zfs snapshot manager" "$(checklist_status ZREPL)" \
+                HIBERNATE "Enable swap partition for hibernation" "$(checklist_status HIBERNATE)" \
+                DELAY "Add delay before importing root pool - for many-disk systems" "$(checklist_status DELAY)" \
+                SOF "Install Sound Open Firmware binaries ${SOF_VERSION} (for some laptops)" "$(checklist_status SOF)" \
+                GNOME "Install Ubuntu Gnome desktop" "$(checklist_status GNOME)" \
+                XFCE "Install Ubuntu xfce4 desktop with goodies" "$(checklist_status XFCE)" \
+                KDE "Install Ubuntu KDE Plasma desktop" "$(checklist_status KDE)" \
+                NEON "Install Neon KDE Plasma desktop" "$(checklist_status NEON)" 2>"${TMPFILE}"
         fi
         RET=${?}
         [[ ${RET} = 1 ]] && exit 1
