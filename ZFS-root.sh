@@ -695,21 +695,56 @@ query_ssh_auth() {
 query_swap() {
     echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
-    # Swap size - if HIBERNATE enabled then this will be an actual disk partition.
+    # Swap size - if HIBERNATE enabled then this will be an actual disk partition, which
+    # must be at least the size of ram.
     # If DISCENC == LUKS then partition will be encrypted.  If SIZE_SWAP is not
     # defined here, then will be calculated to accommodate memory size (plus fudge factor).
+    # shellcheck disable=SC2002  # Using cat is clearer to understand
+    MEMTOTAL=$(cat /proc/meminfo | grep -F MemTotal | tr -s ' ' | cut -d' ' -f2)
+    SWAP_HIBERNATE=$(( (MEMTOTAL + 20480) / 1024 ))
+
+    # SIZE_SWAP not defined
+    #   HIBERNATE = y
+    #     Msg to define swap size min, warning that smaller disables hibernate
+    #   HIBERNATE = n
+    #     Normal msg to choose zfs dataset for swap size
+    # SIZE_SWAP defined
+    #   HIBERNATE = y
+    #     Msg to define swap size min, warning that smaller disables hibernate
+    #   HIBERNATE = n
+    #     No msg just accept defined size
+
     if [[ ! -v SIZE_SWAP ]] ; then
-        # shellcheck disable=SC2002  # Using cat is clearer to understand
-        MEMTOTAL=$(cat /proc/meminfo | grep -F MemTotal | tr -s ' ' | cut -d' ' -f2)
-        SIZE_SWAP=$(( (MEMTOTAL + 20480) / 1024 ))
-        # We MUST have a swap partition of at least ram size if HIBERNATE is enabled
-        # So don't even prompt the user for a size. Her own silly fault if it's
-        # enabled but she doesn't want a swap partition
-        if [ "${HIBERNATE}" = "n" ] ; then
-            SIZE_SWAP=$(whiptail --inputbox "If HIBERNATE enabled then this will be a disk partition otherwise it will be a regular ZFS dataset. If LUKS enabled then the partition will be encrypted.\nIf SWAP size not set here (left blank), then it will be calculated to accommodate memory size. Set to zero (0) to disable swap.\n\nSize of swap space in megabytes (default is calculated value)\nSet to zero (0) to disable swap" \
-            --title "SWAP size" 15 70 $(echo $SIZE_SWAP) 3>&1 1>&2 2>&3)
+        if [ "${HIBERNATE}" = "y" ] ; then
+            SIZE_SWAP=$(whiptail --inputbox "\nHIBERNATE enabled so SWAP will be a disk partition if size is at least ${SWAP_HIBERNATE}M.\n\n* If left smaller than required, HIBERNATE will be disabled and\n  SWAP will be a regular ZFS dataset.\n* If LUKS enabled then the partition will be encrypted.\n* Set to zero (0) to disable swap and Hibernation entirely.\n\nSize of swap space in megabytes (default is calculated value)" \
+            --title "SWAP partition size for Hibernation" 17 70 $(echo $SWAP_HIBERNATE) 3>&1 1>&2 2>&3)
             RET=${?}
             [[ ${RET} = 1 ]] && exit 1
+
+            # If size is still too small, disable HIBERNATE
+            if [[ ${SIZE_SWAP} -lt ${SWAP_HIBERNATE} ]] ; then
+                HIBERNATE='n'
+            fi
+        else
+            SIZE_SWAP=$(whiptail --inputbox "\nDefine the size of the regular ZFS dataset for SWAP. Size below is calculated to accommodate memory size.\n\nSize of swap space in megabytes (default is calculated value)\nSet to zero (0) to disable swap entirely" \
+            --title "ZFS dataset for SWAP size" 13 70 $(echo $SWAP_HIBERNATE) 3>&1 1>&2 2>&3)
+            RET=${?}
+            [[ ${RET} = 1 ]] && exit 1
+        fi
+    else
+        # SWAP_SIZE was defined - check for HIBERNATE and if size is big enough
+        if [ "${HIBERNATE}" = "y" ] ; then
+            if [[ ${SIZE_SWAP} -lt ${SWAP_HIBERNATE} ]] ; then
+                SIZE_SWAP=$(whiptail --inputbox "\nHIBERNATE enabled but configured SWAP size ${SIZE_SWAP}M is less than minimum ${SWAP_HIBERNATE}M required (calculated from memory size).\n\n* If left smaller than required, HIBERNATE will be disabled and\n  SWAP will be a regular ZFS dataset.\n* If set to at least ${SWAP_HIBERNATE} then SWAP will be a disk partition\n  suitable for Hibernation.\n* If LUKS enabled then the partition will be encrypted.\n\nSize of swap space in megabytes (default is calculated value)\nSet to zero (0) to disable swap entirely" \
+                --title "SWAP size too small for Hibernate" 19 70 $(echo $SWAP_HIBERNATE) 3>&1 1>&2 2>&3)
+                RET=${?}
+                [[ ${RET} = 1 ]] && exit 1
+
+                # If size is still too small, disable HIBERNATE
+                if [[ ${SIZE_SWAP} -lt ${SWAP_HIBERNATE} ]] ; then
+                    HIBERNATE='n'
+                fi
+            fi
         fi
     fi # Check for Swap size in ZFS-root.conf
 } # query_swap()
@@ -3950,7 +3985,6 @@ if [ "${WIPE_FRESH}" == "y" ] ; then
     select_disks "$@"
     # Choose encryption
     select_encryption
-    query_swap
 fi
 
 # Query for install options
@@ -3958,6 +3992,12 @@ query_install_options
 # zrepl has no release for 25.04/plucky or 25.10/questing yet
 # Looks like releases for all versions are there now ?
 # [ "${SUITE}" == "resolute" ] || [ "${SUITE}" == "plucky" ] || [ "${SUITE}" == "questing" ] && ZREPL=n
+
+# Need to know HIBERNATE from query_install_options() before setting up swap
+if [ "${WIPE_FRESH}" == "y" ] ; then
+    # If just a new dataset, then will copy /etc/fstab (including swap definition) from running system below
+    query_swap
+fi
 
 query_nvidia
 query_google_auth
