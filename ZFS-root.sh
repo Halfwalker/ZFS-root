@@ -3741,12 +3741,34 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         zfs set mountpoint=/ ${POOLNAME}/ROOT/${SUITE}_rescue_base
     fi
 
+    # Before installing Gnome/KDE etc we need to divert uname away
+    # update-initramfs is usually called with results from uname -r which returns
+    # the main system kernel, NOT necessarily the ones in /boot. If something needs
+    # access to kernel modules in /lib/modules/<kernel-version> that will likely fail
+    # nvidia-driver-<version> is a prime example
+    # So, we divert uname away and replace with a fake one that only returns the kernel
+    # in /boot
+    # Undo the divert below just before the desktop_install zfs snapshot
+    KVER=$(ls /lib/modules | sort -V | tail -n1)   # e.g. 7.0.0-38-generic
+    dpkg-divert --local --rename --add /bin/uname
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+    cat > /bin/uname <<-EOF
+		#!/bin/sh
+		if [ "\$1" = "-r" ]; then
+		    echo "$KVER"
+		else
+		    exec /bin/uname.distrib "\$@"
+		fi
+	EOF
+    chmod +x /bin/uname
+
     # Install main ubuntu gnome desktop, plus maybe HWE packages
     if [ "${GNOME}" = "y" ] ; then
         # NOTE: bionic has an xserver-xorg-hwe-<distro> package, focal and above do NOT
         case ${SUITE} in
             focal | jammy | noble | plucky | questing | resolute)
                 # Don't install kdump-tools
+                # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
                 cat > /tmp/kdump-selections <<- EOF
 					# Should kdump-tools be enabled by default?
 					kdump-tools     kdump-tools/use_kdump   boolean false
@@ -3840,7 +3862,7 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     fi # NEON
 
     if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] || [ "${NEON}" = "y" ] || [ "${XFCE}" = "y" ] ; then
-        # Check for Nvidia graphics - if so, install from the ppa:graphics-drivers/ppa
+        # Check for Nvidia graphics - add the ppa:graphics-drivers/ppa (usually not needed)
         # The NVIDIA var should be set to the appropriate version from the menu query
         if [ "${NVIDIA}" != "none" ] ; then
             apt-add-repository --yes --update ppa:graphics-drivers/ppa
@@ -3903,6 +3925,10 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         cd /usr/local/share/sof-bin-${SOF_VERSION}
         ./install.sh
     fi # Sound Open Firmware
+
+    # Undo the uname divert
+    rm /bin/uname
+    dpkg-divert --local --rename --remove /bin/uname
 
     # Snapshot the clean desktop(s) after base install
     if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] || [ "${NEON}" = "y" ] || [ "${XFCE}" = "y" ] ; then
