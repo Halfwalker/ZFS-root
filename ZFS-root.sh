@@ -3862,6 +3862,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     fi # NEON
 
     if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] || [ "${NEON}" = "y" ] || [ "${XFCE}" = "y" ] ; then
+        # software-properties-gtk for Software and Updates (Additional Drivers) app
+        apt-get -qq --yes install software-properties-gtk
+
         # Check for Nvidia graphics - add the ppa:graphics-drivers/ppa (usually not needed)
         # The NVIDIA var should be set to the appropriate version from the menu query
         if [ "${NVIDIA}" != "none" ] ; then
