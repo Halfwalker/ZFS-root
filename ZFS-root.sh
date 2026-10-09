@@ -931,7 +931,7 @@ show_options() {
     # selected above and we do not want to pause here for asking the user
     #
     if [ "${WIPE_FRESH}" == "y" ] ; then
-        box_height=$(( ${#zfsdisks[@]} + 31 ))
+        box_height=$(( ${#zfsdisks[@]} + 32 ))
         # shellcheck disable=SC2086,SC2116
         whiptail --title "WIPING DISK(s) - Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
         Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
@@ -955,16 +955,16 @@ show_options() {
         NEON       = $(echo $NEON)  : Install Neon KDE Plasma desktop\n \
         NVIDIA     = $(echo $NVIDIA)  : Install Nvidia drivers\n \
         SOF        = $(echo $SOF)  : Install Sound Open Firmware ${SOF_VERSION} binaries\n \
-        HIBERNATE  = $(echo $HIBERNATE)  : Enable SWAP disk partition for hibernation\n \
         DISCENC    = $(echo $DISCENC)  : Enable disk encryption (No, LUKS, ZFS)\n \
         DROPBEAR   = $(echo $DROPBEAR)  : Enable Dropbear unlocking of encrypted disks\n \
+        HIBERNATE  = $(echo $HIBERNATE)  : Enable SWAP disk partition for hibernation\n \
         Swap size  = $(echo $SIZE_SWAP)M $([ ${SIZE_SWAP} -eq 0 ] && echo ': DISABLED')\n" \
         ${box_height} 79
         RET=${?}
         [[ ${RET} = 1 ]] && exit 1
     else
         # Not wiping fresh, so no need for Disk, Raid, Secureboot, Autosign, Hibernate
-        box_height=$(( ${#zfsdisks[@]} + 28 ))
+        box_height=$(( ${#zfsdisks[@]} + 29 ))
         # shellcheck disable=SC2086,SC2116
         whiptail --title "New dataset - Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
         Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
