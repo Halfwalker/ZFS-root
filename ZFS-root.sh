@@ -1934,8 +1934,8 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     ZFSLOCATION=$(which zfs)
 
     # Ensure floppy driver is disabled
-    mkdir -p /etc/modules-load.d
-    echo "blacklist floppy" > /etc/modules-load.d/blacklist-floppy.conf
+    mkdir -p /etc/modprobe.d
+    echo "blacklist floppy" > /etc/modprobe.d/blacklist-floppy.conf
 
     if [ "${DISCENC}" != "NOENC" ] ; then
         apt-get -qq --yes --no-install-recommends install cryptsetup keyutils
