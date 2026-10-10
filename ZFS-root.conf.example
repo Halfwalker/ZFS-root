@@ -145,6 +145,10 @@ ZREPL=y
 HIBERNATE=n
 DELAY=n
 SOF=n
+# NOTE: When gnome, kde etc installed, we prevent sssd from installing via config
+#       in /etc/apt/preferences.d/no-sssh
+#       Unless /etc/sssh/sssd.conf is configured it will cause boot errors
+#       Unless we're using ldap for auth, it's not needed
 GNOME=n
 KDE=n
 NEON=n

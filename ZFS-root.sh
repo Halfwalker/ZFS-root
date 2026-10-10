@@ -3762,6 +3762,19 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 	EOF
     chmod +x /bin/uname
 
+    if [ "${GNOME}" = "y" ] || [ "${KDE}" = "y" ] || [ "${NEON}" = "y" ] || [ "${XFCE}" = "y" ] ; then
+        # Don't install sssd
+        cat > /apt/preferences.d/no-sssd <<- EOF
+			# Prevent sssd package from installing
+			# Unless /etc/sssh/sssd.conf is configured it will cause boot errors
+			# Unless we're using ldap for auth, it's not needed
+
+			Package: sssd*
+			Pin: version *
+			Pin-Priority: -1
+		EOF
+    fi
+
     # Install main ubuntu gnome desktop, plus maybe HWE packages
     if [ "${GNOME}" = "y" ] ; then
         # NOTE: bionic has an xserver-xorg-hwe-<distro> package, focal and above do NOT
