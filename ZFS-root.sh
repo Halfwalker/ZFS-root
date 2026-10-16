@@ -246,6 +246,7 @@ setup_cacher() {
             fi
         done
 
+        # shellcheck disable=SC2086
         PROXY=$(whiptail --inputbox "Enter an apt proxy. Cancel or hit <esc> for no proxy" --title "APT proxy setup" 8 70 $PROXY 3>&1 1>&2 2>&3)
         RET=${?}
         (( RET )) && PROXY=
@@ -411,6 +412,7 @@ select_disks() {
         m=-1
         for disk in "${disklabels[@]}"
         do
+           # shellcheck disable=SC2086
            if [ ${#disk} -gt $m ]
            then
               m=${#disk}
@@ -655,6 +657,7 @@ query_google_auth() {
     if [ "${GOOGLE}" = "y" ] ; then
         apt-get -qq --no-install-recommends --yes install python3-qrcode libpam-google-authenticator qrencode
         # Generate a google auth config
+        # shellcheck disable=SC2086
         google-authenticator --time-based --disallow-reuse --label=${MYHOSTNAME} --qr-mode=UTF8 --rate-limit=3 --rate-time=30 --secret=/tmp/google_auth.txt --window-size=3 --force --quiet
         # Grab secret to build otpauth line below
         GOOGLE_SECRET=$(head -1 /tmp/google_auth.txt)
@@ -681,6 +684,7 @@ query_ssh_auth() {
     echo "${FUNCNAME[0]}"
     # SSH authorized keys from github for dropbear and ssh
     if [[ ! -v AUTHKEYS ]] ; then
+        # shellcheck disable=SC2086
         AUTHKEYS=$(whiptail --inputbox "Dropbear and ssh need authorized ssh pubkeys to allow access to the server. Please enter any github users to pull ssh pubkeys from.  none means no keys to install\n\nDropbear is used for remote unlocking of disk encryption\n\n      ssh -p 222 root@<ip addr>" --title "SSH pubkeys for ssh and dropbear" 13 70 $(echo none) 3>&1 1>&2 2>&3)
         RET=${?}
         [[ ${RET} = 1 ]] && exit 1
@@ -1174,6 +1178,7 @@ stop_md_arrays() {
     echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
     for disk in $(seq 0 $(( ${#zfsdisks[@]} - 1))) ; do
+        # shellcheck disable=SC2086
         lsblk -nrpo NAME,TYPE /dev/disk/by-id/${zfsdisks[${disk}]} | awk '$2 ~ /^(raid|linear)/ {print $1}'
     done | sort -u | while read -r md ; do
         echo "Stopping mdadm array ${md}"
@@ -1185,6 +1190,7 @@ stop_md_arrays() {
 
 # -------------------------------------------------------------------------------------------------------
 # Only called when wiping fresh
+# shellcheck disable=SC2086
 partition_disks() {
     echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
@@ -1270,6 +1276,7 @@ partition_disks() {
 
 # -------------------------------------------------------------------------------------------------------
 # Only called when WIPE_FRESH = y
+# shellcheck disable=SC2086
 setup_swap_partition() {
     echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
@@ -1308,6 +1315,7 @@ setup_swap_partition() {
 
 # -------------------------------------------------------------------------------------------------------
 # Only called when WIPE_FRESH = y
+# shellcheck disable=SC2086
 luks_encrypt_root() {
     echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
@@ -1376,6 +1384,7 @@ create_root_pool() {
 
 # -------------------------------------------------------------------------------------------------------
 # Only called when WIPE_FRESH = y
+# shellcheck disable=SC2086
 create_zfs_datasets() {
     echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
@@ -1441,6 +1450,7 @@ create_zfs_datasets() {
 
 
 # -------------------------------------------------------------------------------------------------------
+# shellcheck disable=SC2086
 install_debootstrap() {
     echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
@@ -1468,6 +1478,7 @@ install_debootstrap() {
 
 # -------------------------------------------------------------------------------------------------------
 # Only called when WIPE_FRESH = y
+# shellcheck disable=SC2086
 setup_boot_partition() {
     echo "--------------------------------------------------------------------------------"
     echo "${FUNCNAME[0]}"
@@ -4062,6 +4073,7 @@ log_options
 # ZFS and the pool and datasets
 apt-get -qq --yes update
 apt-get -qq --no-install-recommends --yes install debootstrap gdisk dosfstools mdadm parted
+# shellcheck disable=SC2086
 if [ "${WIPE_FRESH}" == "y" ] ; then
     install_zfs
     partition_disks
@@ -4143,6 +4155,7 @@ mount -t cgroup2 none ${ZFSBUILD}/sys/fs/cgroup
 
 # chroot and set up system
 # chroot ${ZFSBUILD} /bin/bash --login -c /root/Setup.sh
+# shellcheck disable=SC2086
 unshare --mount --fork chroot ${ZFSBUILD} /bin/bash --login -c /root/Setup.sh $1
 
 # Remove any lingering crash reports
@@ -4162,9 +4175,12 @@ umount -n ${ZFSBUILD}/{dev/pts,dev/fuse,dev,sys/fs/cgroup,sys,proc}
 # Copy setup log and chroot Setup.sh to originating system (livecd or local /root dir)
 DATETIME=$(date +%F-%H-%M-%S)
 # Copy setup log and chroot Setup.sh to local install dir
+# shellcheck disable=SC2086
 cp /root/ZFS-setup.log       ZFS-${MYHOSTNAME}-${SUITE}-wipe_${WIPE_FRESH}-${DATETIME}.log
+# shellcheck disable=SC2086
 cp ${ZFSBUILD}/root/Setup.sh ZFS-${MYHOSTNAME}-${SUITE}-wipe_${WIPE_FRESH}-${DATETIME}.chroot.sh
 
+# shellcheck disable=SC2086
 if [ "${WIPE_FRESH}" == "y" ] ; then
     # Copy setup log and chroot Setup.sh to built system
     cp /root/ZFS-setup.log       ${ZFSBUILD}/home/${USERNAME}/ZFS-${MYHOSTNAME}-${SUITE}-wipe_${WIPE_FRESH}-${DATETIME}.log
