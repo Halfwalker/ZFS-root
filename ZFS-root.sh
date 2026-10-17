@@ -2796,6 +2796,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
 		# https://unix.stackexchange.com/questions/99325/automatically-save-bash-command-history-in-screen-session
 		PROMPT_COMMAND='history -a; history -n;'
+
+		# allow zpool status scripts
+		export ZPOOL_SCRIPTS_AS_ROOT=1
 	EOF
 
     # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
@@ -2826,6 +2829,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 		export LC_ALL=en_US.UTF-8
 		export LANG=en_US.UTF-8
 		export LANGUAGE=en_US.UTF-8
+
+		# allow zpool status scripts
+		export ZPOOL_SCRIPTS_AS_ROOT=1
 	EOF
 
 
@@ -3338,8 +3344,32 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
     fi # SecureBoot
 
 
-    # Allow read-only zfs commands with no sudo password
-    cat /etc/sudoers.d/zfs | sed -e 's/#//' > /etc/sudoers.d/zfsALLOW
+    # Allow read-only zfs commands with no sudo password - dup of commented-out existing file
+    # plus the ZPOOL_SCRIPTS_AS_ROOT to allow 'sudo zpool status -c mode,serial,size' etc.
+    # NOTE: heredoc using TABS - be sure to use TABS if you make any changes
+    cat > /etc/sudoers.d/zfsALLOW <<- EOF
+		# Allow read-only ZoL commands to be called through sudo
+		# without a password. Remove the first '#' column to enable.
+		#
+		# CAUTION: Any syntax error introduced here will break sudo.
+		#
+		# Cmnd alias specification
+		Cmnd_Alias C_ZFS = \
+		  /sbin/zfs "", /sbin/zfs help *, \
+		  /sbin/zfs get, /sbin/zfs get *, \
+		  /sbin/zfs list, /sbin/zfs list *, \
+		  /sbin/zpool "", /sbin/zpool help *, \
+		  /sbin/zpool iostat, /sbin/zpool iostat *, \
+		  /sbin/zpool list, /sbin/zpool list *, \
+		  /sbin/zpool status, /sbin/zpool status *, \
+		  /sbin/zpool upgrade, /sbin/zpool upgrade -v
+		
+		# allow zpool status scripts
+		Defaults env_keep += "ZPOOL_SCRIPTS_AS_ROOT"
+		
+		# allow any user to use basic read-only ZFS commands
+		ALL ALL = (root) NOPASSWD: C_ZFS
+	EOF
 
     # Configure google authenticator if we have a config
     if [ "${GOOGLE}" = "y" ]; then
