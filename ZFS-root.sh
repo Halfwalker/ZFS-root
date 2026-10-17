@@ -4200,7 +4200,15 @@ if [ "${WIPE_FRESH}" == "n" ] ; then
     fi
 fi
 
-umount -n ${ZFSBUILD}/{dev/pts,dev/fuse,dev,sys/fs/cgroup,sys,proc}
+if [ "${WIPE_FRESH}" == "y" ] ; then
+    # Have to do this here before we unmount dev proc etc.
+    echo "===================================="
+    echo "Unmounting filesystems"
+    # unmount non-zfs filesystems
+    # Have to escape any / in path - $3 is mountpoint, $5 is type
+    mount | tac | awk -v prefix="${ZFSBUILD}" '($3 == prefix || index($3, prefix "/") == 1) && $5 != "zfs" {print $3}' | xargs -r -I{} umount -lfv {}
+    echo "===================================="
+fi
 
 # Copy setup log and chroot Setup.sh to originating system (livecd or local /root dir)
 DATETIME=$(date +%F-%H-%M-%S)
@@ -4218,18 +4226,23 @@ if [ "${WIPE_FRESH}" == "y" ] ; then
     # Copy the Validation suite to the main user home dir
     cp -av packer-validation ${ZFSBUILD}/home/${USERNAME}
 
-    # umount to be ready for export
-    zfs umount -a
+    # unmount to be ready for export
+    echo "===================================="
+    echo "Unmounting datasets"
+    # Parse all mounted datasets to find just ${ZFSBUILD} ones, then unmount
+    # mounted == yes skips datasets that aren’t mounted, and also skips ones whose mountpoint is none, legacy or -, since those never match the ${ZFSBUILD} prefix
+    # sort -r on the mountpoint puts children before parents (/a/b sorts after /a, so reversed it comes first)
+    # Have to skip over <poolname>/ROOT/<suite> - unmount that last
+    zfs list -H -t filesystem -o mounted,mountpoint,name | grep -v ROOT | awk -F'\t' -v prefix="${ZFSBUILD}" '$1 == "yes" && ($2 == prefix || index($2, prefix "/") == 1) {print $2 "\t" $3}' | sort -r | cut -f2 | xargs --verbose -r -I{} zfs unmount {}
+    # Now unmount ROOT dataset
+    echo "Unmounting ROOT dataset"
+    zfs list -H -t filesystem -o mounted,mountpoint,name | awk -F'\t' -v prefix="${ZFSBUILD}" '$1 == "yes" && ($2 == prefix || index($2, prefix "/") == 1) {print $2 "\t" $3}' | sort -r | cut -f2 | xargs --verbose -r -I{} zfs unmount {}
+    echo "===================================="
 
-    # Back in livecd - unmount filesystems we may have missed
-    # Have to escape any / in path
-    ZFSBUILD_C=$(echo ${ZFSBUILD} | sed -e 's!/!\\/!'g)
-    # mount | grep -v zfs | tac | awk '/\/mnt/ {print \$3}' | xargs -i{} umount -lf {}
-    mount | grep -v zfs | tac | awk '/${ZFSBUILD_C}/ {print $3}' | xargs -i{} umount -lf {}
-    zpool export ${POOLNAME}
+    zpool export -f ${POOLNAME}
 else
     # For just a non-wipe new dataset, unmount and set mountpoint to / to make it bootable
-    zfs umount ${POOLNAME}/ROOT/${SUITE}
+    zfs unmount ${POOLNAME}/ROOT/${SUITE}
     zfs set mountpoint=/ ${POOLNAME}/ROOT/${SUITE}
     zfs set devices=off  ${POOLNAME}/ROOT/${SUITE}
 fi
