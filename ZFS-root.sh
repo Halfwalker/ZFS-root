@@ -1427,7 +1427,7 @@ create_zfs_datasets() {
     zfs create -o canmount=on -o mountpoint=/root ${POOLNAME}/home/root
 
     # If this system will use Docker (which manages its own datasets & snapshots):
-    zfs create -o com.sun:auto-snapshot=false -o mountpoint=/var/lib/docker ${POOLNAME}/docker
+    zfs create -o com.sun:auto-snapshot=false -o recordsize=64k -o mountpoint=/var/lib/docker ${POOLNAME}/docker
 
     # If no HIBERNATE partition (not laptop, no resume etc) then just create
     # a zvol for swap.  Could not create this in the block above for swap because
