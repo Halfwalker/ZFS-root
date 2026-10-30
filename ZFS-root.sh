@@ -1954,9 +1954,9 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 
     # Ensure cachefile exists and zfs-import-cache is active
     # https://github.com/zfsonlinux/zfs/issues/8885
-#-#    zpool set cachefile=/etc/zfs/zpool.cache ${POOLNAME}
-#-#    systemctl enable zfs.target zfs-import-cache zfs-mount zfs-import.target
-    systemctl enable zfs.target zfs-import-scan zfs-mount zfs-import.target
+    zpool set cachefile=/etc/zfs/zpool.cache ${POOLNAME}
+    systemctl enable zfs.target zfs-import-cache zfs-mount zfs-import.target
+#-#    systemctl enable zfs.target zfs-import-scan zfs-mount zfs-import.target
 
 
     # Configure Dracut to load ZFS support
