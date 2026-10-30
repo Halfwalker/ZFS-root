@@ -1436,8 +1436,8 @@ create_zfs_datasets() {
     if [ "${HIBERNATE}" = "n" ] && [ ${SIZE_SWAP} -ne 0 ] ; then
         # No Hibernate, so just use a zfs volume for swap
         echo "Creating swap zfs dataset size ${SIZE_SWAP}M"
-        # zfs create -V ${SIZE_SWAP}M -b $(getconf PAGESIZE) -o compression=zle \
-        zfs create -V ${SIZE_SWAP}M -o compression=zle \
+        # shellcheck disable=SC2046
+        zfs create -V ${SIZE_SWAP}M -b $(getconf PAGESIZE) -o compression=zle \
           -o logbias=throughput -o sync=always \
           -o primarycache=metadata -o secondarycache=none \
           -o com.sun:auto-snapshot=false ${POOLNAME}/ROOT/swap
