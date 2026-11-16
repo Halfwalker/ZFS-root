@@ -134,6 +134,12 @@ ZFSBOOTMENU_REPO_TYPE=TAGGED
 ZFSBOOTMENU_CMDLINE="zbm.skip_hooks=90-xhci-unbind.sh"
 
 #
+# Enable Bottleneck Bandwidth Roundtrip mitigation
+# https://www.ietf.org/archive/id/draft-cardwell-iccrg-bbr-congestion-control-01.html
+#
+BBR=y
+
+#
 # Basic options for install
 # See script for descriptions
 # Be sure to set ALL vars here to y or n, otherwise script will prompt for them

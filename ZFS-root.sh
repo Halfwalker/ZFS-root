@@ -563,15 +563,16 @@ query_install_options() {
     #
     # Slightly fugly - have to check if ANY of these are not set
     #
-    if [[ ! -v ZREPL ]] || [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v HIBERNATE ]] || [[ ! -v DELAY ]] || [[ ! -v SOF ]] || [[ ! -v GNOME ]] || [[ ! -v KDE ]] || [[ ! -v NEON ]] || [[ ! -v XFCE ]] ; then
+    if [[ ! -v ZREPL ]] || [[ ! -v RESCUE ]] || [[ ! -v GOOGLE ]] || [[ ! -v HWE ]] || [[ ! -v BBR ]] || [[ ! -v HIBERNATE ]] || [[ ! -v DELAY ]] || [[ ! -v SOF ]] || [[ ! -v GNOME ]] || [[ ! -v KDE ]] || [[ ! -v NEON ]] || [[ ! -v XFCE ]] ; then
         # Hibernate can only resume from a single disk, and currently not available for ZFS encryption
         # if [ "${DISCENC}" == "ZFSENC" ] || [ ${#zfsdisks[@]} -gt 1 ] || [ ${HIBERNATE_AVAIL} -ne 0 ] ; then
         if [ ${HIBERNATE_AVAIL} -ne 0 ] ; then
             # Set basic options for install - ZFSENC so no Hibernate available (yet)
-            whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 22 89 11 \
+            whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 23 89 11 \
                 RESCUE "Create rescue dataset by cloning initial install" "$(checklist_status RESCUE)" \
                 GOOGLE "Add google authenticator via pam for ssh logins" "$(checklist_status GOOGLE)" \
                 HWE "Install Hardware Enablement kernel" "$(checklist_status HWE)" \
+                BBR "Enable BBR Bottleneck Bandwidth Roundtrip mitigation" "$(checklist_status BBR)" \
                 ZREPL "Install Zrepl zfs snapshot manager" "$(checklist_status ZREPL)" \
                 DELAY "Add delay before importing root pool - for many-disk systems" "$(checklist_status DELAY)" \
                 SOF "Install Sound Open Firmware binaries ${SOF_VERSION} (for some laptops)" "$(checklist_status SOF)" \
@@ -581,10 +582,11 @@ query_install_options() {
                 NEON "Install Neon KDE Plasma desktop" "$(checklist_status NEON)" 2>"${TMPFILE}"
         else
             # Set basic options for install - ZFSENC so no Hibernate available (yet)
-            whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 23 89 12 \
+            whiptail --title "Set options to install" --separate-output --checklist "Choose options\n\nNOTE: 18.04 HWE kernel requires pool attribute dnodesize=legacy" 24 89 12 \
                 RESCUE "Create rescue dataset by cloning initial install" "$(checklist_status RESCUE)" \
                 GOOGLE "Add google authenticator via pam for ssh logins" "$(checklist_status GOOGLE)" \
                 HWE "Install Hardware Enablement kernel" "$(checklist_status HWE)" \
+                BBR "Enable BBR Bottleneck Bandwidth Roundtrip mitigation" "$(checklist_status BBR)" \
                 ZREPL "Install Zrepl zfs snapshot manager" "$(checklist_status ZREPL)" \
                 HIBERNATE "Enable swap partition for hibernation" "$(checklist_status HIBERNATE)" \
                 DELAY "Add delay before importing root pool - for many-disk systems" "$(checklist_status DELAY)" \
@@ -603,7 +605,7 @@ query_install_options() {
         done < "${TMPFILE}"
 
         # Any options not enabled in the basic options menu we now set to 'n'
-        for option in ZREPL RESCUE GNOME XFCE NEON KDE HWE HIBERNATE DELAY SOF GOOGLE; do
+        for option in ZREPL RESCUE GNOME XFCE NEON KDE HWE BBR HIBERNATE DELAY SOF GOOGLE; do
             [ ${!option} ] || eval "${option}"='n'
         done
     fi # Check ALL options from ZFS-root.conf
@@ -970,7 +972,7 @@ show_options() {
     # selected above and we do not want to pause here for asking the user
     #
     if [ "${WIPE_FRESH}" == "y" ] ; then
-        box_height=$(( ${#zfsdisks[@]} + 32 ))
+        box_height=$(( ${#zfsdisks[@]} + 33 ))
         # shellcheck disable=SC2086,SC2116
         whiptail --title "WIPING DISK(s) - Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
         Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
@@ -985,6 +987,7 @@ show_options() {
         SECUREBOOT = $SECUREBOOT  : Enable UEFI SecureBoot\n \
         AUTOSIGN   = ${AUTOSIGN}  : Enable auto-signing of bootable .efi bundles\n \
         RESCUE     = $(echo $RESCUE)  : Create rescue dataset by cloning install\n \
+        BBR        = $(echo $BBR)  : Enable Bottleneck Bandwidth Roundtrip mitigation\n \
         DELAY      = $(echo $DELAY)  : Enable delay before importing zpool\n \
         ZREPL      = $(echo $ZREPL)  : Install Zrepl zfs snapshot manager\n \
         GOOGLE     = $(echo $GOOGLE)  : Install google authenticator\n \
@@ -1003,7 +1006,7 @@ show_options() {
         [[ ${RET} = 1 ]] && exit 1
     else
         # Not wiping fresh, so no need for Disk, Raid, Secureboot, Autosign, Hibernate
-        box_height=$(( ${#zfsdisks[@]} + 29 ))
+        box_height=$(( ${#zfsdisks[@]} + 30 ))
         # shellcheck disable=SC2086,SC2116
         whiptail --title "New dataset - Summary of install options" --msgbox "These are the options we're about to install with :\n\n \
         Proxy $([ ${PROXY} ] && echo ${PROXY} || echo None)\n \
@@ -1015,6 +1018,7 @@ show_options() {
         SECUREBOOT = $SECUREBOOT  : Enable UEFI SecureBoot\n \
         AUTOSIGN   = ${AUTOSIGN}  : Enable auto-signing of bootable .efi bundles\n \
         RESCUE     = $(echo $RESCUE)  : Create rescue dataset by cloning install\n \
+        BBR        = $(echo $BBR)  : Enable Bottleneck Bandwidth Roundtrip mitigation\n \
         DELAY      = $(echo $DELAY)  : Enable delay before importing zpool\n \
         ZREPL      = $(echo $ZREPL)  : Install Zrepl zfs snapshot manager\n \
         GOOGLE     = $(echo $GOOGLE)  : Install google authenticator\n \
@@ -1046,6 +1050,7 @@ log_options() {
 	   PACKERCI                = ${PACKERCI}
 	   MYHOSTNAME              = ${MYHOSTNAME}
 	   RESCUE                  = ${RESCUE}
+	   BBR                     = ${BBR}
 	   DELAY                   = ${DELAY}
 	   SUITE                   = ${SUITE}
 	   POOLNAME                = ${POOLNAME}
@@ -1698,6 +1703,7 @@ prep_setup() {
 		export DEBUG=${DEBUG}
 		export PACKERCI=${PACKERCI}
 		export RESCUE=${RESCUE}
+		export BBR=${BBR}
 		export BOOTDEVRAW=${BOOTDEVRAW}
 		export DELAY=${DELAY}
 		export SUITE=${SUITE}
@@ -2617,6 +2623,22 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
         sed -i "s/ZFS_INITRD_PRE_MOUNTROOT_SLEEP=.*/ZFS_INITRD_PRE_MOUNTROOT_SLEEP='10'/" /etc/default/zfs
     fi
 
+    # Bottleneck Bandwidth Roundtrip mitigation
+    # https://www.ietf.org/archive/id/draft-cardwell-iccrg-bbr-congestion-control-01.html
+    if [ "${BBR}" == "y" ] ; then
+        mkdir -p /etc/modules-load.d
+        echo "tcp_bbr" > /etc/modules-load.d/bbr.conf
+
+        # Set the default queuing discipline to FQ (required for pacing)
+        # NOTE: /etc/sysctl.d/10-bufferbloat.conf already sets it to fq_codel with a minus sign
+        # sudo sysctl -w net.core.default_qdisc=fq
+        echo "net.core.default_qdisc=fq" > /etc/sysctl.d/90-bbr.conf
+
+        # Set the congestion control algorithm to BBR
+        # sudo sysctl -w net.ipv4.tcp_congestion_control=bbr
+        echo "net.ipv4.tcp_congestion_control=bbr" >> /etc/sysctl.d/90-bbr.conf
+
+    fi
 
     echo "-------- installing basic packages ------------------------------------------"
     #
@@ -3363,10 +3385,10 @@ cat >> ${ZFSBUILD}/root/Setup.sh << '__EOF__'
 		  /sbin/zpool list, /sbin/zpool list *, \
 		  /sbin/zpool status, /sbin/zpool status *, \
 		  /sbin/zpool upgrade, /sbin/zpool upgrade -v
-		
+
 		# allow zpool status scripts
 		Defaults env_keep += "ZPOOL_SCRIPTS_AS_ROOT"
-		
+
 		# allow any user to use basic read-only ZFS commands
 		ALL ALL = (root) NOPASSWD: C_ZFS
 	EOF
